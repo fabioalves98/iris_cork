@@ -16,14 +16,16 @@ def pretty_depth(depth):
     depth >>=2
     depth=depth.astype(np.uint8)
     return depth
+
 if __name__ == "__main__":
     num = 0
+    testFolder = "secondShots"
+
     while 1:
         frame = get_depth()
         frame = pretty_depth(frame)
 
-        frameRGB = get_video()
-        #frameRGB = pretty_depth(frameRGB)
+        frameRGB = get_video()[:, :, ::-1]
 
         cv2.imshow('IR image',frame)
         cv2.imshow('RGB image',frameRGB)
@@ -31,8 +33,8 @@ if __name__ == "__main__":
         k = cv2.waitKey(5) & 0xFF
         if k == ord('q'):
 
-            np.save('depth-' + str(num), frame)
-            np.save('rgb-' + str(num), frameRGB)
+            np.save(testFolder + '/depth-' + str(num), frame)
+            np.save(testFolder + '/rgb-' + str(num), frameRGB)
 
             print ("Photo")
 

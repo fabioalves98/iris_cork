@@ -3,8 +3,6 @@ import numpy as np
 import cv2
 from scipy.interpolate import splprep, splev
 
-
-
 def smoothen_contours(contours):
 
     smoothened = []
@@ -29,14 +27,15 @@ if __name__ == "__main__":
 
     # cv2.imshow('IR image',np.load(open("depth.out", "r")))
     # cv2.imshow('RGB image',np.load(open("rgb.out.npy", "r")))
-    num = 1
+    num = 0
+    testFolder = "firstShots"
     font = cv2.FONT_HERSHEY_COMPLEX
 
     # while 1:
 
     try:
-        ir = np.load(open("firstShots/depth-" + str(num) + ".npy", "rb"))
-        rgb = np.load(open("firstShots/rgb-" + str(num) + ".npy", "rb"))
+        ir = np.load(open(testFolder + "/depth-" + str(num) + ".npy", "rb"))
+        rgb = np.load(open(testFolder + "/rgb-" + str(num) + ".npy", "rb"))
         # cv2.imshow('IR image', ir)
         # cv2.imshow('RGB image',)
     except Exception as e:
@@ -44,14 +43,14 @@ if __name__ == "__main__":
         pass
 
 
-    # for i in range(0, len(ir)):
-    #     for j in range(0, len(ir[0])):
-    #         if(ir[i][j] < 154):
-    #             ir[i][j] = 0
-    #         elif(ir[i][j] > 185):
-    #             ir[i][j] = 255
-    #         else:
-    #             ir[i][j] = (ir[i][j] - 154) * (255 / 29)
+    for i in range(0, len(ir)):
+        for j in range(0, len(ir[0])):
+            if(ir[i][j] < 154):
+                ir[i][j] = 0
+            elif(ir[i][j] > 185):
+                ir[i][j] = 255
+            else:
+                ir[i][j] = (ir[i][j] - 154) * (255 / 29)
 
     # edges = cv2.Canny(rgb,200,300)
     # cv2.imshow('e', edges)
@@ -61,11 +60,12 @@ if __name__ == "__main__":
     # threshold_val = 180
     gray = cv2.cvtColor(rgb, cv2.COLOR_BGR2GRAY)
     blur = cv2.GaussianBlur(gray, (5,5), 0)
-    ret,th = cv2.threshold(blur, 50, 255, cv2.THRESH_BINARY)
+    ret,th = cv2.threshold(ir, 100, 255, cv2.THRESH_BINARY)
 
 
     # hsv = cv2.cvtColor(rgb, cv2.COLOR_BGR2HSV)
-    # cv2.imshow('image', hsv)
+    # cv2.imshow('image', th)
+    # cv2.waitKey(0)
     
     ## "morphological close -> tira rasguras de certos contornos da imagem"
     ## Testar possiveis argumentos - kernel p.ex - nao pareceu util
@@ -73,18 +73,19 @@ if __name__ == "__main__":
     # dilate = cv2.morphologyEx(th, cv2.MORPH_CLOSE, kernel, 3)
     
     ## Sendo que e possivel isolar cada contorno, conseguimos detetar cada traco individualmente
-    _,contours,hierarchy = cv2.findContours(th, 2, 1)
+    contours,hierarchy = cv2.findContours(th, 2, 1)
 
     filtered_contours = []
-    min_area = 1000
-    max_area = 8000 
+    min_area = 500
+    max_area = 10000
 
     for c in contours:
         area = cv2.contourArea(c)
-        if area > min_area and area < max_area:
-            filtered_contours.append(c)
+        #if area > min_area and area < max_area:
+        filtered_contours.append(c)
     
     # filtered_contours = smoothen_contours(filtered_contours)
+    
     
     for c in filtered_contours:
         # approx = cv2.approxPolyDP(c, 0.01*cv2.arcLength(c, True), True)
@@ -93,27 +94,23 @@ if __name__ == "__main__":
         box = cv2.boxPoints(rect)
         box = np.int0(box)
         
-        cv2.drawContours(rgb, [box], 0, (0, 255, 0), 1)
+        #cv2.drawContours(ir, [box], 0, (0, 255, 0), 1)
         x = box.ravel()[0]
         y = box.ravel()[1]
-        if(len(box) == 4):
-            cv2.putText(rgb, "traco", (x,y), font, 1, (255, 255, 255))
-        
+        #if(len(box) == 4):
+            #cv2.putText(rgb, "traco", (x,y), font, 1, (255, 255, 255))
+    
 
+    #cv2.drawContours(rgb, filtered_contours, -1, (0,255,0), 1)
 
-    # cv2.drawContours(rgb, filtered_contours, -1, (0,255,0), 1)
-
-
-    cv2.imshow('IR image', rgb)
-    # cv2.imshow('image', rgb)
-
-    cv2.waitKey(0)
-
+    while 1:
+        cv2.imshow('IR image', ir)
+        # cv2.imshow('image', rgb)
             
-        # k = cv2.waitKey(5) & 0xFF
+        k = cv2.waitKey(5) & 0xFF
 
-        # if k == 27:
-        #     break
+        if k == 27:
+            break
         # elif k == ord('n'):
         #     num += 1
         
