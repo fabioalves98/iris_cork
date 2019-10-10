@@ -5,6 +5,8 @@ find_package(catkin REQUIRED COMPONENTS
   roscpp
   rospy
   std_msgs
+  image_transport
+  cv_bridge
 )
 
 ## Eventualmente esta versao nao precisa de estar aqui
@@ -31,4 +33,6 @@ add_executable(capture src/capture.cpp)
 target_link_libraries(capture ${OpenCV_LIBS} ${catkin_LIBRARIES} ${FREENECT_LIBRARIES})
 add_executable(load src/load.cpp)
 target_link_libraries(load ${OpenCV_LIBS} ${catkin_LIBRARIES})
+add_executable(ros_capture src/ros_capture.cpp)
+target_link_libraries(ros_capture ${OpenCV_LIBS} ${catkin_LIBRARIES})
 
