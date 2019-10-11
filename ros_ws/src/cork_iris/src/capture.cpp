@@ -91,7 +91,7 @@ void *cv_threadfunc (void *ptr) {
         else if(waitKey(15) == 99 & 0xFF){
             cout << "hi" << endl;
             FileStorage file("rgb.ext", cv::FileStorage::WRITE);
-            file << "rgb" << tempimg;
+            file << "img" << tempimg;
         }
 
     }

@@ -75,11 +75,10 @@ void *cv_threadfunc (void *ptr) {
             destroyWindow("Display");
             break;
         }
-        // else if(waitKey(15) == 99 & 0xFF){
-        //     cout << "hi" << endl;
-        //     FileStorage file("rgb.ext", cv::FileStorage::WRITE);
-        //     file << "rgb" << tempimg;
-        // }
+        else if(waitKey(15) == 99 & 0xFF){
+            FileStorage file("img.ext", cv::FileStorage::WRITE);
+            file << "img" << global_img;
+        }
 
     }
     pthread_exit(NULL);
