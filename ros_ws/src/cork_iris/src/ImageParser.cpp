@@ -1,4 +1,4 @@
-#include "ImageParsing.h"
+#include "ImageParser.h"
 
 #include <opencv2/opencv.hpp>
 #include <opencv2/core/core.hpp>
@@ -6,18 +6,18 @@
 #include <opencv2/highgui/highgui.hpp>
 #include <stdlib.h>
 
-ImageParsing::ImageParsing(void)
+ImageParser::ImageParser(void)
 {
  
 }
 
-ImageParsing::~ImageParsing(void)
+ImageParser::~ImageParser(void)
 {
 
 }
 
 
-void ImageParsing::extendDepthImageColors(cv::Mat image)
+void ImageParser::extendDepthImageColors(cv::Mat image)
 {
     int minval = 154;
     int maxval = 185;
@@ -39,7 +39,7 @@ void ImageParsing::extendDepthImageColors(cv::Mat image)
     
 }
 
-cv::Mat ImageParsing::thresholdImage(cv::Mat image, int thresholdValue)
+cv::Mat ImageParser::thresholdImage(cv::Mat image, int thresholdValue)
 {
     cv::Mat newimg;
     
@@ -51,10 +51,10 @@ cv::Mat ImageParsing::thresholdImage(cv::Mat image, int thresholdValue)
 }
 
 
-std::vector<std::vector<cv::Point>> ImageParsing::parseImageContours(cv::Mat image, int thresholdValue)
+std::vector<std::vector<cv::Point>> ImageParser::parseImageContours(cv::Mat image, int thresholdValue)
 {
     cv::Mat i;
-    i = ImageParsing::thresholdImage(image, thresholdValue);
+    i = ImageParser::thresholdImage(image, thresholdValue);
     
     std::vector<std::vector<cv::Point>> contours;
     cv::Mat hierarchy;
@@ -64,7 +64,7 @@ std::vector<std::vector<cv::Point>> ImageParsing::parseImageContours(cv::Mat ima
     return contours;
 }
 
-std::vector<std::vector<cv::Point>> ImageParsing::filterContoursByArea(std::vector<std::vector<cv::Point>> contours, int min_area, int max_area)
+std::vector<std::vector<cv::Point>> ImageParser::filterContoursByArea(std::vector<std::vector<cv::Point>> contours, int min_area, int max_area)
 {
     std::vector<std::vector<cv::Point>> filtered_contours;
 
@@ -80,7 +80,7 @@ std::vector<std::vector<cv::Point>> ImageParsing::filterContoursByArea(std::vect
     return filtered_contours;
 }
 
-std::vector<cv::RotatedRect> ImageParsing::getContourBoundingBox(std::vector<std::vector<cv::Point>> contours)
+std::vector<cv::RotatedRect> ImageParser::getContourBoundingBox(std::vector<std::vector<cv::Point>> contours)
 {
     std::vector<cv::RotatedRect> minRect(contours.size());
     for(int i = 0; i < contours.size(); i++){

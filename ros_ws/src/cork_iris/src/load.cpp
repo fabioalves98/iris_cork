@@ -3,7 +3,7 @@
 #include <math.h>
 #include <pthread.h>
 #include "ros/ros.h"
-#include "ImageParsing.h"
+#include "ImageParser.h"
 #include <opencv2/opencv.hpp>
 #include <opencv2/core/core.hpp>
 #include <opencv2/core/types.hpp>
@@ -36,9 +36,13 @@ void drawContourBoundingBox(Mat drawing, std::vector<cv::RotatedRect> rects)
 int main(int argc, char **argv){
 
     char* filename = argv[1];
+    if(argc < 2){
+        printf("No file to load provided!\n");
+        return 0;
+    }
     printf("Loading: %s\n", filename);
     FileStorage fs(filename, FileStorage::READ);
-    ImageParsing ip;
+    ImageParser ip;
     Mat loadedimg;
     fs["img"] >> loadedimg;
 
