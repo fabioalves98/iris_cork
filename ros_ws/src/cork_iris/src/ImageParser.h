@@ -18,6 +18,8 @@ class ImageParser
         std::vector<std::vector<cv::Point>> filterContoursByArea(std::vector<std::vector<cv::Point>> contours, int min_area, int max_area);
         std::vector<cv::RotatedRect> getContourBoundingBox(std::vector<std::vector<cv::Point>> contours);
 
+        int getImageGrayMean(cv::Mat image);
+
 		~ImageParser();
 		
 };

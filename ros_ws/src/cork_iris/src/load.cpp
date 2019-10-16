@@ -21,6 +21,13 @@ void drawImageContours(Mat drawing, std::vector<std::vector<cv::Point>> contours
     }
 }
 
+void drawRect(Mat drawing, std::vector<cv::Point> rectPoints, cv::Scalar color){
+
+    for(int j = 0; j < 4; j++){
+        line(drawing, rectPoints[j], rectPoints[(j+1) % 4], color);
+    }
+}
+
 void drawContourBoundingBox(Mat drawing, std::vector<cv::RotatedRect> rects)
 {
     for(int i = 0; i < rects.size(); i++){
@@ -32,20 +39,23 @@ void drawContourBoundingBox(Mat drawing, std::vector<cv::RotatedRect> rects)
     }
 }
 
+
+
 int main(int argc, char **argv){
 
     char* filename = argv[1];
-    if(argc < 2){
+    if(argc != 2){
         printf("No file to load provided!\n");
         return 0;
     }
+    
     printf("Loading: %s\n", filename);
     FileStorage fs(filename, FileStorage::READ);
     ImageParser ip;
     Mat loadedimg;
     fs["img"] >> loadedimg;
 
-    printf("Rows - %d; Cols - %d; Size - %d\n", loadedimg.rows, loadedimg.cols, loadedimg.total());
+    // printf("Rows - %d; Cols - %d; Size - %d\n", loadedimg.rows, loadedimg.cols, loadedimg.total());
 
     std::vector<Point> possible_pins;
 
@@ -68,7 +78,7 @@ int main(int argc, char **argv){
         }
     }
 
-    print(possible_pins);
+    // print(possible_pins);
     std::vector<Point> good_pins;
 
     for (int i = 0; i < possible_pins.size(); i++)
@@ -102,38 +112,31 @@ int main(int argc, char **argv){
         }
     }
 
-    print(good_pins);
+    // print(good_pins);
+    // printf("\n");
 
+    drawRect(loadedimg, good_pins, Scalar(255, 255, 0));
 
-    printf("\n");
-
-    Mat gray;
-    cvtColor(loadedimg, gray, CV_BGR2GRAY);
-    Scalar m = mean(gray);
-    int media = (int)m[0];
-    printf("%d\n", media);
+    int media = ip.getImageGrayMean(loadedimg);
 
     // ip.extendDepthImageColors(loadedimg);
     // loadedimg = ip.thresholdImage(loadedimg, 50);
-    std::vector<std::vector<cv::Point>> conts;
-    // conts = ip.parseImageContours(loadedimg, 50);
-    // conts = ip.filterContoursByArea(conts, 500, 10000);
+
     // Rect roi(95, 70 , 400, 380);
     // loadedimg = loadedimg(roi);
 
-    // draw those contours
-    // drawImageContours(loadedimg, conts);
-    // std::vector<cv::RotatedRect> rect_points;
-    // rect_points = ip.getContourBoundingBox(conts);
-    // drawContourBoundingBox(loadedimg, rect_points);
-    
-    int i = 50;
+    std::vector<std::vector<cv::Point>> conts;
+    int i = media;
+    cv::putText(loadedimg, std::to_string(i), cv::Point(20, 50),
+                cv::FONT_HERSHEY_DUPLEX, 1.0, CV_RGB(0, 0, 0));
     while(1){
 
-        conts = ip.parseImageContours(loadedimg, media);
+
+        // Get contours and filter them by a certain area
+        conts = ip.parseImageContours(loadedimg, i);
         conts = ip.filterContoursByArea(conts, 500, 8000);
 
-        // draw those contours
+        // Draw contours and their bounding boxes
         drawImageContours(loadedimg, conts);
         std::vector<cv::RotatedRect> rect_points;
         rect_points = ip.getContourBoundingBox(conts);
@@ -141,24 +144,21 @@ int main(int argc, char **argv){
 
         imshow("Display", loadedimg);
 
-        // wait for quit key
+        // ESC
         if(waitKey(0) == 27 && 0xFF) break;
+        // C Key
         else if(waitKey(0) == 99 && 0xFF) {
-
-         
-            conts.clear();
-            fs["img"] >> loadedimg;
-            // loadedimg = loadedimg(roi);
-               cv::putText(loadedimg, //target image
-            std::to_string(i), //text
-            cv::Point(10, loadedimg.rows / 2), //top-left position
-            cv::FONT_HERSHEY_DUPLEX,
-            1.0,
-            CV_RGB(118, 185, 0), //font color
-            2);
             if(i < 250) i+=5;
-            else break;
-        } 
+        // X Key
+        }else if(waitKey(0) == 120 && 0xFF){
+            if(i > 30) i-=5;
+        }
+
+        // Clear all contours, reload the image and update text
+        conts.clear();
+        fs["img"] >> loadedimg;
+        cv::putText(loadedimg, std::to_string(i), cv::Point(20, 50),
+                    cv::FONT_HERSHEY_DUPLEX, 1.0, CV_RGB(0, 0, 0));
 
     }
 

@@ -90,6 +90,18 @@ std::vector<cv::RotatedRect> ImageParser::getContourBoundingBox(std::vector<std:
 }
 
 
+int ImageParser::getImageGrayMean(cv::Mat image){
+
+    cv::Mat gray;
+    cv::cvtColor(image, gray, CV_BGR2GRAY);
+    cv::Scalar m = cv::mean(gray);
+    int media = (int)m[0];
+    // printf("%d\n", media);
+    return media;
+
+}
+
+
 
 
 
