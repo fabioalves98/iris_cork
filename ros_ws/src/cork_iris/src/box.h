@@ -10,5 +10,6 @@ class Box
     public:
         Box();
         std::vector<cv::Point> get_pins(cv::Mat image);
+        void draw_rect(cv::Mat image, std::vector<cv::Point> pins);
         
 };

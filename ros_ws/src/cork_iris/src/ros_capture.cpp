@@ -10,7 +10,7 @@
 
 */
 
-
+#include <stdio.h>
 #include <ros/ros.h>
 #include <image_transport/image_transport.h>
 #include <cv_bridge/cv_bridge.h>
@@ -19,6 +19,7 @@
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/highgui/highgui.hpp>
 #include <pthread.h>
+#include "box.h"
 
 using namespace cv;
 
@@ -28,6 +29,7 @@ pthread_t cv_thread;
 cv::Mat global_img;
 int first_assignment = 0;
 
+Box box;
 
 void image_callback(const sensor_msgs::ImageConstPtr& msg){
     pthread_mutex_lock( &mutex_kinect );
@@ -64,6 +66,10 @@ void *cv_threadfunc (void *ptr) {
             cv::Mat img_scaled_8u;
             cv::Mat(global_img-0).convertTo(img_scaled_8u, CV_8UC1, 255. / (1000 - 0));
             // cv::cvtColor(img_scaled_8u, global_img, CV_GRAY2RGB);
+
+            std::vector<Point> good_pins = box.get_pins(global_img);
+            //box.draw_rect(global_img, good_pins);
+        
             imshow("Display", global_img);
         }
         //unlock mutex for depth image

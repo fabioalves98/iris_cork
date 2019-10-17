@@ -56,11 +56,40 @@ std::vector<cv::Point> Box::get_pins(cv::Mat image)
             if (count > 5)
             {
                 good_pins.push_back(candidate);
-                //circle(image, candidate, 5, Scalar(250, 0, 0));
                 break;
             }
         }
     }
 
     return good_pins;
+}
+
+void Box::draw_rect(cv::Mat image, std::vector<cv::Point> pins)
+{
+    Point min = Point(640, 480);
+    Point max = Point(0, 0);
+
+    for (int i = 0; i < pins.size(); i++)
+    {
+        if (min.x + min.y > pins[i].x + pins[i].y)
+        {
+            min = pins[i];
+        }
+        if (max.x + max.y < pins[i].x + pins[i].y)
+        {
+            max = pins[i];
+        }
+    }
+    for (int i = 0; i < pins.size(); i++)
+    {
+        if (pins[i] == min || pins[i] == max)
+        {
+            continue;
+        }
+        else
+        {
+            line(image, min, pins[i], Scalar(0, 0, 255), 2);
+            line(image, max, pins[i], Scalar(0, 0, 255), 2);
+        }   
+    }
 }

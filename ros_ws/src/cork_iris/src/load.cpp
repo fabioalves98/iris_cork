@@ -22,13 +22,6 @@ void drawImageContours(Mat drawing, std::vector<std::vector<cv::Point>> contours
     }
 }
 
-void drawRect(Mat drawing, std::vector<cv::Point> rectPoints, cv::Scalar color){
-
-    for(int j = 0; j < 4; j++){
-        line(drawing, rectPoints[j], rectPoints[(j+1) % 4], color);
-    }
-}
-
 void drawContourBoundingBox(Mat drawing, std::vector<cv::RotatedRect> rects)
 {
     for(int i = 0; i < rects.size(); i++){
@@ -59,7 +52,9 @@ int main(int argc, char **argv){
     Box box;
     std::vector<Point> good_pins = box.get_pins(loadedimg);
 
-    drawRect(loadedimg, good_pins, Scalar(255, 255, 0));
+    cout << good_pins << endl;
+
+    box.draw_rect(loadedimg, good_pins);
 
     int media = ip.getImageGrayMean(loadedimg);
 
