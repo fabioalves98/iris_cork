@@ -67,7 +67,8 @@ void *cv_threadfunc (void *ptr) {
             cv::Mat(global_img-0).convertTo(img_scaled_8u, CV_8UC1, 255. / (1000 - 0));
             // cv::cvtColor(img_scaled_8u, global_img, CV_GRAY2RGB);
 
-            std::vector<Point> good_pins = box.get_pins(global_img);
+            // Draw a rectangle arround the box's pins
+            //std::vector<Point> good_pins = box.get_pins(global_img);
             //box.draw_rect(global_img, good_pins);
         
             imshow("Display", global_img);

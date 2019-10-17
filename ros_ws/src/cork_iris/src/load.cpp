@@ -49,12 +49,12 @@ int main(int argc, char **argv){
     Mat loadedimg;
     fs["img"] >> loadedimg;
 
-    Box box;
-    std::vector<Point> good_pins = box.get_pins(loadedimg);
 
-    cout << good_pins << endl;
-
-    box.draw_rect(loadedimg, good_pins);
+    // Draw a rectangle arround the boxs pins
+    // Box box;
+    // std::vector<Point> good_pins = box.get_pins(loadedimg);
+    // cout << good_pins << endl;
+    // box.draw_rect(loadedimg, good_pins);
 
     int media = ip.getImageGrayMean(loadedimg);
 
