@@ -7,6 +7,9 @@ find_package(catkin REQUIRED COMPONENTS
   std_msgs
   image_transport
   cv_bridge
+  pcl_conversions
+  pcl_ros
+  sensor_msgs
 )
 
 ## Eventualmente esta versao nao precisa de estar aqui
@@ -35,4 +38,5 @@ add_executable(load src/load.cpp src/ImageParser.cpp src/box.cpp)
 target_link_libraries(load ${OpenCV_LIBS} ${catkin_LIBRARIES})
 add_executable(ros_capture src/ros_capture.cpp src/ImageParser.cpp)
 target_link_libraries(ros_capture ${OpenCV_LIBS} ${catkin_LIBRARIES})
-
+add_executable(pcl_test src/pcl_test.cpp)
+target_link_libraries(pcl_test ${catkin_LIBRARIES})
