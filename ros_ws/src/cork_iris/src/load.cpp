@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
+#include <algorithm>
 #include <pthread.h>
 #include "ros/ros.h"
 #include "ImageParser.h"
@@ -59,6 +60,83 @@ std::vector<cv::Point> spiral_out(int x_, int y_, int xOffset, int yOffset){
     return spiralPoints;
 }
 
+void checkNeighbour(Mat drawing, Mat image, Point p, vector<cv::Point> *spiralPoints){
+    vector<Point> neighbours = {Point(-1,-1), Point(-1, 0), Point(-1, 1),
+                                Point(0,-1), Point(0, 1),
+                                Point(1, -1), Point(1, 0), Point(1,1)};
+
+
+    unsigned char *input = (unsigned char*)(image.data);
+    unsigned char *output = (unsigned char*)(drawing.data);
+    unsigned char point_color = input[image.step * p.y + p.x + 2];
+
+    for(int i = 0; i < neighbours.size(); i++){
+        if(point_color == 255) break;
+        Point current_neighbour = neighbours.at(i);
+        Point new_point((p.x + current_neighbour.x), (p.y + current_neighbour.y));
+        unsigned char current_color = input[image.step * new_point.y + new_point.x  + 2];
+
+        int color_diff = abs(current_color - point_color);
+        // if(color_diff == 255) break;
+        if(color_diff > 20){
+            // cout << " = = = " << endl;
+            // cout << p << " " << (int)point_color << endl;
+            // cout << new_point << " " << (int)current_color << endl;
+            // cout << "BIG DIFFERENCE -> " << color_diff << endl;
+
+            output[image.step * new_point.y + new_point.x  + 2] = 255;
+            output[image.step * new_point.y + new_point.x  + 1] = 0;
+            output[image.step * new_point.y + new_point.x] = 255;
+        }
+    }
+
+}
+
+vector<Point> getPointNeighbours(Point p){
+    vector<Point> neighbours_norm = {Point(-1,-1), Point(-1, 0), Point(-1, 1),
+                                Point(0,-1), Point(0,0), Point(0, 1),
+                                Point(1, -1), Point(1, 0), Point(1,1)};
+
+    vector<Point> neighbours;
+    for(int i = 0; i < neighbours_norm.size(); i++){
+        neighbours.push_back(p + neighbours_norm.at(i));
+    }
+
+    return neighbours;
+}
+
+Point findHighestPoint(Mat image)
+{
+    int min = 256;
+    int x, y;
+    // Hard coded starting j and i values just for testing
+    unsigned char *input = (unsigned char*)(image.data);
+    for(int j = 200; j < image.rows-100;j++){
+        for(int i = 150; i < image.cols-50;i++){
+            unsigned char b = input[image.step * j + i ] ;
+            unsigned char g = input[image.step * j + i + 1];
+            unsigned char r = input[image.step * j + i + 2];
+
+            // why do some pixels have different values rgb values? (0, 255, 0) ... etc
+            if(r == g && r == b){
+                if(r < min && r != 0){
+                    min = r;
+                    x = i;
+                    y = j;
+                }
+            }
+
+        }
+    }
+    printf("New pixel found! (%d, %d)[%d]\n", x, y, min);
+    //circle(loadedimg, Point(x, y), 4, Scalar(0, 0, 255));
+
+    return Point(x, y);
+
+}
+
+
+
 
 
 
@@ -81,54 +159,77 @@ int main(int argc, char **argv){
     // std::vector<Point> good_pins = box.get_pins(loadedimg);
     // // cout << good_pins << endl;
     // box.draw_rect(loadedimg, good_pins);
-
-
     
-
     // int media = ip.getImageGrayMean(loadedimg);
 
     ip.extendDepthImageColors(loadedimg);
     // loadedimg = ip.thresholdImage(loadedimg, 50);
 
-
-    int min = 256;
-    int x, y;
-    int step = loadedimg.step;
-    printf("Rows: %d  Cols: %d  Step: %d\n", loadedimg.rows, loadedimg.cols, step);
-    // Hard coded starting j and i values just for testing
+    Mat finalimage = loadedimg.clone();
+    // cvtColor(finalimage, finalimage, CV_GRAY2BGR);
+    Point highest = findHighestPoint(loadedimg);
+    vector<Point> pixels = getPointNeighbours(highest);
     unsigned char *input = (unsigned char*)(loadedimg.data);
-    for(int j = 200;j < loadedimg.rows-100;j++){
-        for(int i = 150;i < loadedimg.cols-50;i++){
-            unsigned char b = input[loadedimg.step * j + i ] ;
-            unsigned char g = input[loadedimg.step * j + i + 1];
-            unsigned char r = input[loadedimg.step * j + i + 2];
+    unsigned char *output = (unsigned char*)(finalimage.data);
 
-            // printf("(%d, %d, %d)\n", r, g, b);
-            // why do some pixels have different values rgb values? (0, 255, 0) ... etc
-            if(r == g && r == b){
-                if(r < min && r != 0){
-                    min = r;
-                    x = i;
-                    y = j;
+    const int BLACK_THRESHOLD = 120;
+
+    int MAX_ITERS = 10000;
+    for(int i = 0; i < pixels.size(); i++){
+        if(MAX_ITERS == 0) break;
+        Point p = pixels.at(i);
+        int pcolor = (int)input[loadedimg.step * p.y + p.x + 2];   
+        vector<Point> neighbours = getPointNeighbours(p);
+        for(int j = 0; j < neighbours.size(); j++){
+            Point pneighbour = neighbours.at(j);
+            int ncolor = (int)input[loadedimg.step * pneighbour.y + pneighbour.x + 2]; 
+
+            if(!(find(pixels.begin(), pixels.end(), pneighbour) != pixels.end()))
+            {
+                if(abs(pcolor-ncolor) < 9 && pcolor <= ncolor)
+                    pixels.push_back(pneighbour);
+                // cout << "good point. adding" << endl;
+            
+                else
+                {
+                    // cout << "not good " << pneighbour << endl;
+                    output[finalimage.step * pneighbour.y + pneighbour.x + 2] = 0;   
+                    output[finalimage.step * pneighbour.y + pneighbour.x + 1] = 0;   
+                    output[finalimage.step * pneighbour.y + pneighbour.x ] = 255;   
                 }
             }
 
+                
+            
         }
-    }
-    // cvtColor(loadedimg, loadedimg, CV_GRAY2BGR);
-    // printf("New pixel found! (%d, %d)[%d]\n", x, y, min);
-    // circle(loadedimg, Point(x, y), 4, Scalar(0, 0, 255));
-    vector<Point> spiralPoints = spiral_out(100, 100, x, y);
-
-    for(int i = 0; i < spiralPoints.size(); i++){
-        Point p = spiralPoints.at(i);
-        unsigned char r = input[loadedimg.step * p.y + p.x + 2];
-        cout << p;
-        printf("%d\n", r);
-        // circle(loadedimg, p, 1, Scalar(255, 0, 0));
+        MAX_ITERS--;
     }
 
+
+    // vector<Point> spiralPoints = spiral_out(350, 350, highest.x, highest.y);
+
+
+    // Threshold value that defines what is worth to look as a cork piece or simply background or other pieces
+    // (Dug down way deeper)
+
+    // vector<Point> dead_points;
+    // for(int i = 0; i < spiralPoints.size(); i++){
+    //     Point p = spiralPoints.at(i);
+    //     unsigned char r = input[loadedimg.step * p.y + p.x + 2];
     
+    //     // most likely cork piece surface
+    //     if(r < black_threshold){
+    //         // cout << p;
+    //         // printf(" %d\n", r);
+    //         // printf(" [+] Cork piece surface %d\n", r);
+    //         // circle(loadedimg, p, 1, Scalar(255, 0, 0));
+
+    //         checkNeighbour(finalimage, loadedimg, p, &spiralPoints);
+
+    //     }       
+    // }
+
+    // cvtColor(finalimage, finalimage, CV_GRAY2BGR);
 
 
 
@@ -149,7 +250,7 @@ int main(int argc, char **argv){
         // rect_points = ip.getContourBoundingBox(conts);
         // drawContourBoundingBox(loadedimg, rect_points);
 
-        imshow("Display", loadedimg);
+        imshow("Display", finalimage);
 
         // ESC
         if(waitKey(0) == 27 && 0xFF) break;
