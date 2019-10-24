@@ -17,27 +17,7 @@ ImageParser::~ImageParser(void)
 }
 
 
-void ImageParser::extendDepthImageColors(cv::Mat image)
-{
-    int minval = 154;
-    int maxval = 185;
-    int diff = maxval-minval;
-    int i, j;
-    unsigned char *ptr = (unsigned char*)(image.data);
-    for(i = 0; i < image.cols; i++){
-        for(j = 0; j < image.rows; j++){
-            if(ptr[image.cols * j + i] < minval){
-                ptr[image.cols * j + i] = 0;
-            }else if(ptr[image.cols * j + i] >= maxval){
-                ptr[image.cols * j + i] = 255;           
-            }else{
-                ptr[image.cols * j + i] = (ptr[image.cols * j + i] - minval) * (255 / diff);
-   
-            }
-        }
-    }
-    
-}
+
 
 cv::Mat ImageParser::thresholdImage(cv::Mat image, int thresholdValue)
 {

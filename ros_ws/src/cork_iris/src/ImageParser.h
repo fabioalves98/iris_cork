@@ -12,7 +12,6 @@ class ImageParser
 
 	public:		
 		ImageParser();
-        void extendDepthImageColors(cv::Mat irimage);
         cv::Mat thresholdImage(cv::Mat image, int thresholdValue);
         std::vector<std::vector<cv::Point>> parseImageContours(cv::Mat image, int thresholdValue);
         std::vector<std::vector<cv::Point>> filterContoursByArea(std::vector<std::vector<cv::Point>> contours, int min_area, int max_area);

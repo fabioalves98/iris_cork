@@ -34,9 +34,15 @@ include_directories(${FREENECT_INCLUDE_DIRS})
 ## 
 add_executable(capture src/capture.cpp)
 target_link_libraries(capture ${OpenCV_LIBS} ${catkin_LIBRARIES} ${FREENECT_LIBRARIES})
-add_executable(load src/load.cpp src/ImageParser.cpp src/box.cpp)
+
+###### ROS CAPTURE MODULE #######
+add_executable(load src/load.cpp src/ImageParser.cpp src/box.cpp src/DepthParser.cpp)
 target_link_libraries(load ${OpenCV_LIBS} ${catkin_LIBRARIES})
-add_executable(ros_capture src/ros_capture.cpp src/ImageParser.cpp src/box.cpp)
+
+###### LOAD MODULE #######
+add_executable(ros_capture src/ros_capture.cpp src/ImageParser.cpp src/box.cpp src/DepthParser.cpp)
 target_link_libraries(ros_capture ${OpenCV_LIBS} ${catkin_LIBRARIES})
+
+
 add_executable(pcl_test src/pcl_test.cpp)
 target_link_libraries(pcl_test ${catkin_LIBRARIES})

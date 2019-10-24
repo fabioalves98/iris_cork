@@ -26,21 +26,44 @@ using namespace cv;
 pthread_mutex_t mutex_kinect = PTHREAD_MUTEX_INITIALIZER;
 pthread_t cv_thread;
 
-cv::Mat global_img;
-int first_assignment = 0;
+cv::Mat global_img_depth, global_img_rgb;
+cv::Mat img_scaled_8u;
+
+int depth_assignment = 0;
+int rgb_assignment = 0;
 
 Box box;
 
-void image_callback(const sensor_msgs::ImageConstPtr& msg){
+void depth_callback(const sensor_msgs::ImageConstPtr& msg){
     pthread_mutex_lock( &mutex_kinect );
-        // printf("callback\n");
+
+    cv_bridge::CvImagePtr cv_image_ptr;
+
+    try{
+        cv_image_ptr = cv_bridge::toCvCopy(msg, sensor_msgs::image_encodings::TYPE_16UC1);
+        // cv_image_ptr = cv_bridge::toCvCopy(msg);
+        global_img_depth = cv_image_ptr->image;
+        depth_assignment = 1;
+    }catch(cv_bridge::Exception& e){
+        ROS_ERROR("%s", e.what());
+        return;
+    }
+    // imshow("Display", cv_image_ptr->image);
+    // waitKey(3);
+    pthread_mutex_unlock( &mutex_kinect );
+
+
+}
+
+void rgb_callback(const sensor_msgs::ImageConstPtr& msg){
+    pthread_mutex_lock( &mutex_kinect );
 
     cv_bridge::CvImagePtr cv_image_ptr;
 
     try{
         cv_image_ptr = cv_bridge::toCvCopy(msg, sensor_msgs::image_encodings::BGR8);
-        global_img = cv_image_ptr->image;
-        first_assignment = 1;
+        global_img_rgb = cv_image_ptr->image;
+        rgb_assignment = 1;
     }catch(cv_bridge::Exception& e){
         ROS_ERROR("%s", e.what());
         return;
@@ -61,30 +84,41 @@ void *cv_threadfunc (void *ptr) {
         //lock mutex for depth image
         pthread_mutex_lock( &mutex_kinect );
         // cvtColor(depthimg,tempimg,CV_GRAY2BGR);
-        if(first_assignment){
-            namedWindow("Display");
-            cv::Mat img_scaled_8u;
-            cv::Mat(global_img-0).convertTo(img_scaled_8u, CV_8UC1, 255. / (1000 - 0));
-            // cv::cvtColor(img_scaled_8u, global_img, CV_GRAY2RGB);
-
+        if(depth_assignment){
+            namedWindow("Depth Display");
+            cv::Mat(global_img_depth-0).convertTo(img_scaled_8u, CV_8UC1, 255. / (1000 - 0));
+            // cv::cvtColor(img_scaled_8u, global_image_depth, CV_GRAY2RGB);
+            // std::cout << img_scaled_8u.rows << img_scaled_8u.step << img_scaled_8u.cols << std::endl;
             // Draw a rectangle arround the box's pins
-            //std::vector<Point> good_pins = box.get_pins(global_img);
-            //box.draw_rect(global_img, good_pins);
+            //std::vector<Point> good_pins = box.get_pins(global_image_depth);
+            //box.draw_rect(global_image_depth, good_pins);
         
-            imshow("Display", global_img);
+            imshow("Depth Display", img_scaled_8u);
         }
+
+        if(rgb_assignment){
+            namedWindow("RGB Display");
+            //cv::Mat(global_img_rgb-0).convertTo(img_scaled_8u, CV_8UC1, 255. / (1000 - 0));
+            imshow("RGB Display", global_img_rgb);
+
+        }
+
         //unlock mutex for depth image
         pthread_mutex_unlock( &mutex_kinect );
 
 
         // wait for quit key
         if(waitKey(15) == 27 && 0xFF){
-            destroyWindow("Display");
+            destroyWindow("Depth Display");
+            destroyWindow("RGB Display");
             break;
         }
         else if(waitKey(15) == 99 & 0xFF){
             FileStorage file("img.ext", cv::FileStorage::WRITE);
-            file << "img" << global_img;
+            file << "img" << global_img_rgb;
+        }else if(waitKey(15) == 100 & 0xFF){
+            FileStorage file("depth.ext", cv::FileStorage::WRITE);
+            file << "img" << img_scaled_8u;   
         }
 
     }
@@ -99,10 +133,13 @@ int main(int argc, char** argv){
     ros::init(argc, argv, "ros_capture");
     ros::NodeHandle n;
     image_transport::ImageTransport it(n);
+    image_transport::Subscriber depth_sub;
     image_transport::Subscriber image_sub;
     // image_transport::Publisher image_pub;
 
-    image_sub = it.subscribe("/camera/rgb/image_raw", 1, image_callback);
+    // image_sub = it.subscribe("/camera/rgb/image_raw", 1, image_callback2);
+    image_sub = it.subscribe("/camera/rgb/image_raw", 1, rgb_callback);
+    depth_sub = it.subscribe("/camera/depth_registered/image_raw", 1, depth_callback);
     int res = 0;
 
     res = pthread_create(&cv_thread, NULL, cv_threadfunc, NULL);
