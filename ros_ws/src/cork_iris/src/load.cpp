@@ -95,9 +95,6 @@ int main(int argc, char **argv){
     // loadedimg = ip.thresholdImage(loadedimg, 50);
 
     
-
-
-    
     Mat src1, src2, dst;
     FileStorage fs2("img/depth_registered.ext", FileStorage::READ);
     fs2["img"] >> src1;
