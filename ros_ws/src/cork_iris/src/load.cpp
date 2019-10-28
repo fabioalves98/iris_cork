@@ -76,8 +76,8 @@ int main(int argc, char **argv){
     FileStorage fs(filename, FileStorage::READ);
     ImageParser ip;
     DepthParser dp;
-    Mat loadedimg;
-    fs["img"] >> loadedimg;
+    // Mat loadedimg;
+    // fs["img"] >> loadedimg;
 
 
     // Draw a rectangle arround the boxs pins
@@ -96,9 +96,9 @@ int main(int argc, char **argv){
 
     
     Mat src1, src2, dst;
-    FileStorage fs2("img/depth_registered.ext", FileStorage::READ);
-    fs2["img"] >> src1;
-    cvtColor(src1, src1, CV_GRAY2BGR);
+    // FileStorage fs2("img/depth_registered.ext", FileStorage::READ);
+    // fs2["img"] >> src1;
+    // cvtColor(src1, src1, CV_GRAY2BGR);
 
 
     FileStorage fs1("img/rgb_registered_pair.ext", FileStorage::READ);
@@ -123,7 +123,7 @@ int main(int argc, char **argv){
         // rect_points = ip.getContourBoundingBox(conts);
         // drawContourBoundingBox(loadedimg, rect_points);
 
-        imshow("Display", dst);
+        imshow("Display", src2);
 
 
         // ESC
