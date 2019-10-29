@@ -46,8 +46,8 @@ cv::Point DepthParser::findHighestPoint(cv::Mat image)
     int x, y;
     // Hard coded starting j and i values just for testing
     unsigned char *input = (unsigned char*)(image.data);
-    for(int j = 200; j < image.rows-100;j++){
-        for(int i = 150; i < image.cols-50;i++){
+    for(int j = 0; j < image.rows;j++){
+        for(int i = 0; i < image.cols;i++){
             unsigned char b = input[image.step * j + i ] ;
             unsigned char g = input[image.step * j + i + 1];
             unsigned char r = input[image.step * j + i + 2];
@@ -63,8 +63,8 @@ cv::Point DepthParser::findHighestPoint(cv::Mat image)
 
         }
     }
-    printf("New pixel found! (%d, %d)[%d]\n", x, y, min);
-    //circle(loadedimg, cv::Point(x, y), 4, Scalar(0, 0, 255));
+    // printf("New pixel found! (%d, %d)[%d]\n", x, y, min);
+    // circle(loadedimg, cv::Point(x, y), 4, Scalar(0, 0, 255));
 
     return cv::Point(x, y);
 

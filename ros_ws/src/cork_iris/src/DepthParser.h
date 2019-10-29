@@ -8,13 +8,12 @@
 class DepthParser
 {
 	private:
-        cv::Point findHighestPoint(cv::Mat image);
         std::vector<cv::Point> getPointNeighbours(cv::Point p);
-
 
 	public:		
 		DepthParser();
         void extendDepthImageColors(cv::Mat irimage);
+        cv::Point findHighestPoint(cv::Mat image);
         cv::Mat getBestPossibleCorkPiece(cv::Mat input_image);
 
 		~DepthParser();

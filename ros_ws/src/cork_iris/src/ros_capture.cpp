@@ -20,6 +20,8 @@
 #include <opencv2/highgui/highgui.hpp>
 #include <pthread.h>
 #include "box.h"
+#include "DepthParser.h"
+#include "ImageParser.h"
 
 using namespace cv;
 
@@ -33,6 +35,29 @@ int depth_assignment = 0;
 int rgb_assignment = 0;
 
 Box box;
+DepthParser dp;
+ImageParser ip;
+
+void drawImageContours(Mat drawing, std::vector<std::vector<cv::Point>> contours)
+{
+    for( int i = 0; i < contours.size(); i++ )
+    {
+        drawContours(drawing, contours, i, Scalar(0, 255, 0), 1);
+    }
+}
+
+void drawContourBoundingBox(Mat drawing, std::vector<cv::RotatedRect> rects)
+{
+    for(int i = 0; i < rects.size(); i++){
+        Point2f rect_points[4];
+        rects[i].points(rect_points);
+        for(int j = 0; j < 4; j++){
+            line(drawing, rect_points[j], rect_points[(j+1) % 4], Scalar(0, 255, 0));
+        }
+    }
+}
+
+
 
 void depth_callback(const sensor_msgs::ImageConstPtr& msg){
     pthread_mutex_lock( &mutex_kinect );
@@ -92,13 +117,37 @@ void *cv_threadfunc (void *ptr) {
             // Draw a rectangle arround the box's pins
             //std::vector<Point> good_pins = box.get_pins(global_image_depth);
             //box.draw_rect(global_image_depth, good_pins);
+
         
+
+            // 
+            // cv::Point hp = dp.findHighestPoint(img_scaled_8u);
+            // std::cout << hp << std::endl;
+            // circle(global_img_rgb, hp, 4, Scalar(0, 0, 255));
+            // circle(img_scaled_8u, hp, 4, Scalar(0, 0, 255));
+            
+           
             imshow("Depth Display", img_scaled_8u);
         }
 
         if(rgb_assignment){
             namedWindow("RGB Display");
             //cv::Mat(global_img_rgb-0).convertTo(img_scaled_8u, CV_8UC1, 255. / (1000 - 0));
+            std::vector<Point> points = box.get_blue_box(global_img_rgb);
+            int th = 85;
+            int min_area = 100000;
+            int max_area = 200000;
+            // Assuming only the box square contour is taken out of the image
+            std::vector<std::vector<Point>> contour_points = ip.filterContoursByArea(ip.parseImageContours(global_img_rgb, th), min_area, max_area);
+            drawImageContours(global_img_rgb, contour_points);
+            std::vector<cv::Point> corners = box.get_box_corners(contour_points.at(0));
+
+            for (int i = 0; i < corners.size(); i++)
+            {
+                circle(global_img_rgb, corners.at(i), 3, cv::Scalar(0, 255, 255), 2);
+            }
+            
+            
             imshow("RGB Display", global_img_rgb);
 
         }
