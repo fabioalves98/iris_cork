@@ -16,9 +16,6 @@ ImageParser::~ImageParser(void)
 
 }
 
-
-
-
 cv::Mat ImageParser::thresholdImage(cv::Mat image, int thresholdValue)
 {
     cv::Mat newimg;
@@ -96,7 +93,6 @@ int ImageParser::getImageGrayMean(cv::Mat image){
     cv::cvtColor(image, gray, CV_BGR2GRAY);
     cv::Scalar m = cv::mean(gray);
     int media = (int)m[0];
-    // printf("%d\n", media);
     return media;
 
 }

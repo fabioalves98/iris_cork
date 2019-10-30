@@ -67,17 +67,14 @@ void depth_callback(const sensor_msgs::ImageConstPtr& msg){
 
     try{
         cv_image_ptr = cv_bridge::toCvCopy(msg, sensor_msgs::image_encodings::TYPE_16UC1);
-        // cv_image_ptr = cv_bridge::toCvCopy(msg);
         global_img_depth = cv_image_ptr->image;
         depth_assignment = 1;
     }catch(cv_bridge::Exception& e){
         ROS_ERROR("%s", e.what());
         return;
     }
-
     pthread_mutex_unlock( &mutex_kinect );
-
-
+ 
 }
 
 void rgb_callback(const sensor_msgs::ImageConstPtr& msg){
@@ -99,37 +96,28 @@ void rgb_callback(const sensor_msgs::ImageConstPtr& msg){
 }
 
 void *cv_threadfunc (void *ptr) {
-
     // use image polling
     while (1)
     {
+
         //lock mutex for depth image
         pthread_mutex_lock( &mutex_kinect );
+
         if(depth_assignment){
             namedWindow("Depth Display");
             cv::Mat(global_img_depth-0).convertTo(img_scaled_8u, CV_8UC1, 255. / (1000 - 0));
-            // cv::cvtColor(img_scaled_8u, global_image_depth, CV_GRAY2RGB);
-            // std::cout << img_scaled_8u.rows << img_scaled_8u.step << img_scaled_8u.cols << std::endl;
             // Draw a rectangle arround the box's pins
             //std::vector<Point> good_pins = box.get_pins(global_image_depth);
             //box.draw_rect(global_image_depth, good_pins);
-
-
-
-            // 
-            // cv::Point hp = dp.findHighestPoint(img_scaled_8u);
-            // std::cout << hp << std::endl;
-            // circle(global_img_rgb, hp, 4, Scalar(0, 0, 255));
-            // circle(img_scaled_8u, hp, 4, Scalar(0, 0, 255));
             
-           
+
             imshow("Depth Display", img_scaled_8u);
         }
 
         if(rgb_assignment){
             if(parse_image && depth_assignment){
                 cv::Mat parsed_image = global_img_rgb.clone();
-                //cv::Mat(global_img_rgb-0).convertTo(img_scaled_8u, CV_8UC1, 255. / (1000 - 0));
+                cv::Mat parsed_depth = img_scaled_8u.clone();
                 cv::Mat drawable = global_img_rgb.clone();
                 std::vector<Point> points = box.get_blue_box(drawable);
                 cv::Mat mask = box.getMaskInRange(drawable, cv::Scalar(0, 0, 250), cv::Scalar(0, 0, 255));
@@ -140,22 +128,20 @@ void *cv_threadfunc (void *ptr) {
                 // This contour should be the inside contour (excluding the all the box around the cork pieces)
                 contour_points.push_back(ip.smallestAreaContour(ip.filterContoursByArea(ip.parseImageContours(mask, -1), min_area, max_area)));
                 drawImageContours(parsed_image, contour_points);
-                std::vector<cv::Point> corners = box.get_box_corners(contour_points.at(0));
-                bool isInside = cv::pointPolygonTest(contour_points.at(0), Point(320, 240), false);
-                //imshow("mask Display", mask);
-                imshow("parsed Display", parsed_image);
+                
+                unsigned char *output = (unsigned char*)(parsed_depth.data);
+                Point highest = dp.findMinMaxPoint(parsed_depth, contour_points.at(0), true); 
+                Point lowest  = dp.findMinMaxPoint(parsed_depth, contour_points.at(0), false); 
+                dp.extendDepthImageColors(parsed_depth, output[parsed_depth.step * highest.y + highest.x], output[parsed_depth.step * lowest.y + lowest.x]); 
+                
+                cv::Mat cork_piece = dp.getBestPossibleCorkPiece(parsed_depth, contour_points.at(0));
+                imshow("cork Display", cork_piece);
+                // imshow("parsed Display", parsed_image);
                 parse_image = 0;
-
                 
             }
             namedWindow("RGB Display");
             
-            // for (int i = 0; i < corners.size(); i++)
-            // {
-            //     circle(global_img_rgb, corners.at(i), 3, cv::Scalar(0, 255, 255), 2);
-            // }
-            
-            // Not live
     
             // Live feed
             imshow("RGB Display", global_img_rgb);

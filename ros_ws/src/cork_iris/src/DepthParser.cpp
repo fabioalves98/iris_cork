@@ -17,13 +17,11 @@ DepthParser::~DepthParser(void)
 }
 
 
-void DepthParser::extendDepthImageColors(cv::Mat image)
+void DepthParser::extendDepthImageColors(cv::Mat image, int minval, int maxval)
 {
-    // Hard coded values here as well
-    int minval = 154;
-    int maxval = 185;
-    int diff = maxval-minval;
-    int i, j;
+    int diff = abs(maxval-minval);
+    
+    int i, j; 
     unsigned char *ptr = (unsigned char*)(image.data);
     for(i = 0; i < image.cols; i++){
         for(j = 0; j < image.rows; j++){
@@ -40,11 +38,11 @@ void DepthParser::extendDepthImageColors(cv::Mat image)
     
 }
 
-cv::Point DepthParser::findHighestPoint(cv::Mat image)
+cv::Point DepthParser::findMinMaxPoint(cv::Mat image, std::vector<cv::Point> contour, bool toggle)
 {
     int min = 256;
+    int max = -1;
     int x, y;
-    // Hard coded starting j and i values just for testing
     unsigned char *input = (unsigned char*)(image.data);
     for(int j = 0; j < image.rows;j++){
         for(int i = 0; i < image.cols;i++){
@@ -54,18 +52,32 @@ cv::Point DepthParser::findHighestPoint(cv::Mat image)
 
             // why do some pixels have different values rgb values? (0, 255, 0) ... etc
             if(r == g && r == b){
-                if(r < min && r != 0){
-                    min = r;
-                    x = i;
-                    y = j;
+                if(toggle){
+                    if(r < min && r != 0){
+                        int isInside = cv::pointPolygonTest(contour, cv::Point(i, j), false);
+                        if(isInside == 1)
+                        {
+                            min = r;
+                            x = i;
+                            y = j;
+                        }
+                    }
+                }else{
+                    if(r > max && r != 255){
+                        int isInside = cv::pointPolygonTest(contour, cv::Point(i, j), false);
+                        if(isInside == 1)
+                        {
+                            max = r;
+                            x = i;
+                            y = j;
+                        }
+                    }
                 }
+                    
             }
 
         }
     }
-    // printf("New pixel found! (%d, %d)[%d]\n", x, y, min);
-    // circle(loadedimg, cv::Point(x, y), 4, Scalar(0, 0, 255));
-
     return cv::Point(x, y);
 
 }
@@ -86,9 +98,9 @@ std::vector<cv::Point> DepthParser::getPointNeighbours(cv::Point p)
 
 
 
-cv::Mat DepthParser::getBestPossibleCorkPiece(cv::Mat input_image)
+cv::Mat DepthParser::getBestPossibleCorkPiece(cv::Mat input_image, std::vector<cv::Point> contour)
 {
-    cv::Point highest = DepthParser::findHighestPoint(input_image);
+    cv::Point highest = DepthParser::findMinMaxPoint(input_image, contour, true);
     std::vector<cv::Point> pixels = getPointNeighbours(highest);
     cv::Mat output_image = input_image.clone();
 
@@ -97,7 +109,7 @@ cv::Mat DepthParser::getBestPossibleCorkPiece(cv::Mat input_image)
 
     const int BLACK_THRESHOLD = 120;
 
-    int MAX_ITERS = 10000;
+    int MAX_ITERS = 100000;
     for(int i = 0; i < pixels.size(); i++){
         if(MAX_ITERS == 0) break;
 
@@ -110,12 +122,11 @@ cv::Mat DepthParser::getBestPossibleCorkPiece(cv::Mat input_image)
 
             if(!(find(pixels.begin(), pixels.end(), pneighbour) != pixels.end()))
             {
-                if(abs(pcolor-ncolor) < 9 && pcolor <= ncolor)
+                if(abs(pcolor-ncolor) < 9) //&& pcolor <= ncolor)
                     pixels.push_back(pneighbour);
             
                 else
                 {
-                    // cout << "not good " << pneighbour << endl;
                     output[output_image.step * pneighbour.y + pneighbour.x + 2] = 0;   
                     output[output_image.step * pneighbour.y + pneighbour.x + 1] = 0;   
                     output[output_image.step * pneighbour.y + pneighbour.x ] = 255;   
