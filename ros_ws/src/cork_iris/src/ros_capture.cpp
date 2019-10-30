@@ -104,14 +104,14 @@ void *cv_threadfunc (void *ptr) {
         pthread_mutex_lock( &mutex_kinect );
 
         if(depth_assignment){
-            namedWindow("Depth Display");
+            //namedWindow("Depth Display");
             cv::Mat(global_img_depth-0).convertTo(img_scaled_8u, CV_8UC1, 255. / (1000 - 0));
             // Draw a rectangle arround the box's pins
             //std::vector<Point> good_pins = box.get_pins(global_image_depth);
             //box.draw_rect(global_image_depth, good_pins);
             
 
-            imshow("Depth Display", img_scaled_8u);
+            //imshow("Depth Display", img_scaled_8u);
         }
 
         if(rgb_assignment){
@@ -154,7 +154,7 @@ void *cv_threadfunc (void *ptr) {
 
         // wait for quit key
         if(waitKey(15) == 27 && 0xFF){
-            destroyWindow("Depth Display");
+            //destroyWindow("Depth Display");
             destroyWindow("RGB Display");
             break;
         }

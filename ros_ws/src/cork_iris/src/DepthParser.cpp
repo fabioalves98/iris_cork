@@ -110,7 +110,7 @@ cv::Mat DepthParser::getBestPossibleCorkPiece(cv::Mat input_image, std::vector<c
 
     const int BLACK_THRESHOLD = 120;
 
-    int MAX_ITERS = 100000;
+    int MAX_ITERS = 20000;
     for(int i = 0; i < pixels.size(); i++){
         if(MAX_ITERS == 0) break;
 
@@ -123,7 +123,7 @@ cv::Mat DepthParser::getBestPossibleCorkPiece(cv::Mat input_image, std::vector<c
 
             if(!(find(pixels.begin(), pixels.end(), pneighbour) != pixels.end()))
             {
-                if(abs(pcolor-ncolor) < 9) //&& pcolor <= ncolor)
+                if(abs(pcolor-ncolor) < 9 && pcolor <= ncolor)
                     pixels.push_back(pneighbour);
             
                 else
