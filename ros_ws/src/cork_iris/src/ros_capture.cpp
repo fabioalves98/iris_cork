@@ -127,7 +127,7 @@ void *cv_threadfunc (void *ptr) {
         }
 
         if(rgb_assignment){
-            if(parse_image){
+            if(parse_image && depth_assignment){
                 cv::Mat parsed_image = global_img_rgb.clone();
                 //cv::Mat(global_img_rgb-0).convertTo(img_scaled_8u, CV_8UC1, 255. / (1000 - 0));
                 cv::Mat drawable = global_img_rgb.clone();
@@ -145,6 +145,8 @@ void *cv_threadfunc (void *ptr) {
                 //imshow("mask Display", mask);
                 imshow("parsed Display", parsed_image);
                 parse_image = 0;
+
+                
             }
             namedWindow("RGB Display");
             
