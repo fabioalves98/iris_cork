@@ -96,8 +96,6 @@ std::vector<cv::Point> Box::get_blue_box(cv::Mat image)
 {
     std::vector<cv::Point> box;
 
-    unsigned char *output = (unsigned char*)(image.data);
-
     for (int i = 0; i < image.rows; i++)
     {
         for (int j = 0; j < image.cols; j++)
@@ -157,4 +155,11 @@ std::vector<cv::Point> Box::get_box_corners(std::vector<cv::Point> box_contour)
     corners.push_back(lower_right);
 
     return corners;
+}
+
+cv::Mat Box::getMaskInRange(cv::Mat image, cv::Scalar min, cv::Scalar max)
+{
+    cv::Mat mask;   
+    cv::inRange(image, min, max, mask);
+    return mask;
 }

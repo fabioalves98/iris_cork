@@ -31,8 +31,9 @@ pthread_t cv_thread;
 cv::Mat global_img_depth, global_img_rgb;
 cv::Mat img_scaled_8u;
 
-int depth_assignment = 0;
-int rgb_assignment = 0;
+bool depth_assignment = 0;
+bool rgb_assignment = 0;
+bool parse_image = 0;
 
 Box box;
 DepthParser dp;
@@ -73,8 +74,7 @@ void depth_callback(const sensor_msgs::ImageConstPtr& msg){
         ROS_ERROR("%s", e.what());
         return;
     }
-    // imshow("Display", cv_image_ptr->image);
-    // waitKey(3);
+
     pthread_mutex_unlock( &mutex_kinect );
 
 
@@ -93,8 +93,6 @@ void rgb_callback(const sensor_msgs::ImageConstPtr& msg){
         ROS_ERROR("%s", e.what());
         return;
     }
-    // imshow("Display", cv_image_ptr->image);
-    // waitKey(3);
     pthread_mutex_unlock( &mutex_kinect );
 
 
@@ -105,10 +103,8 @@ void *cv_threadfunc (void *ptr) {
     // use image polling
     while (1)
     {
-        // printf("display thread");
         //lock mutex for depth image
         pthread_mutex_lock( &mutex_kinect );
-        // cvtColor(depthimg,tempimg,CV_GRAY2BGR);
         if(depth_assignment){
             namedWindow("Depth Display");
             cv::Mat(global_img_depth-0).convertTo(img_scaled_8u, CV_8UC1, 255. / (1000 - 0));
@@ -118,7 +114,7 @@ void *cv_threadfunc (void *ptr) {
             //std::vector<Point> good_pins = box.get_pins(global_image_depth);
             //box.draw_rect(global_image_depth, good_pins);
 
-        
+
 
             // 
             // cv::Point hp = dp.findHighestPoint(img_scaled_8u);
@@ -131,23 +127,35 @@ void *cv_threadfunc (void *ptr) {
         }
 
         if(rgb_assignment){
-            namedWindow("RGB Display");
-            //cv::Mat(global_img_rgb-0).convertTo(img_scaled_8u, CV_8UC1, 255. / (1000 - 0));
-            std::vector<Point> points = box.get_blue_box(global_img_rgb);
-            int th = 85;
-            int min_area = 100000;
-            int max_area = 200000;
-            // Assuming only the box square contour is taken out of the image
-            std::vector<std::vector<Point>> contour_points = ip.filterContoursByArea(ip.parseImageContours(global_img_rgb, th), min_area, max_area);
-            drawImageContours(global_img_rgb, contour_points);
-            std::vector<cv::Point> corners = box.get_box_corners(contour_points.at(0));
+            if(parse_image){
+                cv::Mat parsed_image = global_img_rgb.clone();
+                //cv::Mat(global_img_rgb-0).convertTo(img_scaled_8u, CV_8UC1, 255. / (1000 - 0));
+                cv::Mat drawable = global_img_rgb.clone();
+                std::vector<Point> points = box.get_blue_box(drawable);
+                cv::Mat mask = box.getMaskInRange(drawable, cv::Scalar(0, 0, 250), cv::Scalar(0, 0, 255));
 
-            for (int i = 0; i < corners.size(); i++)
-            {
-                circle(global_img_rgb, corners.at(i), 3, cv::Scalar(0, 255, 255), 2);
+                int min_area = 1000;
+                int max_area = 200000;
+                std::vector<std::vector<Point>> contour_points;
+                // This contour should be the inside contour (excluding the all the box around the cork pieces)
+                contour_points.push_back(ip.smallestAreaContour(ip.filterContoursByArea(ip.parseImageContours(mask, -1), min_area, max_area)));
+                drawImageContours(parsed_image, contour_points);
+                std::vector<cv::Point> corners = box.get_box_corners(contour_points.at(0));
+                bool isInside = cv::pointPolygonTest(contour_points.at(0), Point(320, 240), false);
+                //imshow("mask Display", mask);
+                imshow("parsed Display", parsed_image);
+                parse_image = 0;
             }
+            namedWindow("RGB Display");
             
+            // for (int i = 0; i < corners.size(); i++)
+            // {
+            //     circle(global_img_rgb, corners.at(i), 3, cv::Scalar(0, 255, 255), 2);
+            // }
             
+            // Not live
+    
+            // Live feed
             imshow("RGB Display", global_img_rgb);
 
         }
@@ -168,6 +176,9 @@ void *cv_threadfunc (void *ptr) {
         }else if(waitKey(15) == 100 & 0xFF){
             FileStorage file("depth.ext", cv::FileStorage::WRITE);
             file << "img" << img_scaled_8u;   
+        }else if(waitKey(15) == 112 & 0xFF){
+            printf("Parsing current frame...\n");
+            parse_image = 1;
         }
 
     }

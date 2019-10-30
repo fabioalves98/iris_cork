@@ -34,10 +34,14 @@ cv::Mat ImageParser::thresholdImage(cv::Mat image, int thresholdValue)
 std::vector<std::vector<cv::Point>> ImageParser::parseImageContours(cv::Mat image, int thresholdValue)
 {
     cv::Mat i;
-    i = ImageParser::thresholdImage(image, thresholdValue);
-    
     std::vector<std::vector<cv::Point>> contours;
     cv::Mat hierarchy;
+    i = image;
+
+    if(thresholdValue >= 0)
+    {
+        i = ImageParser::thresholdImage(image, thresholdValue);    
+    }
 
     cv::findContours(i, contours, hierarchy, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, cv::Point(0, 0));
     hierarchy.release();
@@ -60,6 +64,22 @@ std::vector<std::vector<cv::Point>> ImageParser::filterContoursByArea(std::vecto
     return filtered_contours;
 }
 
+std::vector<cv::Point> ImageParser::smallestAreaContour(std::vector<std::vector<cv::Point>> contours)
+{
+    int min_area = cv::contourArea(contours[0]);
+    int idx = contours.size();
+    for( int i = 0; i < contours.size(); i++ )
+    {
+        int area = cv::contourArea(contours[i]);
+        if(area < min_area)
+        {
+            min_area = area;
+            idx = i;
+        }
+    }  
+    return contours[idx];
+}
+
 std::vector<cv::RotatedRect> ImageParser::getContourBoundingBox(std::vector<std::vector<cv::Point>> contours)
 {
     std::vector<cv::RotatedRect> minRect(contours.size());
@@ -80,6 +100,7 @@ int ImageParser::getImageGrayMean(cv::Mat image){
     return media;
 
 }
+
 
 
 
