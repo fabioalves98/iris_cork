@@ -64,7 +64,8 @@ std::vector<std::vector<cv::Point>> ImageParser::filterContoursByArea(std::vecto
 std::vector<cv::Point> ImageParser::smallestAreaContour(std::vector<std::vector<cv::Point>> contours)
 {
     int min_area = cv::contourArea(contours[0]);
-    int idx = contours.size();
+    int idx = 0;
+
     for( int i = 0; i < contours.size(); i++ )
     {
         int area = cv::contourArea(contours[i]);

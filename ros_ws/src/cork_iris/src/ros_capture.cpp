@@ -122,13 +122,13 @@ void *cv_threadfunc (void *ptr) {
                 std::vector<Point> points = box.get_blue_box(drawable);
                 cv::Mat mask = box.getMaskInRange(drawable, cv::Scalar(0, 0, 250), cv::Scalar(0, 0, 255));
 
-                int min_area = 1000;
+                int min_area = 20000;
                 int max_area = 200000;
                 std::vector<std::vector<Point>> contour_points;
+
                 // This contour should be the inside contour (excluding the all the box around the cork pieces)
                 contour_points.push_back(ip.smallestAreaContour(ip.filterContoursByArea(ip.parseImageContours(mask, -1), min_area, max_area)));
                 drawImageContours(parsed_image, contour_points);
-                
                 unsigned char *output = (unsigned char*)(parsed_depth.data);
                 Point highest = dp.findMinMaxPoint(parsed_depth, contour_points.at(0), true); 
                 Point lowest  = dp.findMinMaxPoint(parsed_depth, contour_points.at(0), false); 

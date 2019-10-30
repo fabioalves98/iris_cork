@@ -101,6 +101,7 @@ std::vector<cv::Point> DepthParser::getPointNeighbours(cv::Point p)
 cv::Mat DepthParser::getBestPossibleCorkPiece(cv::Mat input_image, std::vector<cv::Point> contour)
 {
     cv::Point highest = DepthParser::findMinMaxPoint(input_image, contour, true);
+    
     std::vector<cv::Point> pixels = getPointNeighbours(highest);
     cv::Mat output_image = input_image.clone();
 
