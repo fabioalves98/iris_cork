@@ -26,14 +26,16 @@
 using namespace cv;
 
 pthread_mutex_t mutex_kinect = PTHREAD_MUTEX_INITIALIZER;
-pthread_t cv_thread;
+pthread_t cv_thread, key_press, image_processing;
+
 
 cv::Mat global_img_depth, global_img_rgb;
 cv::Mat img_scaled_8u;
+cv::Mat drawable;
 
 bool depth_assignment = 0;
 bool rgb_assignment = 0;
-bool parse_image = 0;
+bool drawable_assignment = 0;
 
 Box box;
 DepthParser dp;
@@ -58,10 +60,40 @@ void drawContourBoundingBox(Mat drawing, std::vector<cv::RotatedRect> rects)
     }
 }
 
+void *process_image(void* args){    
+    cv::Mat parsed_image = global_img_rgb.clone();
+    cv::Mat parsed_depth = global_img_depth.clone();
+    
+    // Image box
+    cv::Mat box_image =  global_img_rgb.clone();
+    std::vector<Point> points = box.get_blue_box(box_image);
+    cv::Mat mask = box.getMaskInRange(box_image, cv::Scalar(0, 0, 250), cv::Scalar(0, 0, 255));
+
+    
+    // Contours
+    int min_area = 20000;
+    int max_area = 200000;
+    std::vector<std::vector<Point>> contour_points;
+
+    // This contour should be the inside contour (excluding the all the box around the cork pieces)
+    contour_points.push_back(ip.smallestAreaContour(ip.filterContoursByArea(ip.parseImageContours(mask, -1), min_area, max_area)));
+    drawImageContours(parsed_image, contour_points);
+    
+    dp.extendDepthImageColors(parsed_depth, contour_points.at(0));
+    cv::Mat cork_piece = dp.getBestPossibleCorkPiece(parsed_depth, contour_points.at(0));
+    
+    
+    drawable = box_image.clone();    
+    drawable_assignment = 1;
+    
+    pthread_exit(NULL);
+
+    return NULL;
+}
+
 
 
 void depth_callback(const sensor_msgs::ImageConstPtr& msg){
-    pthread_mutex_lock( &mutex_kinect );
 
     cv_bridge::CvImagePtr cv_image_ptr;
 
@@ -73,12 +105,10 @@ void depth_callback(const sensor_msgs::ImageConstPtr& msg){
         ROS_ERROR("%s", e.what());
         return;
     }
-    pthread_mutex_unlock( &mutex_kinect );
  
 }
 
 void rgb_callback(const sensor_msgs::ImageConstPtr& msg){
-    pthread_mutex_lock( &mutex_kinect );
 
     cv_bridge::CvImagePtr cv_image_ptr;
 
@@ -90,7 +120,6 @@ void rgb_callback(const sensor_msgs::ImageConstPtr& msg){
         ROS_ERROR("%s", e.what());
         return;
     }
-    pthread_mutex_unlock( &mutex_kinect );
 
 
 }
@@ -99,74 +128,29 @@ void *cv_threadfunc (void *ptr) {
     // use image polling
     while (1)
     {
-
-        //lock mutex for depth image
-        pthread_mutex_lock( &mutex_kinect );
-
-        if(depth_assignment){
-            //namedWindow("Depth Display");
+        
+        if(depth_assignment)
+        {
             cv::Mat(global_img_depth-0).convertTo(img_scaled_8u, CV_8UC1, 255. / (1000 - 0));
-            // Draw a rectangle arround the box's pins
-            //std::vector<Point> good_pins = box.get_pins(global_image_depth);
-            //box.draw_rect(global_image_depth, good_pins);
-            
-
-            //imshow("Depth Display", img_scaled_8u);
+            imshow("Depth Display", img_scaled_8u);
         }
 
-        if(rgb_assignment){
-            if(parse_image && depth_assignment){
-                cv::Mat parsed_image = global_img_rgb.clone();
-                cv::Mat parsed_depth = img_scaled_8u.clone();
-                cv::Mat drawable = global_img_rgb.clone();
-                std::vector<Point> points = box.get_blue_box(drawable);
-                cv::Mat mask = box.getMaskInRange(drawable, cv::Scalar(0, 0, 250), cv::Scalar(0, 0, 255));
-
-                int min_area = 20000;
-                int max_area = 200000;
-                std::vector<std::vector<Point>> contour_points;
-
-                // This contour should be the inside contour (excluding the all the box around the cork pieces)
-                contour_points.push_back(ip.smallestAreaContour(ip.filterContoursByArea(ip.parseImageContours(mask, -1), min_area, max_area)));
-                drawImageContours(parsed_image, contour_points);
-                unsigned char *output = (unsigned char*)(parsed_depth.data);
-                Point highest = dp.findMinMaxPoint(parsed_depth, contour_points.at(0), true); 
-                Point lowest  = dp.findMinMaxPoint(parsed_depth, contour_points.at(0), false); 
-                dp.extendDepthImageColors(parsed_depth, output[parsed_depth.step * highest.y + highest.x], output[parsed_depth.step * lowest.y + lowest.x]); 
-                
-                cv::Mat cork_piece = dp.getBestPossibleCorkPiece(parsed_depth, contour_points.at(0));
-                imshow("cork Display", cork_piece);
-                // imshow("parsed Display", parsed_image);
-                parse_image = 0;
-                
-            }
-            namedWindow("RGB Display");
-            
-    
-            // Live feed
+        if(rgb_assignment)
+        {
             imshow("RGB Display", global_img_rgb);
-
         }
 
-        //unlock mutex for depth image
-        pthread_mutex_unlock( &mutex_kinect );
+        if(drawable_assignment)
+        {
+            imshow("Drawable", drawable);
+            drawable_assignment = 0;
+        }
 
 
-        // wait for quit key
+        // Esc to quit
         if(waitKey(15) == 27 && 0xFF){
-            //destroyWindow("Depth Display");
-            destroyWindow("RGB Display");
+            destroyAllWindows();
             break;
-        }
-        else if(waitKey(15) == 99 & 0xFF){
-            FileStorage file("img.ext", cv::FileStorage::WRITE);
-            file << "img" << global_img_rgb;
-        }else if(waitKey(15) == 100 & 0xFF){
-            FileStorage file("depth.ext", cv::FileStorage::WRITE);
-            file << "img" << img_scaled_8u;   
-        }else if(waitKey(15) == 112 & 0xFF){
-            printf("Parsing current frame...\n");
-            parse_image = 1;
         }
 
     }
@@ -175,6 +159,23 @@ void *cv_threadfunc (void *ptr) {
     return NULL;
 
 }
+
+void *key_pressfunc (void *ptr) {
+    while(1)
+    {
+        char key;
+        std::cout << "Key: ";
+        std::cin >> key;
+        if(key == 'p'){
+            int thread_res = 0;
+            thread_res = pthread_create(&image_processing, NULL, process_image, NULL);
+            if(thread_res) return NULL;
+        }
+    }
+    pthread_exit(NULL);
+    return NULL;
+}
+
 
 int main(int argc, char** argv){
 
@@ -188,15 +189,24 @@ int main(int argc, char** argv){
     // image_sub = it.subscribe("/camera/rgb/image_raw", 1, image_callback2);
     image_sub = it.subscribe("/camera/rgb/image_raw", 1, rgb_callback);
     depth_sub = it.subscribe("/camera/depth_registered/image_raw", 1, depth_callback);
+    
+    // Live Image Thread
     int res = 0;
-
     res = pthread_create(&cv_thread, NULL, cv_threadfunc, NULL);
     if (res)
     {
         printf("pthread_create failed\n");
         return 1;
     }
-    printf("Started open cv thread and all inits.\n");
+    
+    int res2 = pthread_create(&key_press, NULL, key_pressfunc, NULL);
+    if(res2)
+    {
+        return 1;
+    }
+
+    
+    printf("Started live feed thread\n");
 
     ros::spin();
     destroyWindow("Display");

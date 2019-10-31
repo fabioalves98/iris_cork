@@ -17,12 +17,18 @@ DepthParser::~DepthParser(void)
 }
 
 
-void DepthParser::extendDepthImageColors(cv::Mat image, int minval, int maxval)
+void DepthParser::extendDepthImageColors(cv::Mat image, std::vector<cv::Point> contour)
 {
-    int diff = abs(maxval-minval);
+    cv::Point highest = DepthParser::findMinMaxPoint(image, contour, true); 
+    cv::Point lowest  = DepthParser::findMinMaxPoint(image, contour, false);
+    std::cout << lowest << " " << highest << std::endl;
     
     int i, j; 
     unsigned char *ptr = (unsigned char*)(image.data);
+    int minval = ptr[image.step * highest.y + highest.x];
+    int maxval = ptr[image.step * lowest.y + lowest.x]; 
+    int diff = abs(maxval-minval);
+
     for(i = 0; i < image.cols; i++){
         for(j = 0; j < image.rows; j++){
             if(ptr[image.cols * j + i] < minval){
@@ -42,7 +48,7 @@ cv::Point DepthParser::findMinMaxPoint(cv::Mat image, std::vector<cv::Point> con
 {
     int min = 256;
     int max = -1;
-    int x, y;
+    int x = 0, y = 0;
     unsigned char *input = (unsigned char*)(image.data);
     for(int j = 0; j < image.rows;j++){
         for(int i = 0; i < image.cols;i++){
