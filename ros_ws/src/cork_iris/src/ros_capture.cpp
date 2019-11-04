@@ -29,8 +29,7 @@ pthread_mutex_t mutex_kinect = PTHREAD_MUTEX_INITIALIZER;
 pthread_t cv_thread, key_press, image_processing;
 
 
-cv::Mat global_img_depth, global_img_rgb;
-cv::Mat img_scaled_8u;
+cv::Mat raw_global_img_depth, global_img_depth, global_img_rgb;
 cv::Mat drawable;
 
 bool depth_assignment = 0;
@@ -83,7 +82,7 @@ void *process_image(void* args){
     cv::Mat cork_piece = dp.getBestPossibleCorkPiece(parsed_depth, contour_points.at(0));
     
     
-    drawable = box_image.clone();    
+    drawable = cork_piece.clone();    
     drawable_assignment = 1;
     
     pthread_exit(NULL);
@@ -99,7 +98,7 @@ void depth_callback(const sensor_msgs::ImageConstPtr& msg){
 
     try{
         cv_image_ptr = cv_bridge::toCvCopy(msg, sensor_msgs::image_encodings::TYPE_16UC1);
-        global_img_depth = cv_image_ptr->image;
+        raw_global_img_depth = cv_image_ptr->image;
         depth_assignment = 1;
     }catch(cv_bridge::Exception& e){
         ROS_ERROR("%s", e.what());
@@ -131,8 +130,8 @@ void *cv_threadfunc (void *ptr) {
         
         if(depth_assignment)
         {
-            cv::Mat(global_img_depth-0).convertTo(img_scaled_8u, CV_8UC1, 255. / (1000 - 0));
-            imshow("Depth Display", img_scaled_8u);
+            cv::Mat(raw_global_img_depth-0).convertTo(global_img_depth, CV_8UC1, 255. / (1000 - 0));
+            imshow("Depth Display", global_img_depth);
         }
 
         if(rgb_assignment)
@@ -191,16 +190,17 @@ int main(int argc, char** argv){
     depth_sub = it.subscribe("/camera/depth_registered/image_raw", 1, depth_callback);
     
     // Live Image Thread
-    int res = 0;
-    res = pthread_create(&cv_thread, NULL, cv_threadfunc, NULL);
-    if (res)
+    int res_cv = 0;
+    res_cv = pthread_create(&cv_thread, NULL, cv_threadfunc, NULL);
+    if (res_cv)
     {
         printf("pthread_create failed\n");
         return 1;
     }
     
-    int res2 = pthread_create(&key_press, NULL, key_pressfunc, NULL);
-    if(res2)
+    int res_key = 0;
+    res_key = pthread_create(&key_press, NULL, key_pressfunc, NULL);
+    if(res_key)
     {
         return 1;
     }

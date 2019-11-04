@@ -19,9 +19,8 @@ DepthParser::~DepthParser(void)
 
 void DepthParser::extendDepthImageColors(cv::Mat image, std::vector<cv::Point> contour)
 {
-    cv::Point highest = DepthParser::findMinMaxPoint(image, contour, true); 
     cv::Point lowest  = DepthParser::findMinMaxPoint(image, contour, false);
-    std::cout << lowest << " " << highest << std::endl;
+    cv::Point highest = DepthParser::findMinMaxPoint(image, contour, true); 
     
     int i, j; 
     unsigned char *ptr = (unsigned char*)(image.data);
@@ -55,6 +54,7 @@ cv::Point DepthParser::findMinMaxPoint(cv::Mat image, std::vector<cv::Point> con
             unsigned char b = input[image.step * j + i ] ;
             unsigned char g = input[image.step * j + i + 1];
             unsigned char r = input[image.step * j + i + 2];
+            // std::cout << (int)r << " " << (int)g << " " << (int)b << std::endl;
 
             // why do some pixels have different values rgb values? (0, 255, 0) ... etc
             if(r == g && r == b){
