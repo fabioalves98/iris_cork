@@ -78,7 +78,7 @@ void *process_image(void* args){
     contour_points.push_back(ip.smallestAreaContour(ip.filterContoursByArea(ip.parseImageContours(mask, -1), min_area, max_area)));
     drawImageContours(parsed_image, contour_points);
     
-    dp.extendDepthImageColors(parsed_depth, contour_points.at(0));
+    // dp.extendDepthImageColors(parsed_depth, contour_points.at(0));
     cv::Mat cork_piece = dp.getBestPossibleCorkPiece(parsed_depth, contour_points.at(0));
     
     

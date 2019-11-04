@@ -8,7 +8,10 @@
 
 DepthParser::DepthParser(void)
 {
- 
+    // Minimum and Maximum parsing value. Every point with a distance outside of this range
+    // will not be parsed
+    int minval = 256;
+    int maxval = 0;
 }
 
 DepthParser::~DepthParser(void)
@@ -24,9 +27,11 @@ void DepthParser::extendDepthImageColors(cv::Mat image, std::vector<cv::Point> c
     
     int i, j; 
     unsigned char *ptr = (unsigned char*)(image.data);
-    int minval = ptr[image.step * highest.y + highest.x];
-    int maxval = ptr[image.step * lowest.y + lowest.x]; 
+    minval = ptr[image.step * highest.y + highest.x];
+    maxval = ptr[image.step * lowest.y + lowest.x]; 
     int diff = abs(maxval-minval);
+    std::cout << "Diff - " << diff << std::endl;
+    std::cout << "Step - " << 255 / diff << std::endl;
 
     for(i = 0; i < image.cols; i++){
         for(j = 0; j < image.rows; j++){
@@ -40,7 +45,6 @@ void DepthParser::extendDepthImageColors(cv::Mat image, std::vector<cv::Point> c
             }
         }
     }
-    
 }
 
 cv::Point DepthParser::findMinMaxPoint(cv::Mat image, std::vector<cv::Point> contour, bool toggle)
@@ -114,8 +118,7 @@ cv::Mat DepthParser::getBestPossibleCorkPiece(cv::Mat input_image, std::vector<c
     unsigned char *input = (unsigned char*)(input_image.data);
     unsigned char *output = (unsigned char*)(output_image.data);
 
-    const int BLACK_THRESHOLD = 120;
-
+    int step = 255 / abs(minval - maxval);
     int MAX_ITERS = 20000;
     for(int i = 0; i < pixels.size(); i++){
         if(MAX_ITERS == 0) break;
@@ -129,7 +132,7 @@ cv::Mat DepthParser::getBestPossibleCorkPiece(cv::Mat input_image, std::vector<c
 
             if(!(find(pixels.begin(), pixels.end(), pneighbour) != pixels.end()))
             {
-                if(abs(pcolor-ncolor) < 9 && pcolor <= ncolor)
+                if(abs(pcolor-ncolor) <= 1 && pcolor <= ncolor)
                     pixels.push_back(pneighbour);
             
                 else

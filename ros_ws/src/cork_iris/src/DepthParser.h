@@ -9,6 +9,7 @@ class DepthParser
 {
 	private:
         std::vector<cv::Point> getPointNeighbours(cv::Point p);
+        int minval, maxval;
 
 	public:		
 		DepthParser();
