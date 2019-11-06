@@ -31,8 +31,6 @@ void DepthParser::extendDepthImageColors(std::vector<cv::Point> contour)
     minval = ptr[image.step * highest.y + highest.x];
     maxval = ptr[image.step * lowest.y + lowest.x]; 
     int diff = abs(maxval-minval);
-    std::cout << "Diff - " << diff << std::endl;
-    std::cout << "Step - " << 255 / diff << std::endl;
 
     for(i = 0; i < image.cols; i++){
         for(j = 0; j < image.rows; j++){
@@ -109,11 +107,12 @@ std::vector<cv::Point> DepthParser::getPointNeighbours(cv::Point p)
 
 
 
-cv::Mat DepthParser::getBestPossibleCorkPiece(std::vector<cv::Point> contour)
+std::vector<cv::Point> DepthParser::getBestPossibleCorkPiece(std::vector<cv::Point> contour)
 {
     cv::Point highest = DepthParser::findMinMaxPoint(contour, true);
-    
+    std::vector<cv::Point> cork_piece; 
     std::vector<cv::Point> pixels = getPointNeighbours(highest);
+    std::vector<cv::Point> closed;
     cv::Mat output_image = image.clone();
 
     unsigned char *input = (unsigned char*)(image.data);
@@ -125,32 +124,34 @@ cv::Mat DepthParser::getBestPossibleCorkPiece(std::vector<cv::Point> contour)
         if(MAX_ITERS == 0) break;
 
         cv::Point p = pixels.at(i);
+        closed.push_back(p);
         int pcolor = (int)input[image.step * p.y + p.x + 2];   
         std::vector<cv::Point> neighbours = DepthParser::getPointNeighbours(p);
         for(int j = 0; j < neighbours.size(); j++){
             cv::Point pneighbour = neighbours.at(j);
+            int isInside = cv::pointPolygonTest(contour, pneighbour, false);
+            if(isInside==-1) continue;          
             int ncolor = (int)input[image.step * pneighbour.y + pneighbour.x + 2]; 
 
             if(!(find(pixels.begin(), pixels.end(), pneighbour) != pixels.end()))
             {
-                if(abs(pcolor-ncolor) <= 1 && pcolor <= ncolor)
+                if(abs(pcolor-ncolor) <= step) //&& pcolor <= ncolor)
                     pixels.push_back(pneighbour);
             
                 else
                 {
-                    output[output_image.step * pneighbour.y + pneighbour.x + 2] = 0;   
-                    output[output_image.step * pneighbour.y + pneighbour.x + 1] = 0;   
-                    output[output_image.step * pneighbour.y + pneighbour.x ] = 255;   
+                    
+                    cork_piece.push_back(pneighbour);
+                    // output[output_image.step * pneighbour.y + pneighbour.x + 2] = 0;   
+                    // output[output_image.step * pneighbour.y + pneighbour.x + 1] = 0;   
+                    // output[output_image.step * pneighbour.y + pneighbour.x ] = 255;   
                 }
-            }
-
-                
-            
+            }            
         }
         MAX_ITERS--;
     }
 
-    return output_image;
+    return cork_piece;
 }
 
 

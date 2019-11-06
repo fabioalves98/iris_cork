@@ -83,10 +83,12 @@ void *process_image(void* args){
     
     DepthParser dp(parsed_depth);
     dp.extendDepthImageColors(contour_points.at(0));
-    cv::Mat cork_piece = dp.getBestPossibleCorkPiece(contour_points.at(0));
+    std::vector<cv::Point> cork_piece = dp.getBestPossibleCorkPiece(contour_points.at(0));
+    for(int i = 0; i < cork_piece.size(); i++){
+        circle(parsed_image,  Point(cork_piece.at(i).x + 2, cork_piece.at(i).y), 0, cv::Scalar(255, 255, 255), 1);
+    }
     
-    
-    drawable = mask.clone();    
+    drawable = parsed_image.clone();    
     drawable_assignment = 1;
     
     pthread_exit(NULL);
