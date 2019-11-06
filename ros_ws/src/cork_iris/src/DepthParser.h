@@ -10,12 +10,14 @@ class DepthParser
 	private:
         std::vector<cv::Point> getPointNeighbours(cv::Point p);
         int minval, maxval;
+        cv::Mat image;
 
 	public:		
-		DepthParser();
-        void extendDepthImageColors(cv::Mat irimage, std::vector<cv::Point> contour);
-        cv::Point findMinMaxPoint(cv::Mat image, std::vector<cv::Point> contour, bool toggle);
-        cv::Mat getBestPossibleCorkPiece(cv::Mat input_image, std::vector<cv::Point> contour);
+		DepthParser(cv::Mat image);
+
+        void extendDepthImageColors(std::vector<cv::Point> contour);
+        cv::Point findMinMaxPoint(std::vector<cv::Point> contour, bool toggle);
+        cv::Mat getBestPossibleCorkPiece(std::vector<cv::Point> contour);
 
 		~DepthParser();
 		

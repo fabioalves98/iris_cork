@@ -6,9 +6,9 @@
 #include <opencv2/highgui/highgui.hpp>
 #include <stdlib.h>
 
-ImageParser::ImageParser(void)
+ImageParser::ImageParser(cv::Mat image)
 {
- 
+    this->image = image;
 }
 
 ImageParser::~ImageParser(void)
@@ -16,7 +16,7 @@ ImageParser::~ImageParser(void)
 
 }
 
-cv::Mat ImageParser::thresholdImage(cv::Mat image, int thresholdValue)
+cv::Mat ImageParser::thresholdImage(int thresholdValue)
 {
     cv::Mat newimg;
     
@@ -28,7 +28,8 @@ cv::Mat ImageParser::thresholdImage(cv::Mat image, int thresholdValue)
 }
 
 
-std::vector<std::vector<cv::Point>> ImageParser::parseImageContours(cv::Mat image, int thresholdValue)
+// -1 threshold value indicates that the image has already been thresholded
+std::vector<std::vector<cv::Point>> ImageParser::parseImageContours(int thresholdValue)
 {
     cv::Mat i;
     std::vector<std::vector<cv::Point>> contours;
@@ -37,7 +38,7 @@ std::vector<std::vector<cv::Point>> ImageParser::parseImageContours(cv::Mat imag
 
     if(thresholdValue >= 0)
     {
-        i = ImageParser::thresholdImage(image, thresholdValue);    
+        i = ImageParser::thresholdImage(thresholdValue);    
     }
 
     cv::findContours(i, contours, hierarchy, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, cv::Point(0, 0));

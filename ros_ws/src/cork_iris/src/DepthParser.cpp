@@ -6,12 +6,13 @@
 #include <opencv2/highgui/highgui.hpp>
 #include <stdlib.h>
 
-DepthParser::DepthParser(void)
+DepthParser::DepthParser(cv::Mat image)
 {
     // Minimum and Maximum parsing value. Every point with a distance outside of this range
     // will not be parsed
     int minval = 256;
     int maxval = 0;
+    this->image = image;
 }
 
 DepthParser::~DepthParser(void)
@@ -20,10 +21,10 @@ DepthParser::~DepthParser(void)
 }
 
 
-void DepthParser::extendDepthImageColors(cv::Mat image, std::vector<cv::Point> contour)
+void DepthParser::extendDepthImageColors(std::vector<cv::Point> contour)
 {
-    cv::Point lowest  = DepthParser::findMinMaxPoint(image, contour, false);
-    cv::Point highest = DepthParser::findMinMaxPoint(image, contour, true); 
+    cv::Point lowest  = DepthParser::findMinMaxPoint(contour, false);
+    cv::Point highest = DepthParser::findMinMaxPoint(contour, true); 
     
     int i, j; 
     unsigned char *ptr = (unsigned char*)(image.data);
@@ -47,7 +48,7 @@ void DepthParser::extendDepthImageColors(cv::Mat image, std::vector<cv::Point> c
     }
 }
 
-cv::Point DepthParser::findMinMaxPoint(cv::Mat image, std::vector<cv::Point> contour, bool toggle)
+cv::Point DepthParser::findMinMaxPoint(std::vector<cv::Point> contour, bool toggle)
 {
     int min = 256;
     int max = -1;
@@ -108,14 +109,14 @@ std::vector<cv::Point> DepthParser::getPointNeighbours(cv::Point p)
 
 
 
-cv::Mat DepthParser::getBestPossibleCorkPiece(cv::Mat input_image, std::vector<cv::Point> contour)
+cv::Mat DepthParser::getBestPossibleCorkPiece(std::vector<cv::Point> contour)
 {
-    cv::Point highest = DepthParser::findMinMaxPoint(input_image, contour, true);
+    cv::Point highest = DepthParser::findMinMaxPoint(contour, true);
     
     std::vector<cv::Point> pixels = getPointNeighbours(highest);
-    cv::Mat output_image = input_image.clone();
+    cv::Mat output_image = image.clone();
 
-    unsigned char *input = (unsigned char*)(input_image.data);
+    unsigned char *input = (unsigned char*)(image.data);
     unsigned char *output = (unsigned char*)(output_image.data);
 
     int step = 255 / abs(minval - maxval);
@@ -124,11 +125,11 @@ cv::Mat DepthParser::getBestPossibleCorkPiece(cv::Mat input_image, std::vector<c
         if(MAX_ITERS == 0) break;
 
         cv::Point p = pixels.at(i);
-        int pcolor = (int)input[input_image.step * p.y + p.x + 2];   
+        int pcolor = (int)input[image.step * p.y + p.x + 2];   
         std::vector<cv::Point> neighbours = DepthParser::getPointNeighbours(p);
         for(int j = 0; j < neighbours.size(); j++){
             cv::Point pneighbour = neighbours.at(j);
-            int ncolor = (int)input[input_image.step * pneighbour.y + pneighbour.x + 2]; 
+            int ncolor = (int)input[image.step * pneighbour.y + pneighbour.x + 2]; 
 
             if(!(find(pixels.begin(), pixels.end(), pneighbour) != pixels.end()))
             {

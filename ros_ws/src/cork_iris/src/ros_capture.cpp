@@ -36,9 +36,6 @@ bool depth_assignment = 0;
 bool rgb_assignment = 0;
 bool drawable_assignment = 0;
 
-Box box;
-DepthParser dp;
-ImageParser ip;
 
 void drawImageContours(Mat drawing, std::vector<std::vector<cv::Point>> contours)
 {
@@ -60,29 +57,36 @@ void drawContourBoundingBox(Mat drawing, std::vector<cv::RotatedRect> rects)
 }
 
 void *process_image(void* args){    
+
     cv::Mat parsed_image = global_img_rgb.clone();
     cv::Mat parsed_depth = global_img_depth.clone();
     
     // Image box
     cv::Mat box_image =  global_img_rgb.clone();
-    std::vector<Point> points = box.get_blue_box(box_image);
-    cv::Mat mask = box.getMaskInRange(box_image, cv::Scalar(0, 0, 250), cv::Scalar(0, 0, 255));
+    Box box(box_image);
+    std::vector<Point> points = box.get_blue_box();
+    // Get blue box painted all blue points bright red. Get the mask for all bright red points
+    cv::Mat mask = box.getMaskInRange(cv::Scalar(0, 0, 250), cv::Scalar(0, 0, 255));
 
     
     // Contours
     int min_area = 20000;
     int max_area = 200000;
     std::vector<std::vector<Point>> contour_points;
+    ImageParser ip(mask);
 
     // This contour should be the inside contour (excluding the all the box around the cork pieces)
-    contour_points.push_back(ip.smallestAreaContour(ip.filterContoursByArea(ip.parseImageContours(mask, -1), min_area, max_area)));
+    // This is a heavy assumption since we are considering that only two contours exist after the first
+    // area filter, the outer box cntour and the inner box contour.
+    contour_points.push_back(ip.smallestAreaContour(ip.filterContoursByArea(ip.parseImageContours(-1), min_area, max_area)));
     drawImageContours(parsed_image, contour_points);
     
-    // dp.extendDepthImageColors(parsed_depth, contour_points.at(0));
-    cv::Mat cork_piece = dp.getBestPossibleCorkPiece(parsed_depth, contour_points.at(0));
+    DepthParser dp(parsed_depth);
+    dp.extendDepthImageColors(contour_points.at(0));
+    cv::Mat cork_piece = dp.getBestPossibleCorkPiece(contour_points.at(0));
     
     
-    drawable = cork_piece.clone();    
+    drawable = mask.clone();    
     drawable_assignment = 1;
     
     pthread_exit(NULL);

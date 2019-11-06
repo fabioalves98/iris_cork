@@ -2,12 +2,12 @@
 
 #include <stdlib.h>
 
-Box::Box(void)
+Box::Box(cv::Mat image)
 {
- 
+    this->image = image;
 }
 
-std::vector<cv::Point> Box::get_pins(cv::Mat image)
+std::vector<cv::Point> Box::get_pins()
 {
     std::vector<cv::Point> possible_pins;
 
@@ -62,7 +62,7 @@ std::vector<cv::Point> Box::get_pins(cv::Mat image)
     return good_pins;
 }
 
-void Box::draw_rect(cv::Mat image, std::vector<cv::Point> pins)
+void Box::draw_rect(std::vector<cv::Point> pins)
 {
     cv::Point min = cv::Point(640, 480);
     cv::Point max = cv::Point(0, 0);
@@ -92,7 +92,7 @@ void Box::draw_rect(cv::Mat image, std::vector<cv::Point> pins)
     }
 }
 
-std::vector<cv::Point> Box::get_blue_box(cv::Mat image)
+std::vector<cv::Point> Box::get_blue_box()
 {
     std::vector<cv::Point> box;
 
@@ -157,7 +157,7 @@ std::vector<cv::Point> Box::get_box_corners(std::vector<cv::Point> box_contour)
     return corners;
 }
 
-cv::Mat Box::getMaskInRange(cv::Mat image, cv::Scalar min, cv::Scalar max)
+cv::Mat Box::getMaskInRange(cv::Scalar min, cv::Scalar max)
 {
     cv::Mat mask;   
     cv::inRange(image, min, max, mask);

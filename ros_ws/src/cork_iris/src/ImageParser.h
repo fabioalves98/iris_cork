@@ -8,12 +8,12 @@
 class ImageParser
 {
 	private:
-
+        cv::Mat image;
 
 	public:		
-		ImageParser();
-        cv::Mat thresholdImage(cv::Mat image, int thresholdValue);
-        std::vector<std::vector<cv::Point>> parseImageContours(cv::Mat image, int thresholdValue);
+		ImageParser(cv::Mat image);
+        cv::Mat thresholdImage(int thresholdValue);
+        std::vector<std::vector<cv::Point>> parseImageContours(int thresholdValue);
         std::vector<std::vector<cv::Point>> filterContoursByArea(std::vector<std::vector<cv::Point>> contours, int min_area, int max_area);
         std::vector<cv::RotatedRect> getContourBoundingBox(std::vector<std::vector<cv::Point>> contours);
         std::vector<cv::Point> smallestAreaContour(std::vector<std::vector<cv::Point>> contours);

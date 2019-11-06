@@ -74,8 +74,8 @@ int main(int argc, char **argv){
 
     printf("Loading: %s\n", filename);
     FileStorage fs(filename, FileStorage::READ);
-    ImageParser ip;
-    DepthParser dp;
+    // ImageParser ip;
+    // DepthParser dp;
     // Mat loadedimg;
     // fs["img"] >> loadedimg;
 
