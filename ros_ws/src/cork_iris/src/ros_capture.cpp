@@ -13,28 +13,28 @@
 #include <stdio.h>
 #include <ros/ros.h>
 #include <image_transport/image_transport.h>
+#include <message_filters/time_synchronizer.h>
+#include <message_filters/time_synchronizer.h>
+#include <message_filters/sync_policies/approximate_time.h>
+#include <message_filters/subscriber.h>
 #include <cv_bridge/cv_bridge.h>
 #include <sensor_msgs/image_encodings.h>
+#include <sensor_msgs/Image.h>
+#include <sensor_msgs/CameraInfo.h>
 #include <opencv2/opencv.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/highgui/highgui.hpp>
-#include <pthread.h>
 #include "box.h"
 #include "DepthParser.h"
 #include "ImageParser.h"
 
+
 using namespace cv;
 
-pthread_mutex_t mutex_kinect = PTHREAD_MUTEX_INITIALIZER;
-pthread_t cv_thread, key_press, image_processing;
 
+image_transport::Publisher depth_pub;
+image_transport::Publisher parsed_pub;
 
-cv::Mat raw_global_img_depth, global_img_depth, global_img_rgb;
-cv::Mat drawable;
-
-bool depth_assignment = 0;
-bool rgb_assignment = 0;
-bool drawable_assignment = 0;
 
 
 void drawImageContours(Mat drawing, std::vector<std::vector<cv::Point>> contours)
@@ -56,13 +56,14 @@ void drawContourBoundingBox(Mat drawing, std::vector<cv::RotatedRect> rects)
     }
 }
 
-void *process_image(void* args){    
+cv::Mat process_image(cv::Mat image, cv::Mat depth){    
+	cv::Mat drawable;
 
-    cv::Mat parsed_image = global_img_rgb.clone();
-    cv::Mat parsed_depth = global_img_depth.clone();
+    cv::Mat parsed_image = image.clone();
+    cv::Mat parsed_depth = depth.clone();
     
     // Image box
-    cv::Mat box_image =  global_img_rgb.clone();
+    cv::Mat box_image =  image.clone();
     Box box(box_image);
     std::vector<Point> points = box.get_blue_box();
     // Get blue box painted all blue points bright red. Get the mask for all bright red points
@@ -89,96 +90,40 @@ void *process_image(void* args){
     }
     
     drawable = parsed_image.clone();    
-    drawable_assignment = 1;
     
-    pthread_exit(NULL);
-
-    return NULL;
+    return drawable;
 }
 
+void callback(const sensor_msgs::ImageConstPtr& image, const sensor_msgs::ImageConstPtr& depth)
+{
+	cv::Mat raw_global_img_depth, global_img_depth, global_img_rgb;
+	cv::Mat drawable;
 
-
-void depth_callback(const sensor_msgs::ImageConstPtr& msg){
-
-    cv_bridge::CvImagePtr cv_image_ptr;
+    cv_bridge::CvImagePtr cv_depth_ptr;
+	cv_bridge::CvImagePtr cv_image_ptr;
 
     try{
-        cv_image_ptr = cv_bridge::toCvCopy(msg, sensor_msgs::image_encodings::TYPE_16UC1);
-        raw_global_img_depth = cv_image_ptr->image;
-        depth_assignment = 1;
-    }catch(cv_bridge::Exception& e){
-        ROS_ERROR("%s", e.what());
-        return;
-    }
- 
-}
+		cv_depth_ptr = cv_bridge::toCvCopy(depth, sensor_msgs::image_encodings::TYPE_16UC1);
+    	cv_image_ptr = cv_bridge::toCvCopy(image, sensor_msgs::image_encodings::BGR8);
+		raw_global_img_depth = cv_depth_ptr->image;
+		global_img_rgb = cv_image_ptr->image;
 
-void rgb_callback(const sensor_msgs::ImageConstPtr& msg){
+		// Convert depth enconding
+		cv::Mat(raw_global_img_depth-0).convertTo(global_img_depth, CV_8UC1, 255. / (1000 - 0));
+		sensor_msgs::ImagePtr msg = cv_bridge::CvImage(std_msgs::Header(), "8UC1", global_img_depth).toImageMsg();
+		depth_pub.publish(msg);
+	
+	}catch(cv_bridge::Exception& e){
+		ROS_ERROR("%s", e.what());
+		return;
+	}
+	
+	// Process only on button click or something
+	drawable = process_image(global_img_rgb, global_img_depth);
+	sensor_msgs::ImagePtr msg = cv_bridge::CvImage(std_msgs::Header(), "bgr8", drawable).toImageMsg();
+	parsed_pub.publish(msg);
 
-    cv_bridge::CvImagePtr cv_image_ptr;
-
-    try{
-        cv_image_ptr = cv_bridge::toCvCopy(msg, sensor_msgs::image_encodings::BGR8);
-        global_img_rgb = cv_image_ptr->image;
-        rgb_assignment = 1;
-    }catch(cv_bridge::Exception& e){
-        ROS_ERROR("%s", e.what());
-        return;
-    }
-
-
-}
-
-void *cv_threadfunc (void *ptr) {
-    // use image polling
-    while (1)
-    {
-        
-        if(depth_assignment)
-        {
-            cv::Mat(raw_global_img_depth-0).convertTo(global_img_depth, CV_8UC1, 255. / (1000 - 0));
-            imshow("Depth Display", global_img_depth);
-        }
-
-        if(rgb_assignment)
-        {
-            imshow("RGB Display", global_img_rgb);
-        }
-
-        if(drawable_assignment)
-        {
-            imshow("Drawable", drawable);
-            drawable_assignment = 0;
-        }
-
-
-        // Esc to quit
-        if(waitKey(15) == 27 && 0xFF){
-            destroyAllWindows();
-            break;
-        }
-
-    }
-    pthread_exit(NULL);
-
-    return NULL;
-
-}
-
-void *key_pressfunc (void *ptr) {
-    while(1)
-    {
-        char key;
-        std::cout << "Key: ";
-        std::cin >> key;
-        if(key == 'p'){
-            int thread_res = 0;
-            thread_res = pthread_create(&image_processing, NULL, process_image, NULL);
-            if(thread_res) return NULL;
-        }
-    }
-    pthread_exit(NULL);
-    return NULL;
+	
 }
 
 
@@ -187,36 +132,23 @@ int main(int argc, char** argv){
     ros::init(argc, argv, "ros_capture");
     ros::NodeHandle n;
     image_transport::ImageTransport it(n);
-    image_transport::Subscriber depth_sub;
-    image_transport::Subscriber image_sub;
-    // image_transport::Publisher image_pub;
 
-    // image_sub = it.subscribe("/camera/rgb/image_raw", 1, image_callback2);
-    image_sub = it.subscribe("/camera/rgb/image_raw", 1, rgb_callback);
-    depth_sub = it.subscribe("/camera/depth_registered/image_raw", 1, depth_callback);
-    
-    // Live Image Thread
-    int res_cv = 0;
-    res_cv = pthread_create(&cv_thread, NULL, cv_threadfunc, NULL);
-    if (res_cv)
-    {
-        printf("pthread_create failed\n");
-        return 1;
-    }
-    
-    int res_key = 0;
-    res_key = pthread_create(&key_press, NULL, key_pressfunc, NULL);
-    if(res_key)
-    {
-        return 1;
-    }
+	depth_pub = it.advertise("/corkiris/depth", 1);
+	parsed_pub = it.advertise("/corkiris/parsed", 1);
+
+    message_filters::Subscriber<sensor_msgs::Image> image_sub(n, "/camera/rgb/image_raw", 1);
+    message_filters::Subscriber<sensor_msgs::Image> depth_sub(n, "/camera/depth_registered/image_raw", 1);
+    message_filters::Subscriber<sensor_msgs::CameraInfo> camerainfo(n, "/camera/rgb/camera_info", 1);
+    using MyPolicy = message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::Image>;
+    MyPolicy mypolicy(32);
 
     
-    printf("Started live feed thread\n");
+	message_filters::Synchronizer<MyPolicy> sync{static_cast<const MyPolicy &>(mypolicy), image_sub, depth_sub};
+    sync.registerCallback(boost::bind(&callback, _1, _2));
+    
+	ROS_INFO("Started Synchronizer\n");
 
     ros::spin();
-    destroyWindow("Display");
-    printf("window destroyed\n");
     return 0;
 
 }
