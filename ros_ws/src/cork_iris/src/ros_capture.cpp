@@ -35,6 +35,8 @@ using namespace cv;
 image_transport::Publisher depth_pub;
 image_transport::Publisher parsed_pub;
 
+// Global image declaration. These are set in the camera callback, and used in the process image function
+cv::Mat raw_global_img_depth, global_img_depth, global_img_rgb;
 
 
 void drawImageContours(Mat drawing, std::vector<std::vector<cv::Point>> contours)
@@ -56,14 +58,14 @@ void drawContourBoundingBox(Mat drawing, std::vector<cv::RotatedRect> rects)
     }
 }
 
-cv::Mat process_image(cv::Mat image, cv::Mat depth){    
+cv::Mat process_image(const ros::TimerEvent& event){    
 	cv::Mat drawable;
 
-    cv::Mat parsed_image = image.clone();
-    cv::Mat parsed_depth = depth.clone();
+    cv::Mat parsed_image = global_img_rgb.clone();
+    cv::Mat parsed_depth = global_img_depth.clone();
     
     // Image box
-    cv::Mat box_image =  image.clone();
+    cv::Mat box_image =  global_img_rgb.clone();
     Box box(box_image);
     std::vector<Point> points = box.get_blue_box();
     // Get blue box painted all blue points bright red. Get the mask for all bright red points
@@ -89,14 +91,18 @@ cv::Mat process_image(cv::Mat image, cv::Mat depth){
         circle(parsed_image,  Point(cork_piece.at(i).x + 2, cork_piece.at(i).y), 0, cv::Scalar(255, 255, 255), 1);
     }
     
-    drawable = parsed_image.clone();    
-    
+    drawable = parsed_image.clone(); 
+
+	sensor_msgs::ImagePtr msg = cv_bridge::CvImage(std_msgs::Header(), "bgr8", drawable).toImageMsg();
+	parsed_pub.publish(msg);
+   
     return drawable;
 }
 
-void callback(const sensor_msgs::ImageConstPtr& image, const sensor_msgs::ImageConstPtr& depth)
+void synced_callback(const sensor_msgs::ImageConstPtr& image, 
+                    const sensor_msgs::ImageConstPtr& depth, 
+                    const sensor_msgs::CameraInfoConstPtr& depth_cam_info)
 {
-	cv::Mat raw_global_img_depth, global_img_depth, global_img_rgb;
 	cv::Mat drawable;
 
     cv_bridge::CvImagePtr cv_depth_ptr;
@@ -118,12 +124,6 @@ void callback(const sensor_msgs::ImageConstPtr& image, const sensor_msgs::ImageC
 		return;
 	}
 	
-	// Process only on button click or something
-	drawable = process_image(global_img_rgb, global_img_depth);
-	sensor_msgs::ImagePtr msg = cv_bridge::CvImage(std_msgs::Header(), "bgr8", drawable).toImageMsg();
-	parsed_pub.publish(msg);
-
-	
 }
 
 
@@ -138,14 +138,14 @@ int main(int argc, char** argv){
 
     message_filters::Subscriber<sensor_msgs::Image> image_sub(n, "/camera/rgb/image_raw", 1);
     message_filters::Subscriber<sensor_msgs::Image> depth_sub(n, "/camera/depth_registered/image_raw", 1);
-    message_filters::Subscriber<sensor_msgs::CameraInfo> camerainfo(n, "/camera/rgb/camera_info", 1);
-    using MyPolicy = message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::Image>;
-    MyPolicy mypolicy(32);
+    message_filters::Subscriber<sensor_msgs::CameraInfo> camera_info(n, "/camera/depth_registered/camera_info", 1);
+    using AproxSync = message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, 
+                                                                     sensor_msgs::Image, sensor_msgs::CameraInfo>;
+    AproxSync mypolicy(32);
 
-    
-	message_filters::Synchronizer<MyPolicy> sync{static_cast<const MyPolicy &>(mypolicy), image_sub, depth_sub};
-    sync.registerCallback(boost::bind(&callback, _1, _2));
-    
+	message_filters::Synchronizer<AproxSync> sync{static_cast<const AproxSync &>(mypolicy), image_sub, depth_sub, camera_info};
+    sync.registerCallback(boost::bind(&synced_callback, _1, _2, _3));
+    ros::Timer timer = n.createTimer(ros::Duration(1), process_image);
 	ROS_INFO("Started Synchronizer\n");
 
     ros::spin();
