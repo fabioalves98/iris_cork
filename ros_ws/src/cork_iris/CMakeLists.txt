@@ -21,28 +21,20 @@ find_package(OpenCV 3.2.0 REQUIRED COMPONENTS
 )
 
 find_package(libfreenect REQUIRED)
+find_package(PCL 1.2 REQUIRED)
+
 
 catkin_package(
 
 )
 
-
 include_directories(${OpenCV_INCLUDE_DIRS})
 include_directories(${catkin_INCLUDE_DIRS})
 include_directories(${FREENECT_INCLUDE_DIRS})
+include_directories(${PCL_INCLUDE_DIRS})
 
-## 
-add_executable(capture src/capture.cpp)
-target_link_libraries(capture ${OpenCV_LIBS} ${catkin_LIBRARIES} ${FREENECT_LIBRARIES})
+add_executable(capture src/capture.cpp src/ImageParser.cpp src/box.cpp src/DepthParser.cpp)
+target_link_libraries(capture ${OpenCV_LIBS} ${catkin_LIBRARIES})
 
-###### ROS CAPTURE MODULE #######
-add_executable(load src/load.cpp src/ImageParser.cpp src/box.cpp src/DepthParser.cpp)
-target_link_libraries(load ${OpenCV_LIBS} ${catkin_LIBRARIES})
-
-###### LOAD MODULE #######
-add_executable(ros_capture src/ros_capture.cpp src/ImageParser.cpp src/box.cpp src/DepthParser.cpp)
-target_link_libraries(ros_capture ${OpenCV_LIBS} ${catkin_LIBRARIES})
-
-
-add_executable(pcl_test src/pcl_test.cpp)
-target_link_libraries(pcl_test ${catkin_LIBRARIES})
+add_executable(pcl_points src/pcl_points.cpp)
+target_link_libraries(pcl_points ${catkin_LIBRARIES} ${PCL_LIBRARIES})
