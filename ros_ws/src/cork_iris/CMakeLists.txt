@@ -20,8 +20,7 @@ find_package(OpenCV 3.2.0 REQUIRED COMPONENTS
   imgcodecs
 )
 
-find_package(libfreenect REQUIRED)
-find_package(PCL 1.2 REQUIRED)
+find_package(PCL REQUIRED)
 
 
 catkin_package(
@@ -30,8 +29,10 @@ catkin_package(
 
 include_directories(${OpenCV_INCLUDE_DIRS})
 include_directories(${catkin_INCLUDE_DIRS})
-include_directories(${FREENECT_INCLUDE_DIRS})
 include_directories(${PCL_INCLUDE_DIRS})
+link_directories(${PCL_LIBRARY_DIRS})
+add_definitions(${PCL_DEFINITIONS})
+
 
 add_executable(capture src/capture.cpp src/ImageParser.cpp src/box.cpp src/DepthParser.cpp)
 target_link_libraries(capture ${OpenCV_LIBS} ${catkin_LIBRARIES})
