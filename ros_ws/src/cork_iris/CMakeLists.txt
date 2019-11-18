@@ -37,5 +37,5 @@ add_definitions(${PCL_DEFINITIONS})
 add_executable(capture src/capture.cpp src/ImageParser.cpp src/box.cpp src/DepthParser.cpp)
 target_link_libraries(capture ${OpenCV_LIBS} ${catkin_LIBRARIES})
 
-add_executable(pcl_points src/pcl_points.cpp)
+add_executable(pcl_points src/pcl_points.cpp src/ImageParser.cpp src/box.cpp src/DepthParser.cpp)
 target_link_libraries(pcl_points ${catkin_LIBRARIES} ${PCL_LIBRARIES})

@@ -11,8 +11,6 @@ class Box
         cv::Mat image;
     public:
         Box(cv::Mat image);
-        std::vector<cv::Point> get_pins();
-        void draw_rect(std::vector<cv::Point> pins);
         std::vector<cv::Point> get_blue_box();
 
         std::vector<cv::Point> get_box_corners(std::vector<cv::Point> box_contour); 
