@@ -30,7 +30,7 @@ boost::shared_ptr<pcl::visualization::PCLVisualizer> normals_vis()
 {   
     boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer (new pcl::visualization::PCLVisualizer ("3D Viewer"));
     viewer->setBackgroundColor (0, 0, 0);
-    viewer->addCoordinateSystem (1.0);
+    viewer->addCoordinateSystem (0.2);
     viewer->initCameraParameters ();
     return (viewer);
 }
@@ -42,17 +42,16 @@ void setViewerPointcloud(pcl::PointCloud<pcl::PointXYZRGB>::ConstPtr cloud,
     pcl::visualization::PointCloudColorHandlerRGBField<pcl::PointXYZRGB> rgb(cloud);
     viewer->addPointCloud<pcl::PointXYZRGB> (cloud, rgb, "sample cloud");
     viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 3, "sample cloud");
-    viewer->addPointCloudNormals<pcl::PointXYZRGB, pcl::Normal> (cloud, cloud_normals, 70, 0.01, "normals");
-
+    // viewer->addPointCloudNormals<pcl::PointXYZRGB, pcl::Normal> (cloud, cloud_normals, 70, 0.01, "normals");
 }
 
 void viewerRunner(boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer)
 {
-    while (!viewer->wasStopped ())
-    {
+    // while (!viewer->wasStopped ())
+    // {
         viewer->spinOnce (100);
         boost::this_thread::sleep (boost::posix_time::microseconds (100000));
-    }
+    // }
 }
 
 
@@ -82,22 +81,32 @@ void cloud_cb (const sensor_msgs::PointCloud2ConstPtr& cloud_msg)
         ne.setRadiusSearch (0.03);
         ne.compute (*cloud_normals);
 
-        setViewerPointcloud(cloud, cloud_normals);
         
         pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_x (new pcl::PointCloud<pcl::PointXYZRGB>);
+        cloud_x->width    = 640;
+        cloud_x->height   = 480;
+        cloud_x->is_dense = false;
+        cloud_x->points.resize (cloud_x->width * cloud_x->height);
 
-        for(int i = 200; i < 640; i++){
-            for(int j = 200; j < 480; j++){
-                cout << cloud->at(j, i) << endl;
-                cout << cloud_normals->at(j, i) << endl;
+        for(int y = 0; y < cloud_x->height; y++){
+            for(int x = 0; x < cloud_x->width; x++){
+                pcl::PointXYZRGB point;
+                point.x = cloud->at(x, y).x;
+                point.y = cloud->at(x, y).y;
+                point.z = cloud->at(x, y).z;
+                point.r = abs(cloud_normals->at(x,y).normal[0]) * 255;
+                point.g = abs(cloud_normals->at(x,y).normal[1]) * 255;
+                point.b = abs(cloud_normals->at(x,y).normal[2]) * 255;
+
+                cloud_x->points.push_back(point);
             }
-            break;
         }
 
         temp_one_time_compute = true;
         std::cout << "Finished computing normals" << std::endl;
 
-        
+        setViewerPointcloud(cloud_x, cloud_normals);
+
     }
 
     viewerRunner(viewer);
