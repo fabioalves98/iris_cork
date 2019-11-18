@@ -18,7 +18,7 @@
  
 */ 
 
-
+using namespace std;
 
 boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer;
 
@@ -35,14 +35,14 @@ boost::shared_ptr<pcl::visualization::PCLVisualizer> normals_vis()
     return (viewer);
 }
 
-void setViewerPointcloud(pcl::PointCloud<pcl::PointXYZRGBA>::ConstPtr cloud, 
+void setViewerPointcloud(pcl::PointCloud<pcl::PointXYZRGB>::ConstPtr cloud, 
                          pcl::PointCloud<pcl::Normal>::ConstPtr cloud_normals)
 {
     // USE UPADTEPOINTCLOUD METHOD TO SET THE POINT CLOUD
-    pcl::visualization::PointCloudColorHandlerRGBField<pcl::PointXYZRGBA> rgb(cloud);
-    viewer->addPointCloud<pcl::PointXYZRGBA> (cloud, rgb, "sample cloud");
+    pcl::visualization::PointCloudColorHandlerRGBField<pcl::PointXYZRGB> rgb(cloud);
+    viewer->addPointCloud<pcl::PointXYZRGB> (cloud, rgb, "sample cloud");
     viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 3, "sample cloud");
-    viewer->addPointCloudNormals<pcl::PointXYZRGBA, pcl::Normal> (cloud, cloud_normals, 70, 0.01, "normals");
+    viewer->addPointCloudNormals<pcl::PointXYZRGB, pcl::Normal> (cloud, cloud_normals, 70, 0.01, "normals");
 
 }
 
@@ -58,12 +58,12 @@ void viewerRunner(boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer)
 
 void cloud_cb (const sensor_msgs::PointCloud2ConstPtr& cloud_msg)
 {
-    // PointXYZRGBA cloud
-    pcl::PointCloud<pcl::PointXYZRGBA>::Ptr cloud (new pcl::PointCloud<pcl::PointXYZRGBA>);
+    // PointXYZRGB cloud
+    pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud (new pcl::PointCloud<pcl::PointXYZRGB>);
 
     // Cloud normals
     pcl::PointCloud<pcl::Normal>::Ptr cloud_normals (new pcl::PointCloud<pcl::Normal>);
-    pcl::search::KdTree<pcl::PointXYZRGBA>::Ptr tree (new pcl::search::KdTree<pcl::PointXYZRGBA> ());
+    pcl::search::KdTree<pcl::PointXYZRGB>::Ptr tree (new pcl::search::KdTree<pcl::PointXYZRGB> ());
 
 
     try{
@@ -76,13 +76,23 @@ void cloud_cb (const sensor_msgs::PointCloud2ConstPtr& cloud_msg)
     if(!temp_one_time_compute)
     {
         std::cout << "Computing normals" << std::endl;
-        pcl::NormalEstimation<pcl::PointXYZRGBA, pcl::Normal> ne;
+        pcl::NormalEstimation<pcl::PointXYZRGB, pcl::Normal> ne;
         ne.setInputCloud (cloud);
         ne.setSearchMethod (tree);
         ne.setRadiusSearch (0.03);
         ne.compute (*cloud_normals);
 
         setViewerPointcloud(cloud, cloud_normals);
+        
+        pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_x (new pcl::PointCloud<pcl::PointXYZRGB>);
+
+        for(int i = 200; i < 640; i++){
+            for(int j = 200; j < 480; j++){
+                cout << cloud->at(j, i) << endl;
+                cout << cloud_normals->at(j, i) << endl;
+            }
+            break;
+        }
 
         temp_one_time_compute = true;
         std::cout << "Finished computing normals" << std::endl;
