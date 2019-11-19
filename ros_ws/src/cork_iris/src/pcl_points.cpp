@@ -29,6 +29,9 @@
 #include "ImageParser.h"
 
 
+#define DEBUG 0
+
+
 /* Useful stuff
 
  - Adding a cube -> http://docs.pointclouds.org/1.8.1/classpcl_1_1visualization_1_1_p_c_l_visualizer.html#aa55f97ba784826552c9584d407014c78
@@ -38,14 +41,17 @@
 
 using namespace std;
 
-boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer;
+pcl::visualization::PCLVisualizer::Ptr viewer;
 image_transport::Publisher parsed_pub;
 
+bool SINGLE_CALC = true;
 
-// Temporary variable for debugging
-bool temp_one_time_compute = false;
 ros::Publisher pub;
 
+// PointXYZRGB cloud
+pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud (new pcl::PointCloud<pcl::PointXYZRGB>);
+// Cloud normals
+pcl::PointCloud<pcl::Normal>::Ptr cloud_normals (new pcl::PointCloud<pcl::Normal>);
 
 void drawImageContours(cv::Mat drawing, std::vector<std::vector<cv::Point>> contours)
 {
@@ -55,40 +61,33 @@ void drawImageContours(cv::Mat drawing, std::vector<std::vector<cv::Point>> cont
     }
 }
 
-boost::shared_ptr<pcl::visualization::PCLVisualizer> normals_vis()
+pcl::visualization::PCLVisualizer::Ptr normals_vis()
 {   
-    boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer (new pcl::visualization::PCLVisualizer ("3D Viewer"));
+    pcl::visualization::PCLVisualizer::Ptr viewer (new pcl::visualization::PCLVisualizer ("3D Viewer"));
     viewer->setBackgroundColor (0, 0, 0);
     viewer->addCoordinateSystem (0.2);
     viewer->initCameraParameters ();
     return (viewer);
 }
 
-void setViewerPointcloud(pcl::PointCloud<pcl::PointXYZRGB>::ConstPtr cloud, 
-                         pcl::PointCloud<pcl::Normal>::ConstPtr cloud_normals)
+void setViewerPointcloud(pcl::PointCloud<pcl::PointXYZRGB>::ConstPtr cloud)
 {
-    // USE UPADTEPOINTCLOUD METHOD TO SET THE POINT CLOUD
     pcl::visualization::PointCloudColorHandlerRGBField<pcl::PointXYZRGB> rgb(cloud);
-    viewer->addPointCloud<pcl::PointXYZRGB> (cloud, rgb, "sample cloud");
-    viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 3, "sample cloud");
-    // viewer->addPointCloudNormals<pcl::PointXYZRGB, pcl::Normal> (cloud, cloud_normals, 70, 0.01, "normals");
+    viewer->addPointCloud<pcl::PointXYZRGB> (cloud, rgb, "kinectcloud");
+    viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 3, "kinectcloud");
 }
 
-void viewerRunner(boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer)
+void setViewerPointcloudNormal(pcl::PointCloud<pcl::PointXYZRGB>::ConstPtr cloud, 
+                               pcl::PointCloud<pcl::Normal>::ConstPtr cloud_normals)
 {
-    // while (!viewer->wasStopped ())
-    // {
-        viewer->spinOnce (100);
-        boost::this_thread::sleep (boost::posix_time::microseconds (100000));
-    // }
+    viewer->addPointCloudNormals<pcl::PointXYZRGB, pcl::Normal> (cloud, cloud_normals, 70, 0.01, "normals");
 }
 
 
-void process_image(cv::Mat image, cv::Mat depth){    
 
-    cv::Mat parsed_image = image.clone();
-    cv::Mat parsed_depth = depth.clone();
-    
+
+vector<cv::Point> getCorkContours(cv::Mat image)
+{        
     // Image box
     cv::Mat box_image =  image.clone();
     Box box(box_image);
@@ -106,17 +105,30 @@ void process_image(cv::Mat image, cv::Mat depth){
     // This is a heavy assumption since we are considering that only two contours exist after the first
     // area filter, the outer box cntour and the inner box contour.
     contour_points.push_back(ip.smallestAreaContour(ip.filterContoursByArea(ip.parseImageContours(-1), min_area, max_area)));
-    drawImageContours(parsed_image, contour_points);
+    
+    return contour_points.at(0);
+}
 
-    sensor_msgs::ImagePtr msg; 
-    try{
-        msg = cv_bridge::CvImage(std_msgs::Header(), "bgr8", parsed_image).toImageMsg();
-        parsed_pub.publish(msg);
-    }catch(cv_bridge::Exception& e){
-        ROS_ERROR("ERROR: %s", e.what());
-	    return; 
+bool isPointInside(cv::Point point, std::vector<cv::Point>* contour)
+{
+    return cv::pointPolygonTest(*contour, point, false) == 1;
+}
+
+void removeBox(vector<cv::Point>* contours)
+{
+    
+    const float bad_point = std::numeric_limits<float>::quiet_NaN();
+
+    for (int x = 0; x < 640; x++)
+    {
+        for (int y = 0; y < 480; y++)
+        {
+            if (!isPointInside(cv::Point(x, y), contours))
+            {
+                cloud->at(x, y).x = cloud->at(x, y).y = cloud->at(x, y).z = bad_point;
+            }
+        }
     }
-
 }
 
 
@@ -126,7 +138,6 @@ void synced_callback(const sensor_msgs::ImageConstPtr& image,
                     const sensor_msgs::PointCloud2ConstPtr& cloud_msg,
                     const sensor_msgs::CameraInfoConstPtr& depth_cam_info)
 {
-
     cv_bridge::CvImagePtr cv_depth_ptr;
 	cv_bridge::CvImagePtr cv_image_ptr;
     cv::Mat cv_image;
@@ -140,36 +151,14 @@ void synced_callback(const sensor_msgs::ImageConstPtr& image,
 		cv_image = cv_image_ptr->image;
 
 		// Convert depth enconding
-		cv::Mat(cv_depth-0).convertTo(cv_depth, CV_8UC1, 255. / (1000 - 0));
-		// sensor_msgs::ImagePtr msg = cv_bridge::CvImage(std_msgs::Header(), "8UC1", cv_depth).toImageMsg();
-		// depth_pub.publish(msg);
+		cv::Mat(cv_depth).convertTo(cv_depth, CV_8UC1, 255. / (1000));
 	
 	}catch(cv_bridge::Exception& e){
 		ROS_ERROR("%s", e.what());
 		return;
 	}
-	
 
-    if(!temp_one_time_compute)
-    {
-        process_image(cv_image, cv_depth);
-
-        temp_one_time_compute = true;
-    }
-
-
-}
-
-void cloud_cb (const sensor_msgs::PointCloud2ConstPtr& cloud_msg)
-{
-    // PointXYZRGB cloud
-    pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud (new pcl::PointCloud<pcl::PointXYZRGB>);
-
-    // Cloud normals
-    pcl::PointCloud<pcl::Normal>::Ptr cloud_normals (new pcl::PointCloud<pcl::Normal>);
-    pcl::search::KdTree<pcl::PointXYZRGB>::Ptr tree (new pcl::search::KdTree<pcl::PointXYZRGB> ());
-
-
+    
     try{
         pcl::fromROSMsg (*cloud_msg, *cloud);
     }catch(pcl::PCLException& e){
@@ -177,17 +166,21 @@ void cloud_cb (const sensor_msgs::PointCloud2ConstPtr& cloud_msg)
 		return;
 	}
 
+    vector<cv::Point> corkContours = getCorkContours(cv_image);
+    removeBox(&corkContours);
 
-
-
-    if(!temp_one_time_compute)
+    if(SINGLE_CALC)
     {
-        std::cout << "Computing normals" << std::endl;
+        // Compute normals
+        pcl::search::KdTree<pcl::PointXYZRGB>::Ptr tree (new pcl::search::KdTree<pcl::PointXYZRGB> ());
         pcl::NormalEstimation<pcl::PointXYZRGB, pcl::Normal> ne;
+
+        std::cout << "Computing normals" << std::endl;
         ne.setInputCloud (cloud);
         ne.setSearchMethod (tree);
         ne.setRadiusSearch (0.03);
         ne.compute (*cloud_normals);
+        std::cout << "Finished Computing normals" << std::endl;
 
         
         pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_x (new pcl::PointCloud<pcl::PointXYZRGB>);
@@ -209,15 +202,18 @@ void cloud_cb (const sensor_msgs::PointCloud2ConstPtr& cloud_msg)
                 cloud_x->points.push_back(point);
             }
         }
+    
+        viewer->updatePointCloud(cloud_x, "kinectcloud");
+        if (DEBUG)
+        {
+            viewer->removePointCloud("normals", 0);
+            setViewerPointcloudNormal(cloud, cloud_normals);
+        }
 
-        temp_one_time_compute = true;
-        std::cout << "Finished computing normals" << std::endl;
-
-        setViewerPointcloud(cloud_x, cloud_normals);
-
+        SINGLE_CALC = false;
     }
 
-    viewerRunner(viewer);
+    viewer->spinOnce (100);
 }
 
 int main (int argc, char** argv)
@@ -244,7 +240,7 @@ int main (int argc, char** argv)
     sync.registerCallback(boost::bind(&synced_callback, _1, _2, _3, _4));
 
     viewer = normals_vis();
-
+    setViewerPointcloud(cloud);
 
     // Create a ROS publisher for the output point cloud
     pub = n.advertise<sensor_msgs::PointCloud2> ("/newtopics/processed_depth", 1);
