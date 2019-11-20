@@ -2,6 +2,7 @@
 // ROS Common
 #include <ros/ros.h>
 // PCL specific includes
+#include <pcl/common/common.h>
 #include <pcl_conversions/pcl_conversions.h>
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
@@ -9,6 +10,7 @@
 #include <pcl/features/normal_3d.h>
 #include <pcl/features/intensity_gradient.h>
 #include <pcl/point_types.h>
+#include <pcl/kdtree/kdtree_flann.h>
 // ROS Sync
 #include <message_filters/time_synchronizer.h>
 #include <message_filters/time_synchronizer.h>
@@ -44,7 +46,7 @@ using namespace std;
 pcl::visualization::PCLVisualizer::Ptr viewer;
 image_transport::Publisher parsed_pub;
 
-bool SINGLE_CALC = true;
+bool NORMALS = false;
 
 ros::Publisher pub;
 
@@ -131,6 +133,32 @@ void removeBox(vector<cv::Point>* contours)
     }
 }
 
+void getHighestPoint()
+{
+    pcl::KdTreeFLANN<pcl::PointXYZRGB> kdtree;
+
+    kdtree.setInputCloud (cloud);
+
+    pcl::PointXYZRGB searchPoint;
+
+    searchPoint.x = 0;
+    searchPoint.y = 0;
+    searchPoint.z = 0;
+
+    int K = 10;
+    std::vector<int> pointIdxNKNSearch(K);
+    std::vector<float> pointNKNSquaredDistance(K);
+
+    if (kdtree.nearestKSearch (searchPoint, K, pointIdxNKNSearch, pointNKNSquaredDistance) > 0)
+    {
+        for (std::size_t i = 0; i < pointIdxNKNSearch.size (); ++i){
+            cloud->points[ pointIdxNKNSearch[i] ].r = 0;
+            cloud->points[ pointIdxNKNSearch[i] ].g = 255;
+            cloud->points[ pointIdxNKNSearch[i] ].b = 0;
+        }
+    }
+}
+
 
 
 void synced_callback(const sensor_msgs::ImageConstPtr& image, 
@@ -169,7 +197,10 @@ void synced_callback(const sensor_msgs::ImageConstPtr& image,
     vector<cv::Point> corkContours = getCorkContours(cv_image);
     removeBox(&corkContours);
 
-    if(SINGLE_CALC)
+    getHighestPoint();
+
+
+    if(NORMALS)
     {
         // Compute normals
         pcl::search::KdTree<pcl::PointXYZRGB>::Ptr tree (new pcl::search::KdTree<pcl::PointXYZRGB> ());
@@ -210,9 +241,13 @@ void synced_callback(const sensor_msgs::ImageConstPtr& image,
             setViewerPointcloudNormal(cloud, cloud_normals);
         }
 
-        SINGLE_CALC = false;
+        NORMALS = false;
     }
-
+    else
+    {
+        viewer->updatePointCloud(cloud, "kinectcloud");
+    }
+    
     viewer->spinOnce (100);
 }
 
