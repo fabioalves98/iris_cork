@@ -47,6 +47,7 @@ pcl::visualization::PCLVisualizer::Ptr viewer;
 image_transport::Publisher parsed_pub;
 
 bool NORMALS = false;
+bool ONE_TIME_CALC = true;
 
 ros::Publisher pub;
 
@@ -86,8 +87,6 @@ void setViewerPointcloudNormal(pcl::PointCloud<pcl::PointXYZRGB>::ConstPtr cloud
 }
 
 
-
-
 vector<cv::Point> getCorkContours(cv::Mat image)
 {        
     // Image box
@@ -118,7 +117,6 @@ bool isPointInside(cv::Point point, std::vector<cv::Point>* contour)
 
 void removeBox(vector<cv::Point>* contours)
 {
-    
     const float bad_point = std::numeric_limits<float>::quiet_NaN();
 
     for (int x = 0; x < 640; x++)
@@ -133,7 +131,7 @@ void removeBox(vector<cv::Point>* contours)
     }
 }
 
-void getHighestPoint()
+int getHighestPoint()
 {
     pcl::KdTreeFLANN<pcl::PointXYZRGB> kdtree;
 
@@ -145,18 +143,64 @@ void getHighestPoint()
     searchPoint.y = 0;
     searchPoint.z = 0;
 
-    int K = 10;
+    // Changed here to one since we only need one point
+    int K = 1;
     std::vector<int> pointIdxNKNSearch(K);
     std::vector<float> pointNKNSquaredDistance(K);
 
     if (kdtree.nearestKSearch (searchPoint, K, pointIdxNKNSearch, pointNKNSquaredDistance) > 0)
-    {
+    {  
         for (std::size_t i = 0; i < pointIdxNKNSearch.size (); ++i){
             cloud->points[ pointIdxNKNSearch[i] ].r = 0;
             cloud->points[ pointIdxNKNSearch[i] ].g = 255;
             cloud->points[ pointIdxNKNSearch[i] ].b = 0;
         }
     }
+
+    // Indice 0 since it's just a point
+    return pointIdxNKNSearch[0];
+
+}
+
+
+// void -> it draws the point cloud directly for now
+void findCorkPiece(){
+
+    int highestPointIdx = getHighestPoint();
+    pcl::PointXYZRGB highestPoint = cloud->points[highestPointIdx];
+    // quanto menor o z mais alto ele esta
+    // with kdtree get nearest points to the current one
+    pcl::KdTreeFLANN<pcl::PointXYZRGB> kdtree;
+    pcl::PointXYZRGB searchPoint = highestPoint;
+
+    kdtree.setInputCloud (cloud);
+    
+    int K = 20;
+    std::vector<int> pointIdxNKNSearch(K);
+    std::vector<float> pointNKNSquaredDistance(K);
+
+    // Aqui para garantir que nao bloqueamos no while (que nao deve acontecer)
+    // TODO: A ideia e agora adicionar algumas verificacoes com as normais
+    // para garantir que selecionamos APENAS o traco e nao alguns "redores" dele
+    int MAX_ITERS = 50000;
+    int i = 0;
+    while (kdtree.nearestKSearch (searchPoint, K, pointIdxNKNSearch, pointNKNSquaredDistance) > 0)
+    {  
+        for (std::size_t i = 0; i < pointIdxNKNSearch.size(); ++i){
+            if(abs(searchPoint.z - cloud->points[pointIdxNKNSearch[i]].z) < 0.05){
+                cloud->points[ pointIdxNKNSearch[i]].r = 255;
+                cloud->points[ pointIdxNKNSearch[i]].g = 0;
+                cloud->points[ pointIdxNKNSearch[i]].b = 255;    
+            }
+        }
+
+        searchPoint = cloud->points[pointIdxNKNSearch[rand() % pointIdxNKNSearch.size()]];
+        pointIdxNKNSearch.clear();
+        pointNKNSquaredDistance.clear();
+        i++;
+        if(i == MAX_ITERS) break;
+    }
+    
 }
 
 
@@ -197,8 +241,7 @@ void synced_callback(const sensor_msgs::ImageConstPtr& image,
     vector<cv::Point> corkContours = getCorkContours(cv_image);
     removeBox(&corkContours);
 
-    getHighestPoint();
-
+    
 
     if(NORMALS)
     {
@@ -245,7 +288,11 @@ void synced_callback(const sensor_msgs::ImageConstPtr& image,
     }
     else
     {
-        viewer->updatePointCloud(cloud, "kinectcloud");
+        if(ONE_TIME_CALC){
+            findCorkPiece();
+            viewer->updatePointCloud(cloud, "kinectcloud");
+            ONE_TIME_CALC = false;
+        }
     }
     
     viewer->spinOnce (100);
