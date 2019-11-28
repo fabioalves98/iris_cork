@@ -20,7 +20,7 @@ std::vector<cv::Point> Box::get_blue_box()
             int g = static_cast<int>(pixel.val[1]);
             int b = static_cast<int>(pixel.val[0]);
 
-            if ((b > g) && (g > r + 10) && (b > 80)) 
+            if ((b > g) && (g > r + 10) && (b > 50)) 
             {
                 box.push_back(cv::Point(j, i));
                 circle(image, cv::Point(j, i), 0, cv::Scalar(0, 0, 255));

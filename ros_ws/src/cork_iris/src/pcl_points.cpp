@@ -1,4 +1,6 @@
 #include <stdio.h>
+#include <chrono>
+#include <numeric>
 // ROS Common
 #include <ros/ros.h>
 // PCL specific includes
@@ -11,6 +13,12 @@
 #include <pcl/features/intensity_gradient.h>
 #include <pcl/point_types.h>
 #include <pcl/kdtree/kdtree_flann.h>
+#include <pcl/ModelCoefficients.h>
+#include <pcl/filters/conditional_removal.h>
+#include <pcl/segmentation/extract_clusters.h>
+#include <pcl/features/normal_3d_omp.h>
+#include <pcl/search/organized.h>
+#include <pcl/features/don.h>
 // ROS Sync
 #include <message_filters/time_synchronizer.h>
 #include <message_filters/time_synchronizer.h>
@@ -30,7 +38,6 @@
 #include "DepthParser.h"
 #include "ImageParser.h"
 
-
 #define DEBUG 0
 
 
@@ -46,7 +53,8 @@ using namespace std;
 pcl::visualization::PCLVisualizer::Ptr viewer;
 image_transport::Publisher parsed_pub;
 
-bool NORMALS = false;
+bool DRAW_NORMALS = false;
+bool COMPUTE_NORMALS = false;
 bool ONE_TIME_CALC = true;
 
 ros::Publisher pub;
@@ -54,6 +62,9 @@ ros::Publisher pub;
 // PointXYZRGB cloud
 pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud (new pcl::PointCloud<pcl::PointXYZRGB>);
 // Cloud normals
+pcl::PointCloud<pcl::PointNormal>::Ptr normals_large_scale (new pcl::PointCloud<pcl::PointNormal>);
+pcl::PointCloud<pcl::PointNormal>::Ptr normals_small_scale (new pcl::PointCloud<pcl::PointNormal>);
+
 pcl::PointCloud<pcl::Normal>::Ptr cloud_normals (new pcl::PointCloud<pcl::Normal>);
 
 void drawImageContours(cv::Mat drawing, std::vector<std::vector<cv::Point>> contours)
@@ -151,9 +162,9 @@ int getHighestPoint()
     if (kdtree.nearestKSearch (searchPoint, K, pointIdxNKNSearch, pointNKNSquaredDistance) > 0)
     {  
         for (std::size_t i = 0; i < pointIdxNKNSearch.size (); ++i){
-            cloud->points[ pointIdxNKNSearch[i] ].r = 0;
-            cloud->points[ pointIdxNKNSearch[i] ].g = 255;
-            cloud->points[ pointIdxNKNSearch[i] ].b = 0;
+            cloud->points[pointIdxNKNSearch[i]].r = 0;
+            cloud->points[pointIdxNKNSearch[i]].g = 255;
+            cloud->points[pointIdxNKNSearch[i]].b = 0;
         }
     }
 
@@ -163,7 +174,16 @@ int getHighestPoint()
 }
 
 
+// calcs dot product for 2 normal points
+double dotProduct(pcl::Normal p1, pcl::Normal p2){
+    std::vector<double> a {p1.normal_x, p1.normal_y, p1.normal_z};
+    std::vector<double> b {p2.normal_x, p2.normal_y, p2.normal_z};
+
+    return std::inner_product(a.begin(), a.end(), b.begin(), 0.0);
+}
+
 // void -> it draws the point cloud directly for now
+// http://www.pointclouds.org/documentation/tutorials/#segmentation-tutorial
 void findCorkPiece(){
 
     int highestPointIdx = getHighestPoint();
@@ -171,38 +191,95 @@ void findCorkPiece(){
     // quanto menor o z mais alto ele esta
     // with kdtree get nearest points to the current one
     pcl::KdTreeFLANN<pcl::PointXYZRGB> kdtree;
+    int searchPointIdx = highestPointIdx;
     pcl::PointXYZRGB searchPoint = highestPoint;
 
     kdtree.setInputCloud (cloud);
     
-    int K = 20;
+    int K = 100 ;
     std::vector<int> pointIdxNKNSearch(K);
     std::vector<float> pointNKNSquaredDistance(K);
+
+    std::vector<int> closed_points;
 
     // Aqui para garantir que nao bloqueamos no while (que nao deve acontecer)
     // TODO: A ideia e agora adicionar algumas verificacoes com as normais
     // para garantir que selecionamos APENAS o traco e nao alguns "redores" dele
-    int MAX_ITERS = 50000;
-    int i = 0;
+    int MAX_ITERS = 50;
+    int iters = 0;
     while (kdtree.nearestKSearch (searchPoint, K, pointIdxNKNSearch, pointNKNSquaredDistance) > 0)
     {  
-        for (std::size_t i = 0; i < pointIdxNKNSearch.size(); ++i){
-            if(abs(searchPoint.z - cloud->points[pointIdxNKNSearch[i]].z) < 0.05){
-                cloud->points[ pointIdxNKNSearch[i]].r = 255;
-                cloud->points[ pointIdxNKNSearch[i]].g = 0;
-                cloud->points[ pointIdxNKNSearch[i]].b = 255;    
-            }
+        
+        std::vector<int> aux_closed;
+        // cout << "HighestPoint: " << cloud_normals->points[highestPointIdx] << endl;
+        for (size_t i = 0; i < pointIdxNKNSearch.size(); ++i)
+        {
+            if (find(closed_points.begin(), closed_points.end(), pointIdxNKNSearch[i]) != closed_points.end()) continue;
+
+            if (abs(searchPoint.z - cloud->points[pointIdxNKNSearch[i]].z) < 0.05)
+            {    
+                aux_closed.push_back(pointIdxNKNSearch[i]);
+                // Paint the point. its a cork piece point
+                cloud->points[pointIdxNKNSearch[i]].r = 0;
+                cloud->points[pointIdxNKNSearch[i]].g = 255;
+                cloud->points[pointIdxNKNSearch[i]].b = 0;       
+            } 
         }
 
-        searchPoint = cloud->points[pointIdxNKNSearch[rand() % pointIdxNKNSearch.size()]];
+        cout << aux_closed.size() << endl;
+        cout << searchPointIdx << endl;
+
+        searchPointIdx = aux_closed.back();
+        searchPoint = cloud->points[searchPointIdx];
+        aux_closed.pop_back();
+        closed_points.insert(closed_points.end(), aux_closed.begin(), aux_closed.end());
+
+        // // Isto random esta aqui por agr. tem de ser alterado
+        // int randIdx = rand() % pointIdxNKNSearch.size();
+        // searchPointIdx = pointIdxNKNSearch[randIdx];
         pointIdxNKNSearch.clear();
         pointNKNSquaredDistance.clear();
-        i++;
-        if(i == MAX_ITERS) break;
+        iters++;
+        if(iters == MAX_ITERS) break;
     }
     
 }
 
+
+void don_segmentation(){
+    pcl::search::Search<pcl::PointXYZRGB>::Ptr tree;
+    pcl::NormalEstimationOMP<pcl::PointXYZRGB, pcl::PointNormal> ne;
+    ne.setInputCloud (cloud);
+    ne.setSearchMethod (tree);
+    ne.setRadiusSearch (0.03);
+    ne.compute (*normals_small_scale);
+    ne.setRadiusSearch (0.1);
+    ne.compute (*normals_large_scale);
+    pcl::PointCloud<pcl::PointNormal>::Ptr doncloud (new pcl::PointCloud<pcl::PointNormal>);
+    copyPointCloud (*cloud, *doncloud);
+
+    std::cout << "Calculating DoN... " << std::endl;
+    // Create DoN operator
+    pcl::DifferenceOfNormalsEstimation<pcl::PointXYZRGB, pcl::PointNormal, pcl::PointNormal> don;
+    don.setInputCloud (cloud);
+    don.setNormalScaleLarge (normals_large_scale);
+    don.setNormalScaleSmall (normals_small_scale);
+
+    if (!don.initCompute ())
+    {
+        std::cerr << "Error: Could not initialize DoN feature operator" << std::endl;
+        exit (EXIT_FAILURE);
+    }
+    std::cout << "Ended DoN... " << std::endl;
+
+    // Compute DoN
+    don.computeFeature (*doncloud);
+    // viewer->addPointCloud<pcl::PointNormal>(doncloud, "foo", 1);
+    std::cout << "Ended compute feature... " << std::endl;
+
+
+
+}
 
 
 void synced_callback(const sensor_msgs::ImageConstPtr& image, 
@@ -243,59 +320,65 @@ void synced_callback(const sensor_msgs::ImageConstPtr& image,
 
     
 
-    if(NORMALS)
+    if(COMPUTE_NORMALS)
     {
         // Compute normals
         pcl::search::KdTree<pcl::PointXYZRGB>::Ptr tree (new pcl::search::KdTree<pcl::PointXYZRGB> ());
         pcl::NormalEstimation<pcl::PointXYZRGB, pcl::Normal> ne;
 
-        std::cout << "Computing normals" << std::endl;
+        std::cout << "Computing normals -- " << std::endl;
         ne.setInputCloud (cloud);
         ne.setSearchMethod (tree);
         ne.setRadiusSearch (0.03);
         ne.compute (*cloud_normals);
         std::cout << "Finished Computing normals" << std::endl;
+        COMPUTE_NORMALS = false;
 
-        
-        pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_x (new pcl::PointCloud<pcl::PointXYZRGB>);
-        cloud_x->width    = 640;
-        cloud_x->height   = 480;
-        cloud_x->is_dense = false;
-        cloud_x->points.resize (cloud_x->width * cloud_x->height);
+        if(DRAW_NORMALS){
+            
+            pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_x (new pcl::PointCloud<pcl::PointXYZRGB>);
+            cloud_x->width    = 640;
+            cloud_x->height   = 480;
+            cloud_x->is_dense = false;
+            cloud_x->points.resize (cloud_x->width * cloud_x->height);
 
-        for(int y = 0; y < cloud_x->height; y++){
-            for(int x = 0; x < cloud_x->width; x++){
-                pcl::PointXYZRGB point;
-                point.x = cloud->at(x, y).x;
-                point.y = cloud->at(x, y).y;
-                point.z = cloud->at(x, y).z;
-                point.r = abs(cloud_normals->at(x,y).normal[0]) * 255;
-                point.g = abs(cloud_normals->at(x,y).normal[1]) * 255;
-                point.b = abs(cloud_normals->at(x,y).normal[2]) * 255;
+            for(int y = 0; y < cloud_x->height; y++){
+                for(int x = 0; x < cloud_x->width; x++){
+                    pcl::PointXYZRGB point;
+                    point.x = cloud->at(x, y).x;
+                    point.y = cloud->at(x, y).y;
+                    point.z = cloud->at(x, y).z;
+                    point.r = abs(cloud_normals->at(x,y).normal[0]) * 255;
+                    point.g = abs(cloud_normals->at(x,y).normal[1]) * 255;
+                    point.b = abs(cloud_normals->at(x,y).normal[2]) * 255;
 
-                cloud_x->points.push_back(point);
+                    cloud_x->points.push_back(point);
+                }
             }
-        }
-    
-        viewer->updatePointCloud(cloud_x, "kinectcloud");
-        if (DEBUG)
-        {
-            viewer->removePointCloud("normals", 0);
-            setViewerPointcloudNormal(cloud, cloud_normals);
-        }
+        
+            viewer->updatePointCloud(cloud_x, "kinectcloud");
+            if (DEBUG)
+            {
+                viewer->removePointCloud("normals", 0);
+                setViewerPointcloudNormal(cloud, cloud_normals);
+            }
 
-        NORMALS = false;
-    }
-    else
-    {
-        if(ONE_TIME_CALC){
-            findCorkPiece();
-            viewer->updatePointCloud(cloud, "kinectcloud");
-            ONE_TIME_CALC = false;
+            DRAW_NORMALS = false;
+
         }
     }
     
-    viewer->spinOnce (100);
+    if(ONE_TIME_CALC)
+    {
+        
+        // findCorkPiece();
+        don_segmentation();
+        // viewer->updatePointCloud(cloud, "kinectcloud");
+        ONE_TIME_CALC = false;
+    
+    }
+    
+    // viewer->spinOnce (100);
 }
 
 int main (int argc, char** argv)
