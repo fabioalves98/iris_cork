@@ -11,14 +11,17 @@
 #include <pcl/visualization/pcl_visualizer.h>
 #include <pcl/features/normal_3d.h>
 #include <pcl/features/intensity_gradient.h>
-#include <pcl/point_types.h>
+#include <pcl/features/don.h>
+#include <pcl/features/normal_3d_omp.h>
 #include <pcl/kdtree/kdtree_flann.h>
 #include <pcl/ModelCoefficients.h>
 #include <pcl/filters/conditional_removal.h>
 #include <pcl/segmentation/extract_clusters.h>
-#include <pcl/features/normal_3d_omp.h>
+#include <pcl/segmentation/sac_segmentation.h>
+#include <pcl/segmentation/conditional_euclidean_clustering.h>
 #include <pcl/search/organized.h>
-#include <pcl/features/don.h>
+#include <pcl/filters/voxel_grid.h>
+#include <pcl/filters/extract_indices.h>
 // ROS Sync
 #include <message_filters/time_synchronizer.h>
 #include <message_filters/time_synchronizer.h>
@@ -44,7 +47,6 @@
 /* Useful stuff
 
  - Adding a cube -> http://docs.pointclouds.org/1.8.1/classpcl_1_1visualization_1_1_p_c_l_visualizer.html#aa55f97ba784826552c9584d407014c78
- - Update pointcloud -> http://docs.pointclouds.org/1.8.1/classpcl_1_1visualization_1_1_p_c_l_visualizer.html#a629dbb72b085fa25d382fa982eaefa64
  
 */ 
 
@@ -62,10 +64,8 @@ ros::Publisher pub;
 // PointXYZRGB cloud
 pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud (new pcl::PointCloud<pcl::PointXYZRGB>);
 // Cloud normals
-pcl::PointCloud<pcl::PointNormal>::Ptr normals_large_scale (new pcl::PointCloud<pcl::PointNormal>);
-pcl::PointCloud<pcl::PointNormal>::Ptr normals_small_scale (new pcl::PointCloud<pcl::PointNormal>);
-
 pcl::PointCloud<pcl::Normal>::Ptr cloud_normals (new pcl::PointCloud<pcl::Normal>);
+pcl::PointCloud<pcl::PointXYZRGBNormal>::Ptr cloud_with_normals (new pcl::PointCloud<pcl::PointXYZRGBNormal>);
 
 void drawImageContours(cv::Mat drawing, std::vector<std::vector<cv::Point>> contours)
 {
@@ -88,6 +88,12 @@ void setViewerPointcloud(pcl::PointCloud<pcl::PointXYZRGB>::ConstPtr cloud)
 {
     pcl::visualization::PointCloudColorHandlerRGBField<pcl::PointXYZRGB> rgb(cloud);
     viewer->addPointCloud<pcl::PointXYZRGB> (cloud, rgb, "kinectcloud");
+    viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 3, "kinectcloud");
+}
+
+void setViewerPointcloud(pcl::PointCloud<pcl::PointNormal>::ConstPtr cloud)
+{
+    viewer->addPointCloud<pcl::PointNormal> (cloud, "kinectcloud", 1);
     viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 3, "kinectcloud");
 }
 
@@ -174,13 +180,6 @@ int getHighestPoint()
 }
 
 
-// calcs dot product for 2 normal points
-double dotProduct(pcl::Normal p1, pcl::Normal p2){
-    std::vector<double> a {p1.normal_x, p1.normal_y, p1.normal_z};
-    std::vector<double> b {p2.normal_x, p2.normal_y, p2.normal_z};
-
-    return std::inner_product(a.begin(), a.end(), b.begin(), 0.0);
-}
 
 // void -> it draws the point cloud directly for now
 // http://www.pointclouds.org/documentation/tutorials/#segmentation-tutorial
@@ -248,19 +247,32 @@ void findCorkPiece(){
 
 void don_segmentation(){
     pcl::search::Search<pcl::PointXYZRGB>::Ptr tree;
-    pcl::NormalEstimationOMP<pcl::PointXYZRGB, pcl::PointNormal> ne;
+    pcl::NormalEstimationOMP<pcl::PointXYZRGB, pcl::PointXYZRGBNormal> ne;
+    pcl::PointCloud<pcl::PointXYZRGBNormal>::Ptr normals_large_scale (new pcl::PointCloud<pcl::PointXYZRGBNormal>);
+    pcl::PointCloud<pcl::PointXYZRGBNormal>::Ptr normals_small_scale (new pcl::PointCloud<pcl::PointXYZRGBNormal>);
+    double small_scale, large_scale;    
+    cout << "small scale: " << endl;
+    cin >> small_scale;
+    cout << "large scale: " << endl;
+    cin >> large_scale;
+    int normals_x;
+    cout << "normals_x: " << endl;
+    cin >> normals_x;
+    
+    std::cout << "Calculating Normals... " << std::endl;
+    
     ne.setInputCloud (cloud);
     ne.setSearchMethod (tree);
-    ne.setRadiusSearch (0.03);
+    ne.setRadiusSearch (small_scale);
     ne.compute (*normals_small_scale);
-    ne.setRadiusSearch (0.1);
+    ne.setRadiusSearch (large_scale);
     ne.compute (*normals_large_scale);
-    pcl::PointCloud<pcl::PointNormal>::Ptr doncloud (new pcl::PointCloud<pcl::PointNormal>);
+    pcl::PointCloud<pcl::PointXYZRGBNormal>::Ptr doncloud (new pcl::PointCloud<pcl::PointXYZRGBNormal>);
     copyPointCloud (*cloud, *doncloud);
 
     std::cout << "Calculating DoN... " << std::endl;
     // Create DoN operator
-    pcl::DifferenceOfNormalsEstimation<pcl::PointXYZRGB, pcl::PointNormal, pcl::PointNormal> don;
+    pcl::DifferenceOfNormalsEstimation<pcl::PointXYZRGB, pcl::PointXYZRGBNormal, pcl::PointXYZRGBNormal> don;
     don.setInputCloud (cloud);
     don.setNormalScaleLarge (normals_large_scale);
     don.setNormalScaleSmall (normals_small_scale);
@@ -274,11 +286,118 @@ void don_segmentation(){
 
     // Compute DoN
     don.computeFeature (*doncloud);
-    // viewer->addPointCloud<pcl::PointNormal>(doncloud, "foo", 1);
     std::cout << "Ended compute feature... " << std::endl;
+    // setViewerPointcloud(doncloud);
+    // viewer->removePointCloud("kinectcloud");
+    viewer->removePointCloud("normals", 0);
+    viewer->addPointCloudNormals<pcl::PointXYZRGBNormal,  pcl::PointXYZRGBNormal>  (doncloud,  doncloud,  normals_x,  0.05,  "normals"); 
+    // viewer->updatePointCloud(doncloud, "kinectcloud");
 
+    
 
+}
 
+double normal_diff;
+double squared_dist;
+double z_diff;
+int num_enforce = 0;
+bool enforceNormals (const pcl::PointXYZRGBNormal& point_a, const pcl::PointXYZRGBNormal& point_b, float squared_distance)
+{
+    Eigen::Map<const Eigen::Vector3f> point_a_normal = point_a.getNormalVector3fMap (), 
+    point_b_normal = point_b.getNormalVector3fMap ();
+
+    num_enforce++;
+
+    if(abs(point_a.z - point_b.z) < z_diff){
+        // if (squared_distance < squared_dist)
+        // {
+        if (abs(point_a_normal.dot(point_b_normal)) > normal_diff)
+            return (true);
+        // }
+    }
+
+    return (false);
+}
+
+void cluster_extraction(){
+    // Parametros do Algoritmo (Conditional Euclidean Clustering)
+    double leaf_size;
+    cout << "Leaf Size (0.005): " << endl;
+    cin >> leaf_size;
+    double cluster_tolerance;
+    cout << "Cluster Tolerance: " << endl;
+    cin >> cluster_tolerance;
+    // Parametros da Função de Condição
+    cout << "Normal enforcement diff: " << endl;
+    cin >> normal_diff;
+    cout << "Z diff: " << endl;
+    cin >> z_diff;
+    
+    pcl::IndicesClustersPtr clusters (new pcl::IndicesClusters), 
+    small_clusters (new pcl::IndicesClusters), large_clusters (new pcl::IndicesClusters);
+    // Cloud downsampling -> mais eficiente e densidade de pontos mais equalizada
+    pcl::VoxelGrid<pcl::PointXYZRGB> vg;
+    pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_filtered (new pcl::PointCloud<pcl::PointXYZRGB>);
+    vg.setInputCloud (cloud);
+    vg.setLeafSize (leaf_size, leaf_size, leaf_size);
+    vg.setDownsampleAllData (true);
+    vg.filter (*cloud_filtered);
+    
+    pcl::search::KdTree<pcl::PointXYZRGB>::Ptr search_tree (new pcl::search::KdTree<pcl::PointXYZRGB>);
+    pcl::copyPointCloud(*cloud_filtered, *cloud_with_normals);
+    pcl::NormalEstimation<pcl::PointXYZRGB, pcl::PointXYZRGBNormal> ne;
+    ne.setInputCloud (cloud_filtered);
+    ne.setSearchMethod (search_tree);
+    ne.setRadiusSearch (0.03);
+    ne.compute (*cloud_with_normals);
+
+    
+    pcl::ConditionalEuclideanClustering<pcl::PointXYZRGBNormal> cec (true);
+    cec.setInputCloud (cloud_with_normals);
+    cec.setConditionFunction (&enforceNormals);
+    cec.setClusterTolerance (cluster_tolerance);
+    cec.setMinClusterSize (cloud_with_normals->points.size () / 1000);
+    cec.setMaxClusterSize (cloud_with_normals->points.size () / 5);
+    cec.segment (*clusters);
+    cec.getRemovedClusters (small_clusters, large_clusters);
+
+    cout << "small cluster size: " << small_clusters->size() << endl;
+    cout << "large cluster size: " << large_clusters->size() << endl;
+    cout << "cluster size: " << clusters->size() << endl;
+    cout << "cloud filtered size: " << cloud_filtered->width  << " " << cloud_filtered->height<<  endl;
+    cout << "number of comparissons: " << num_enforce << endl;
+
+     for (int i = 0; i < small_clusters->size (); ++i){
+        for (int j = 0; j < (*small_clusters)[i].indices.size (); ++j){
+            cloud_filtered->points[(*small_clusters)[i].indices[j]].r = 0;
+            cloud_filtered->points[(*small_clusters)[i].indices[j]].g = 255;
+            cloud_filtered->points[(*small_clusters)[i].indices[j]].b = 0;
+
+        }
+
+     }
+    for (int i = 0; i < large_clusters->size (); ++i){
+        for (int j = 0; j < (*large_clusters)[i].indices.size (); ++j){
+            cloud_filtered->points[(*large_clusters)[i].indices[j]].r = 0;
+            cloud_filtered->points[(*large_clusters)[i].indices[j]].g = 0;
+            cloud_filtered->points[(*large_clusters)[i].indices[j]].b = 255;
+
+        }
+
+     }
+    // para cada cluster
+    for (int i = 0; i < clusters->size (); ++i)
+    {
+        // para cada indice de certo  
+        for (int j = 0; j < (*clusters)[i].indices.size (); ++j){
+            cloud_filtered->points[(*clusters)[i].indices[j]].r = 60 + (((10 * i)) % 255);
+            cloud_filtered->points[(*clusters)[i].indices[j]].g = 20 + (((40 * i)) % 255);
+            cloud_filtered->points[(*clusters)[i].indices[j]].b = 100 + (((20 * i)) % 255);
+
+        }
+    }
+    
+    viewer->updatePointCloud(cloud_filtered, "kinectcloud");
 }
 
 
@@ -373,12 +492,13 @@ void synced_callback(const sensor_msgs::ImageConstPtr& image,
         
         // findCorkPiece();
         don_segmentation();
-        // viewer->updatePointCloud(cloud, "kinectcloud");
+        // cluster_extraction();
+        viewer->updatePointCloud(cloud, "kinectcloud");
         ONE_TIME_CALC = false;
     
     }
     
-    // viewer->spinOnce (100);
+    viewer->spinOnce (100);
 }
 
 int main (int argc, char** argv)
