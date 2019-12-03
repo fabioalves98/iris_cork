@@ -5,6 +5,7 @@
 #include <ros/ros.h>
 // PCL specific includes
 #include <pcl/common/common.h>
+#include <pcl/io/pcd_io.h>
 #include <pcl_conversions/pcl_conversions.h>
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
@@ -22,6 +23,7 @@
 #include <pcl/search/organized.h>
 #include <pcl/filters/voxel_grid.h>
 #include <pcl/filters/extract_indices.h>
+#include <pcl/surface/mls.h>
 // ROS Sync
 #include <message_filters/time_synchronizer.h>
 #include <message_filters/time_synchronizer.h>
@@ -287,11 +289,9 @@ void don_segmentation(){
     // Compute DoN
     don.computeFeature (*doncloud);
     std::cout << "Ended compute feature... " << std::endl;
-    // setViewerPointcloud(doncloud);
-    // viewer->removePointCloud("kinectcloud");
+    
     viewer->removePointCloud("normals", 0);
     viewer->addPointCloudNormals<pcl::PointXYZRGBNormal,  pcl::PointXYZRGBNormal>  (doncloud,  doncloud,  normals_x,  0.05,  "normals"); 
-    // viewer->updatePointCloud(doncloud, "kinectcloud");
 
     
 
@@ -301,6 +301,7 @@ double normal_diff;
 double squared_dist;
 double z_diff;
 int num_enforce = 0;
+
 bool enforceNormals (const pcl::PointXYZRGBNormal& point_a, const pcl::PointXYZRGBNormal& point_b, float squared_distance)
 {
     Eigen::Map<const Eigen::Vector3f> point_a_normal = point_a.getNormalVector3fMap (), 
@@ -319,14 +320,14 @@ bool enforceNormals (const pcl::PointXYZRGBNormal& point_a, const pcl::PointXYZR
     return (false);
 }
 
-void cluster_extraction(){
+void cluster_extraction() {
     // Parametros do Algoritmo (Conditional Euclidean Clustering)
-    double leaf_size;
-    cout << "Leaf Size (0.005): " << endl;
-    cin >> leaf_size;
-    double cluster_tolerance;
-    cout << "Cluster Tolerance: " << endl;
-    cin >> cluster_tolerance;
+    double leaf_size = 0.005;
+    //cout << "Leaf Size (0.005): " << endl;
+    //cin >> leaf_size;
+    double cluster_tolerance = 0.01;
+    //cout << "Cluster Tolerance: " << endl;
+    //cin >> cluster_tolerance;
     // Parametros da Função de Condição
     cout << "Normal enforcement diff: " << endl;
     cin >> normal_diff;
@@ -364,18 +365,18 @@ void cluster_extraction(){
     cout << "small cluster size: " << small_clusters->size() << endl;
     cout << "large cluster size: " << large_clusters->size() << endl;
     cout << "cluster size: " << clusters->size() << endl;
+    cout << "original cloud size: " << cloud->width << " - " << cloud->height << endl;
     cout << "cloud filtered size: " << cloud_filtered->width  << " " << cloud_filtered->height<<  endl;
     cout << "number of comparissons: " << num_enforce << endl;
 
-     for (int i = 0; i < small_clusters->size (); ++i){
+    for (int i = 0; i < small_clusters->size (); ++i){
         for (int j = 0; j < (*small_clusters)[i].indices.size (); ++j){
             cloud_filtered->points[(*small_clusters)[i].indices[j]].r = 0;
             cloud_filtered->points[(*small_clusters)[i].indices[j]].g = 255;
             cloud_filtered->points[(*small_clusters)[i].indices[j]].b = 0;
 
         }
-
-     }
+    }
     for (int i = 0; i < large_clusters->size (); ++i){
         for (int j = 0; j < (*large_clusters)[i].indices.size (); ++j){
             cloud_filtered->points[(*large_clusters)[i].indices[j]].r = 0;
@@ -383,8 +384,7 @@ void cluster_extraction(){
             cloud_filtered->points[(*large_clusters)[i].indices[j]].b = 255;
 
         }
-
-     }
+    }
     // para cada cluster
     for (int i = 0; i < clusters->size (); ++i)
     {
@@ -400,6 +400,39 @@ void cluster_extraction(){
     viewer->updatePointCloud(cloud_filtered, "kinectcloud");
 }
 
+void cloud_smoothing() {
+    pcl::search::KdTree<pcl::PointXYZRGB>::Ptr tree (new pcl::search::KdTree<pcl::PointXYZRGB>);
+
+    // Output has the PointNormal type in order to store the normals calculated by MLS
+    pcl::PointCloud<pcl::PointXYZRGBNormal> mls_points;
+
+    // Init object (second point type is for the normals, even if unused)
+    pcl::MovingLeastSquares<pcl::PointXYZRGB, pcl::PointXYZRGBNormal> mls;
+    
+    mls.setComputeNormals (true);
+
+    // Set parameters
+    vector<int> test;
+    pcl::removeNaNFromPointCloud(*cloud, *cloud, test);
+    mls.setInputCloud (cloud);
+    mls.setPolynomialOrder (2);
+    mls.setSearchMethod (tree);
+    mls.setSearchRadius (0.03);
+
+    cout << "fraga gay" << endl;
+    // Reconstruct
+    mls.process (mls_points);
+
+    // Save output
+    pcl::io::savePCDFile ("original.pcd", *cloud);
+    pcl::io::savePCDFile ("after.pcd", mls_points);
+
+    cout << "saved" << endl;
+    
+    //viewer->removePointCloud("normals", 0);
+    //viewer->addPointCloudNormals<pcl::PointNormal,  pcl::PointNormal>  (mls_points, mls_points,  10,  0.05,  "normals"); 
+
+}
 
 void synced_callback(const sensor_msgs::ImageConstPtr& image, 
                     const sensor_msgs::ImageConstPtr& depth, 
@@ -489,15 +522,15 @@ void synced_callback(const sensor_msgs::ImageConstPtr& image,
     
     if(ONE_TIME_CALC)
     {
-        
         // findCorkPiece();
-        don_segmentation();
+        // don_segmentation();
         // cluster_extraction();
+        cloud_smoothing();
         viewer->updatePointCloud(cloud, "kinectcloud");
         ONE_TIME_CALC = false;
     
     }
-    
+    //viewer->updatePointCloud(cloud, "kinectcloud");
     viewer->spinOnce (100);
 }
 
