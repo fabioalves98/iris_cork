@@ -44,6 +44,7 @@
 #include "ImageParser.h"
 
 #define DEBUG 0
+#define SAVE_CLOUDS 0 
 
 
 /* Useful stuff
@@ -68,6 +69,9 @@ pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud (new pcl::PointCloud<pcl::PointXYZR
 // Cloud normals
 pcl::PointCloud<pcl::Normal>::Ptr cloud_normals (new pcl::PointCloud<pcl::Normal>);
 pcl::PointCloud<pcl::PointXYZRGBNormal>::Ptr cloud_with_normals (new pcl::PointCloud<pcl::PointXYZRGBNormal>);
+
+pcl::IndicesClustersPtr clusters (new pcl::IndicesClusters), 
+small_clusters (new pcl::IndicesClusters), large_clusters (new pcl::IndicesClusters);
 
 void drawImageContours(cv::Mat drawing, std::vector<std::vector<cv::Point>> contours)
 {
@@ -289,17 +293,29 @@ void don_segmentation(){
     // Compute DoN
     don.computeFeature (*doncloud);
     std::cout << "Ended compute feature... " << std::endl;
-    
-    viewer->removePointCloud("normals", 0);
-    viewer->addPointCloudNormals<pcl::PointXYZRGBNormal,  pcl::PointXYZRGBNormal>  (doncloud,  doncloud,  normals_x,  0.05,  "normals"); 
+
+
+    for(int i = 0; i < doncloud->size(); i++){
+        doncloud->points[i].r = abs(doncloud->points[i].normal[0]) * 255;
+        doncloud->points[i].g = abs(doncloud->points[i].normal[1]) * 255;
+        doncloud->points[i].b = abs(doncloud->points[i].normal[2]) * 255;
+    }
+    copyPointCloud (*doncloud, *cloud);
 
     
-
+    // viewer->removePointCloud("normals", 0);
+    // viewer->addPointCloudNormals<pcl::PointXYZRGB,  pcl::PointXYZRGBNormal>  (cloud_x,  doncloud,  normals_x,  0.05,  "normals"); 
+    if(SAVE_CLOUDS){
+        pcl::io::savePCDFile ("original.pcd", *cloud);
+        pcl::io::savePCDFile ("don.pcd", *doncloud);
+        cout << "saved" << endl;
+    }
+    
 }
 
 double normal_diff;
 double squared_dist;
-double z_diff;
+double curv;
 int num_enforce = 0;
 
 bool enforceNormals (const pcl::PointXYZRGBNormal& point_a, const pcl::PointXYZRGBNormal& point_b, float squared_distance)
@@ -309,12 +325,24 @@ bool enforceNormals (const pcl::PointXYZRGBNormal& point_a, const pcl::PointXYZR
 
     num_enforce++;
 
-    if(abs(point_a.z - point_b.z) < z_diff){
-        // if (squared_distance < squared_dist)
-        // {
-        if (abs(point_a_normal.dot(point_b_normal)) > normal_diff)
+    if (num_enforce < 20)
+    {
+        cout << "Point A: " << point_a << " - Point B: " << point_b << endl;
+    }
+    
+
+
+    // if(abs(point_a.z - point_b.z) < z_diff){
+    
+    if(abs(point_a.curvature - point_b.curvature) > curv){
+        return (false);
+    }    
+    
+    if (squared_distance < squared_dist)
+    {
+        if (abs(point_a_normal.dot(point_b_normal)) > normal_diff){
             return (true);
-        // }
+        }
     }
 
     return (false);
@@ -331,11 +359,12 @@ void cluster_extraction() {
     // Parametros da Função de Condição
     cout << "Normal enforcement diff: " << endl;
     cin >> normal_diff;
-    cout << "Z diff: " << endl;
-    cin >> z_diff;
+    cout << "squared_dist: " << endl;
+    cin >> squared_dist;
+    cout << "curv: " << endl;
+    cin >> curv;
     
-    pcl::IndicesClustersPtr clusters (new pcl::IndicesClusters), 
-    small_clusters (new pcl::IndicesClusters), large_clusters (new pcl::IndicesClusters);
+
     // Cloud downsampling -> mais eficiente e densidade de pontos mais equalizada
     pcl::VoxelGrid<pcl::PointXYZRGB> vg;
     pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_filtered (new pcl::PointCloud<pcl::PointXYZRGB>);
@@ -357,7 +386,7 @@ void cluster_extraction() {
     cec.setInputCloud (cloud_with_normals);
     cec.setConditionFunction (&enforceNormals);
     cec.setClusterTolerance (cluster_tolerance);
-    cec.setMinClusterSize (cloud_with_normals->points.size () / 1000);
+    cec.setMinClusterSize (cloud_with_normals->points.size () / 70);
     cec.setMaxClusterSize (cloud_with_normals->points.size () / 5);
     cec.segment (*clusters);
     cec.getRemovedClusters (small_clusters, large_clusters);
@@ -388,11 +417,16 @@ void cluster_extraction() {
     // para cada cluster
     for (int i = 0; i < clusters->size (); ++i)
     {
+        int randR = rand() % 255;
+        int randG = rand() % 255;
+        int randB = rand() % 255;
         // para cada indice de certo  
         for (int j = 0; j < (*clusters)[i].indices.size (); ++j){
-            cloud_filtered->points[(*clusters)[i].indices[j]].r = 60 + (((10 * i)) % 255);
-            cloud_filtered->points[(*clusters)[i].indices[j]].g = 20 + (((40 * i)) % 255);
-            cloud_filtered->points[(*clusters)[i].indices[j]].b = 100 + (((20 * i)) % 255);
+           
+
+            cloud_filtered->points[(*clusters)[i].indices[j]].r = randR;
+            cloud_filtered->points[(*clusters)[i].indices[j]].g = randG;
+            cloud_filtered->points[(*clusters)[i].indices[j]].b = randB;
 
         }
     }
@@ -408,7 +442,7 @@ void cloud_smoothing() {
 
     // Init object (second point type is for the normals, even if unused)
     pcl::MovingLeastSquares<pcl::PointXYZRGB, pcl::PointXYZRGBNormal> mls;
-    
+    cout << "Starting cloud smoothing operation!" << endl;
     mls.setComputeNormals (true);
 
     // Set parameters
@@ -419,18 +453,20 @@ void cloud_smoothing() {
     mls.setSearchMethod (tree);
     mls.setSearchRadius (0.03);
 
-    cout << "fraga gay" << endl;
     // Reconstruct
     mls.process (mls_points);
 
-    // Save output
-    pcl::io::savePCDFile ("original.pcd", *cloud);
-    pcl::io::savePCDFile ("after.pcd", mls_points);
+    if(SAVE_CLOUDS){
+        // Save output
+        pcl::io::savePCDFile ("original.pcd", *cloud);
+        pcl::io::savePCDFile ("after.pcd", mls_points);
 
-    cout << "saved" << endl;
-    
-    //viewer->removePointCloud("normals", 0);
-    //viewer->addPointCloudNormals<pcl::PointNormal,  pcl::PointNormal>  (mls_points, mls_points,  10,  0.05,  "normals"); 
+        cout << "saved" << endl;
+    }
+    cout << "Finished cloud smoothing operation!" << endl;
+
+    // Alterar tipo da cloud para PointXYZRGB
+    copyPointCloud(mls_points, *cloud);
 
 }
 
@@ -522,11 +558,14 @@ void synced_callback(const sensor_msgs::ImageConstPtr& image,
     
     if(ONE_TIME_CALC)
     {
+        int smooth_cloud = 0;
+        cout << "smooth?" << endl;
+        cin >> smooth_cloud;
+        if(smooth_cloud) cloud_smoothing();
         // findCorkPiece();
         // don_segmentation();
-        // cluster_extraction();
-        cloud_smoothing();
-        viewer->updatePointCloud(cloud, "kinectcloud");
+        cluster_extraction();
+        // viewer->updatePointCloud(cloud, "kinectcloud");
         ONE_TIME_CALC = false;
     
     }
