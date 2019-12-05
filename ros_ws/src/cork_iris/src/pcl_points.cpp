@@ -62,6 +62,13 @@ bool DRAW_NORMALS = false;
 bool COMPUTE_NORMALS = false;
 bool ONE_TIME_CALC = true;
 
+double normal_diff;
+double squared_dist;
+double curv;
+bool smooth_cloud;
+
+int num_enforce = 0;
+
 ros::Publisher pub;
 
 // PointXYZRGB cloud
@@ -313,10 +320,7 @@ void don_segmentation(){
     
 }
 
-double normal_diff;
-double squared_dist;
-double curv;
-int num_enforce = 0;
+
 
 bool enforceNormals (const pcl::PointXYZRGBNormal& point_a, const pcl::PointXYZRGBNormal& point_b, float squared_distance)
 {
@@ -558,7 +562,6 @@ void synced_callback(const sensor_msgs::ImageConstPtr& image,
     
     if(ONE_TIME_CALC)
     {
-        int smooth_cloud = 0;
         cout << "smooth?" << endl;
         cin >> smooth_cloud;
         if(smooth_cloud) cloud_smoothing();
@@ -573,10 +576,20 @@ void synced_callback(const sensor_msgs::ImageConstPtr& image,
     viewer->spinOnce (100);
 }
 
+void getGlobalParams(ros::NodeHandle n){
+    n.getParam("cork_iris/smooth_cloud", smooth_cloud);
+    n.getParam("cork_iris/normal_diff", normal_diff);
+    n.getParam("cork_iris/squared_dist", squared_dist);
+    n.getParam("cork_iris/curvature", curv);
+}
+
 int main (int argc, char** argv)
 {
+
     ros::init (argc, argv, "pcl_test");
     ros::NodeHandle n;
+    getGlobalParams(n);
+
 
     image_transport::ImageTransport it(n);
 	parsed_pub = it.advertise("/corkiris/parsed", 1);
