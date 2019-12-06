@@ -44,7 +44,6 @@
 #define DEBUG 0
 #define SAVE_CLOUDS 0 
 
-
 /* Useful stuff
 
  - Adding a cube -> http://docs.pointclouds.org/1.8.1/classpcl_1_1visualization_1_1_p_c_l_visualizer.html#aa55f97ba784826552c9584d407014c78
@@ -62,6 +61,8 @@ double normal_diff;
 double squared_dist;
 double curv;
 bool smooth_cloud;
+bool live;
+string display_type;
 
 int num_enforce = 0;
 
@@ -70,7 +71,6 @@ ros::Publisher pub;
 // PointXYZRGB cloud
 pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud (new pcl::PointCloud<pcl::PointXYZRGB>);
 // Cloud normals
-pcl::PointCloud<pcl::Normal>::Ptr cloud_normals (new pcl::PointCloud<pcl::Normal>);
 pcl::PointCloud<pcl::PointXYZRGBNormal>::Ptr cloud_with_normals (new pcl::PointCloud<pcl::PointXYZRGBNormal>);
 
 pcl::IndicesClustersPtr clusters (new pcl::IndicesClusters), 
@@ -134,17 +134,20 @@ bool isPointInside(cv::Point point, std::vector<cv::Point>* contour)
     return cv::pointPolygonTest(*contour, point, false) == 1;
 }
 
-void removeBox(vector<cv::Point>* contours)
+void removeBox(pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_in, 
+               pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_out,
+               vector<cv::Point>* contours)
 {
     const float bad_point = std::numeric_limits<float>::quiet_NaN();
+    copyPointCloud(*cloud_in, *cloud_out);
 
-    for (int x = 0; x < 640; x++)
+    for (int x = 0; x < cloud_in->width; x++)
     {
-        for (int y = 0; y < 480; y++)
+        for (int y = 0; y < cloud_in->height; y++)
         {
             if (!isPointInside(cv::Point(x, y), contours))
             {
-                cloud->at(x, y).x = cloud->at(x, y).y = cloud->at(x, y).z = bad_point;
+                cloud_out->at(x, y).x = cloud_out->at(x, y).y = cloud_out->at(x, y).z = bad_point;
             }
         }
     }
@@ -210,7 +213,6 @@ void findCorkPiece(){
     {  
         
         std::vector<int> aux_closed;
-        // cout << "HighestPoint: " << cloud_normals->points[highestPointIdx] << endl;
         for (size_t i = 0; i < pointIdxNKNSearch.size(); ++i)
         {
             if (find(closed_points.begin(), closed_points.end(), pointIdxNKNSearch[i]) != closed_points.end()) continue;
@@ -233,9 +235,6 @@ void findCorkPiece(){
         aux_closed.pop_back();
         closed_points.insert(closed_points.end(), aux_closed.begin(), aux_closed.end());
 
-        // // Isto random esta aqui por agr. tem de ser alterado
-        // int randIdx = rand() % pointIdxNKNSearch.size();
-        // searchPointIdx = pointIdxNKNSearch[randIdx];
         pointIdxNKNSearch.clear();
         pointNKNSquaredDistance.clear();
         iters++;
@@ -269,11 +268,7 @@ void cluster_extraction (pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_in, pcl::
 {
     // Parametros do Algoritmo (Conditional Euclidean Clustering)
     double leaf_size = 0.005;
-    //cout << "Leaf Size (0.005): " << endl;
-    //cin >> leaf_size;
     double cluster_tolerance = 0.01;
-    //cout << "Cluster Tolerance: " << endl;
-    //cin >> cluster_tolerance;
 
     // Cloud downsampling -> mais eficiente e densidade de pontos mais equalizada
     pcl::VoxelGrid<pcl::PointXYZRGB> vg;
@@ -346,6 +341,9 @@ void cluster_extraction (pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_in, pcl::
 
 void cloud_smoothing (pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_in, pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_out)
 {
+    // Timer related stuff
+    auto start = chrono::steady_clock::now();
+
     pcl::search::KdTree<pcl::PointXYZRGB>::Ptr tree (new pcl::search::KdTree<pcl::PointXYZRGB>);
 
     // Output has the PointNormal type in order to store the normals calculated by MLS
@@ -368,8 +366,12 @@ void cloud_smoothing (pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_in, pcl::Poi
     // Reconstruct
     mls.process (mls_points);
 
-    cout << "Finished cloud smoothing" << endl;
 
+    // Timer related stuff
+    auto end = chrono::steady_clock::now();
+    auto diff = end - start;
+    cout << "Finished cloud smoothing in " << chrono::duration <double, milli> (diff).count() << " ms" << endl;
+    
     // Alterar tipo da cloud para PointXYZRGB
     copyPointCloud(mls_points, *cloud_out);
 }
@@ -379,6 +381,7 @@ void surface_normals (pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_in, pcl::Poi
     // Compute normals
     pcl::search::KdTree<pcl::PointXYZRGB>::Ptr tree (new pcl::search::KdTree<pcl::PointXYZRGB> ());
     pcl::NormalEstimation<pcl::PointXYZRGB, pcl::Normal> ne;
+    pcl::PointCloud<pcl::Normal>::Ptr cloud_normals (new pcl::PointCloud<pcl::Normal>);
 
     cout << "Starting computing normals" << endl;
     ne.setInputCloud (cloud_in);
@@ -386,26 +389,14 @@ void surface_normals (pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_in, pcl::Poi
     ne.setRadiusSearch (0.03);
     ne.compute (*cloud_normals);
     cout << "Finished computing normals" << endl;
+
+    copyPointCloud(*cloud_in, *cloud_out);
         
-    cloud_out->width    = 640;
-    cloud_out->height   = 480;
-    cloud_out->is_dense = false;
-    cloud_out->points.resize (cloud_out->width * cloud_out->height);
-
-    for(int y = 0; y < cloud_out->height; y++)
+    for (int i = 0; i < cloud_in->size(); i++)
     {
-        for(int x = 0; x < cloud_out->width; x++)
-        {
-            pcl::PointXYZRGB point;
-            point.x = cloud->at(x, y).x;
-            point.y = cloud->at(x, y).y;
-            point.z = cloud->at(x, y).z;
-            point.r = abs(cloud_normals->at(x,y).normal[0]) * 255;
-            point.g = abs(cloud_normals->at(x,y).normal[1]) * 255;
-            point.b = abs(cloud_normals->at(x,y).normal[2]) * 255;
-
-            cloud_out->points.push_back(point);
-        }
+        cloud_out->points[i].r = abs(cloud_normals->points[i].normal[0]) * 255;
+        cloud_out->points[i].g = abs(cloud_normals->points[i].normal[1]) * 255;
+        cloud_out->points[i].b = abs(cloud_normals->points[i].normal[2]) * 255;
     }
 }
 
@@ -419,7 +410,8 @@ void synced_callback(const sensor_msgs::ImageConstPtr& image,
     cv::Mat cv_image;
     cv::Mat cv_depth;
 
-    try{
+    try
+    {
         // Convert sensor msg to cv mat
 		cv_depth_ptr = cv_bridge::toCvCopy(depth, sensor_msgs::image_encodings::TYPE_16UC1);
     	cv_image_ptr = cv_bridge::toCvCopy(image, sensor_msgs::image_encodings::BGR8);
@@ -429,43 +421,69 @@ void synced_callback(const sensor_msgs::ImageConstPtr& image,
 		// Convert depth enconding
 		cv::Mat(cv_depth).convertTo(cv_depth, CV_8UC1, 255. / (1000));
 	
-	}catch(cv_bridge::Exception& e){
+	}
+    catch(cv_bridge::Exception& e)
+    {
+		ROS_ERROR("%s", e.what());
+		return;
+	}
+
+    try
+    {
+        pcl::fromROSMsg (*cloud_msg, *cloud);
+    }
+    catch(pcl::PCLException& e)
+    {
 		ROS_ERROR("%s", e.what());
 		return;
 	}
 
     
-    try{
-        pcl::fromROSMsg (*cloud_msg, *cloud);
-    }catch(pcl::PCLException& e){
-		ROS_ERROR("%s", e.what());
-		return;
-	}
-
-    vector<cv::Point> corkContours = getCorkContours(cv_image);
-    removeBox(&corkContours);
-
     if (!displayed)
-    {
-        pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_out (new pcl::PointCloud<pcl::PointXYZRGB>);
-        
-        //surface_normals(cloud, cloud_out);
-
-        if (smooth_cloud)
+    {   
+        if (!strcmp(display_type.c_str(), "original"))
         {
-            cloud_smoothing(cloud, cloud);
+            viewer->updatePointCloud(cloud, "kinectcloud");
         }
-        
-        cluster_extraction(cloud, cloud_out);
-        viewer->updatePointCloud(cloud_out, "kinectcloud");
+        else
+        {
+            pcl::PointCloud<pcl::PointXYZRGB>::Ptr cork_pieces (new pcl::PointCloud<pcl::PointXYZRGB>);
+            vector<cv::Point> corkContours = getCorkContours(cv_image);
+            removeBox(cloud, cork_pieces, &corkContours);
 
-        displayed = true;
+            if (smooth_cloud)
+            {
+                cloud_smoothing(cork_pieces, cork_pieces);
+            }
+
+            if (!strcmp(display_type.c_str(), "surface_normals"))
+            {
+                surface_normals(cork_pieces, cork_pieces);
+            }
+            else if (!strcmp(display_type.c_str(), "clustering"))
+            {
+                cluster_extraction(cork_pieces, cork_pieces);
+            }
+            
+            viewer->updatePointCloud(cork_pieces, "kinectcloud");
+        }
+
+        if (!live)
+        {
+            displayed = true;
+        }  
     }
     viewer->spinOnce (100);
 }
 
 void getGlobalParams(ros::NodeHandle n){
+
+    // Control params
+    n.getParam("cork_iris/live", live);
+    n.getParam("cork_iris/type", display_type);
     n.getParam("cork_iris/smooth_cloud", smooth_cloud);
+
+    // Clustering params
     n.getParam("cork_iris/normal_diff", normal_diff);
     n.getParam("cork_iris/squared_dist", squared_dist);
     n.getParam("cork_iris/curvature", curv);

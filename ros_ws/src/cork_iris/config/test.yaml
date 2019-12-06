@@ -1,4 +1,9 @@
+# type = original, cork_pieces, surface_normals, clustering
+type: "clustering"
+live: true
 smooth_cloud: true
+
+# Clustering params
 normal_diff: 0.995
 squared_dist: 0.1 #big values not yet used 
-curvature: 0.1    #big values not yet used
+curvature: 0.01    #big values not yet used
