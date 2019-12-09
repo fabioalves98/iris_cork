@@ -10,6 +10,11 @@ find_package(catkin REQUIRED COMPONENTS
   pcl_conversions
   pcl_ros
   sensor_msgs
+  dynamic_reconfigure
+)
+
+generate_dynamic_reconfigure_options(
+  cfg/PCLPoints.cfg
 )
 
 ## Eventualmente esta versao nao precisa de estar aqui
@@ -21,11 +26,6 @@ find_package(OpenCV 3.2.0 REQUIRED COMPONENTS
 )
 
 find_package(PCL REQUIRED)
-
-
-catkin_package(
-
-)
 
 include_directories(${OpenCV_INCLUDE_DIRS})
 include_directories(${catkin_INCLUDE_DIRS})
@@ -39,3 +39,6 @@ target_link_libraries(capture ${OpenCV_LIBS} ${catkin_LIBRARIES})
 
 add_executable(pcl_points src/pcl_points.cpp src/ImageParser.cpp src/box.cpp src/DepthParser.cpp)
 target_link_libraries(pcl_points ${catkin_LIBRARIES} ${PCL_LIBRARIES})
+
+add_dependencies(pcl_points ${PROJECT_NAME}_gencfg)
+

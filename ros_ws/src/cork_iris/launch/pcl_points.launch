@@ -1,8 +1,0 @@
-<launch>
-    <arg name="config_file" default="test.yaml"/>
-    <group ns="cork_iris">
-        <rosparam file="$(find cork_iris)/config/$(arg config_file)" />
-    </group>
-    <node pkg="cork_iris" type="pcl_points" name="pcl_points" output="screen" />
-
-</launch>

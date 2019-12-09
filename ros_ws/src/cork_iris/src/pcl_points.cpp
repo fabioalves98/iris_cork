@@ -22,6 +22,11 @@
 #include <pcl/filters/voxel_grid.h>
 #include <pcl/filters/extract_indices.h>
 #include <pcl/surface/mls.h>
+
+//Dynamic Parameters Configure
+#include <dynamic_reconfigure/server.h>
+#include <cork_iris/PCLPointsConfig.h>
+
 // ROS Sync
 #include <message_filters/time_synchronizer.h>
 #include <message_filters/time_synchronizer.h>
@@ -57,12 +62,17 @@ image_transport::Publisher parsed_pub;
 
 bool displayed = false;
 
+bool smooth_cloud;
+bool live;
+int display_type;
+
 double normal_diff;
 double squared_dist;
 double curv;
-bool smooth_cloud;
-bool live;
-string display_type;
+double leaf_size;
+double cluster_tolerance;
+int min_cluster_size;
+int max_cluster_size;
 
 int num_enforce = 0;
 
@@ -266,9 +276,6 @@ bool enforceNormals (const pcl::PointXYZRGBNormal& point_a, const pcl::PointXYZR
 
 void cluster_extraction (pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_in, pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_out)
 {
-    // Parametros do Algoritmo (Conditional Euclidean Clustering)
-    double leaf_size = 0.005;
-    double cluster_tolerance = 0.01;
 
     // Cloud downsampling -> mais eficiente e densidade de pontos mais equalizada
     pcl::VoxelGrid<pcl::PointXYZRGB> vg;
@@ -289,8 +296,8 @@ void cluster_extraction (pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_in, pcl::
     cec.setInputCloud (cloud_with_normals);
     cec.setConditionFunction (&enforceNormals);
     cec.setClusterTolerance (cluster_tolerance);
-    cec.setMinClusterSize (cloud_with_normals->points.size () / 70);
-    cec.setMaxClusterSize (cloud_with_normals->points.size () / 5);
+    cec.setMinClusterSize (cloud_with_normals->points.size () / min_cluster_size);
+    cec.setMaxClusterSize (cloud_with_normals->points.size () / max_cluster_size);
     cec.segment (*clusters);
     cec.getRemovedClusters (small_clusters, large_clusters);
 
@@ -305,9 +312,9 @@ void cluster_extraction (pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_in, pcl::
     {
         for (int j = 0; j < (*small_clusters)[i].indices.size (); ++j)
         {
-            cloud_out->points[(*small_clusters)[i].indices[j]].r = 0;
-            cloud_out->points[(*small_clusters)[i].indices[j]].g = 255;
-            cloud_out->points[(*small_clusters)[i].indices[j]].b = 0;
+            cloud_out->points[(*small_clusters)[i].indices[j]].r = 100;
+            cloud_out->points[(*small_clusters)[i].indices[j]].g = 100;
+            cloud_out->points[(*small_clusters)[i].indices[j]].b = 100;
 
         }
     }
@@ -316,9 +323,9 @@ void cluster_extraction (pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_in, pcl::
     {
         for (int j = 0; j < (*large_clusters)[i].indices.size (); ++j)
         {
-            cloud_out->points[(*large_clusters)[i].indices[j]].r = 0;
-            cloud_out->points[(*large_clusters)[i].indices[j]].g = 0;
-            cloud_out->points[(*large_clusters)[i].indices[j]].b = 255;
+            cloud_out->points[(*large_clusters)[i].indices[j]].r = 100;
+            cloud_out->points[(*large_clusters)[i].indices[j]].g = 50;
+            cloud_out->points[(*large_clusters)[i].indices[j]].b = 0;
 
         }
     }
@@ -329,12 +336,22 @@ void cluster_extraction (pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_in, pcl::
         int randG = rand() % 255;
         int randB = rand() % 255;
 
+        bitset<8> binary = bitset<8>(i);
+
         for (int j = 0; j < (*clusters)[i].indices.size (); ++j)
         {
-            cloud_out->points[(*clusters)[i].indices[j]].r = randR;
-            cloud_out->points[(*clusters)[i].indices[j]].g = randG;
-            cloud_out->points[(*clusters)[i].indices[j]].b = randB;
-
+            if (i % 8 == 0) 
+            {
+                cloud_out->points[(*clusters)[i].indices[j]].r = 255;
+                cloud_out->points[(*clusters)[i].indices[j]].g = 150;
+                cloud_out->points[(*clusters)[i].indices[j]].b = 0;
+            }
+            else
+            {
+                cloud_out->points[(*clusters)[i].indices[j]].r = 255 * binary[0];
+                cloud_out->points[(*clusters)[i].indices[j]].g = 255 * binary[1];
+                cloud_out->points[(*clusters)[i].indices[j]].b = 255 * binary[2];
+            }   
         }
     }
 }
@@ -400,6 +417,31 @@ void surface_normals (pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_in, pcl::Poi
     }
 }
 
+void parameterConfigure(cork_iris::PCLPointsConfig &config, uint32_t level) 
+{
+
+
+    // General params
+    display_type = config.type;
+    live = config.live;
+    smooth_cloud = config.smooth_cloud;
+
+    // Clustering params
+    leaf_size = config.leaf_size;
+    cluster_tolerance = config.cluster_tolerance;
+    
+    min_cluster_size = config.min_cluster_size;
+    max_cluster_size = config.max_cluster_size;
+    normal_diff = config.normal_diff;
+    squared_dist = config.squared_dist;
+    curv = config.curvature;
+
+
+
+
+    displayed = false;
+}
+
 void synced_callback(const sensor_msgs::ImageConstPtr& image, 
                     const sensor_msgs::ImageConstPtr& depth, 
                     const sensor_msgs::PointCloud2ConstPtr& cloud_msg,
@@ -439,14 +481,15 @@ void synced_callback(const sensor_msgs::ImageConstPtr& image,
 	}
 
     
-    if (!displayed)
+    if (!displayed || live)
     {   
-        if (!strcmp(display_type.c_str(), "original"))
+        if (display_type == 0) // Original point Cloud
         {
             viewer->updatePointCloud(cloud, "kinectcloud");
         }
         else
         {
+            // Original point cloud without the box
             pcl::PointCloud<pcl::PointXYZRGB>::Ptr cork_pieces (new pcl::PointCloud<pcl::PointXYZRGB>);
             vector<cv::Point> corkContours = getCorkContours(cv_image);
             removeBox(cloud, cork_pieces, &corkContours);
@@ -456,11 +499,11 @@ void synced_callback(const sensor_msgs::ImageConstPtr& image,
                 cloud_smoothing(cork_pieces, cork_pieces);
             }
 
-            if (!strcmp(display_type.c_str(), "surface_normals"))
+            if (display_type == 2) // Surface normals color
             {
                 surface_normals(cork_pieces, cork_pieces);
             }
-            else if (!strcmp(display_type.c_str(), "clustering"))
+            else if (display_type == 3) // Clustering Extraction
             {
                 cluster_extraction(cork_pieces, cork_pieces);
             }
@@ -468,39 +511,25 @@ void synced_callback(const sensor_msgs::ImageConstPtr& image,
             viewer->updatePointCloud(cork_pieces, "kinectcloud");
         }
 
-        if (!live)
-        {
-            displayed = true;
-        }  
+        displayed = true; 
     }
     viewer->spinOnce (100);
 }
 
-void getGlobalParams(ros::NodeHandle n){
 
-    // Control params
-    n.getParam("cork_iris/live", live);
-    n.getParam("cork_iris/type", display_type);
-    n.getParam("cork_iris/smooth_cloud", smooth_cloud);
-
-    // Clustering params
-    n.getParam("cork_iris/normal_diff", normal_diff);
-    n.getParam("cork_iris/squared_dist", squared_dist);
-    n.getParam("cork_iris/curvature", curv);
-}
 
 int main (int argc, char** argv)
 {
 
-    ros::init (argc, argv, "pcl_test");
+    ros::init (argc, argv, "pcl_points");
     ros::NodeHandle n;
-    getGlobalParams(n);
 
 
     image_transport::ImageTransport it(n);
 	parsed_pub = it.advertise("/corkiris/parsed", 1);
-    // Creating subscribers for rgb, depth and cloud images, and syncing a callback for them
 
+
+    // Creating subscribers for rgb, depth and cloud images, and syncing a callback for them
     message_filters::Subscriber<sensor_msgs::Image> image_sub(n, "/camera/rgb/image_raw", 1);
     message_filters::Subscriber<sensor_msgs::Image> depth_sub(n, "/camera/depth_registered/image_raw", 1);
     message_filters::Subscriber<sensor_msgs::PointCloud2> pointcloud_sub(n, "/camera/depth_registered/points", 1);
@@ -511,6 +540,13 @@ int main (int argc, char** argv)
                                                                      sensor_msgs::PointCloud2, 
                                                                      sensor_msgs::CameraInfo>;
     AproxSync mypolicy(32);
+
+
+    // Dynamic reconfigure init and callback
+    dynamic_reconfigure::Server<cork_iris::PCLPointsConfig> server;
+    dynamic_reconfigure::Server<cork_iris::PCLPointsConfig>::CallbackType pclConfigCallback;
+    pclConfigCallback = boost::bind(&parameterConfigure, _1, _2);
+    server.setCallback(pclConfigCallback);
 
 	message_filters::Synchronizer<AproxSync> sync{static_cast<const AproxSync &>(mypolicy), image_sub, depth_sub, pointcloud_sub, camera_info};
     sync.registerCallback(boost::bind(&synced_callback, _1, _2, _3, _4));
