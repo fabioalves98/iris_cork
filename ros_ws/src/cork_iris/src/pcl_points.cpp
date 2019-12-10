@@ -1,4 +1,4 @@
-#include <stdio.h>
+ #include <stdio.h>
 #include <chrono>
 #include <numeric>
 // ROS Common
@@ -62,6 +62,8 @@ image_transport::Publisher parsed_pub;
 
 bool displayed = false;
 
+
+// Global parameter values
 bool smooth_cloud;
 bool live;
 int display_type;
@@ -237,8 +239,8 @@ void findCorkPiece(){
             } 
         }
 
-        cout << aux_closed.size() << endl;
-        cout << searchPointIdx << endl;
+        //cout << aux_closed.size() << endl;
+        //cout << searchPointIdx << endl;
 
         searchPointIdx = aux_closed.back();
         searchPoint = cloud->points[searchPointIdx];
@@ -259,14 +261,16 @@ bool enforceNormals (const pcl::PointXYZRGBNormal& point_a, const pcl::PointXYZR
     point_b_normal = point_b.getNormalVector3fMap ();
 
     num_enforce++;
-    
-    if(abs(point_a.curvature - point_b.curvature) > curv){
-        return (false);
-    }    
+
+    double enf_normal_diff = point_a_normal.dot(point_b_normal);
+
+    //cout << "\nNormal Difference: "  << enf_normal_diff << endl;      
+    //cout << "Squared Distance: " << squared_distance << endl;
     
     if (squared_distance < squared_dist)
     {
-        if (abs(point_a_normal.dot(point_b_normal)) > normal_diff){
+        if (enf_normal_diff >= normal_diff)
+        {
             return (true);
         }
     }
@@ -276,8 +280,7 @@ bool enforceNormals (const pcl::PointXYZRGBNormal& point_a, const pcl::PointXYZR
 
 void cluster_extraction (pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_in, pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_out)
 {
-
-    // Cloud downsampling -> mais eficiente e densidade de pontos mais equalizada
+    //cout << "\nStaring Cluster Extraction" << endl;
     pcl::VoxelGrid<pcl::PointXYZRGB> vg;
     vg.setInputCloud (cloud_in);
     vg.setLeafSize (leaf_size, leaf_size, leaf_size);
@@ -301,12 +304,12 @@ void cluster_extraction (pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_in, pcl::
     cec.segment (*clusters);
     cec.getRemovedClusters (small_clusters, large_clusters);
 
-    cout << "small cluster size: " << small_clusters->size() << endl;
-    cout << "large cluster size: " << large_clusters->size() << endl;
-    cout << "cluster size: " << clusters->size() << endl;
-    cout << "original cloud size: " << cloud->width << " - " << cloud->height << endl;
-    cout << "cloud filtered size: " << cloud_out->width  << " " << cloud_out->height<<  endl;
-    cout << "number of comparissons: " << num_enforce << endl;
+    //cout << "small cluster size: " << small_clusters->size() << endl;
+    //cout << "large cluster size: " << large_clusters->size() << endl;
+    //cout << "cluster size: " << clusters->size() << endl;
+    //cout << "original cloud size: " << cloud->width << " - " << cloud->height << endl;
+    //cout << "cloud filtered size: " << cloud_out->width  << " " << cloud_out->height<<  endl;
+    //cout << "number of comparissons: " << num_enforce << endl;
 
     for (int i = 0; i < small_clusters->size (); ++i)
     {
@@ -354,13 +357,12 @@ void cluster_extraction (pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_in, pcl::
             }   
         }
     }
+
+    //cout << "Finished Cluster Extration\n" << endl;
 }
 
 void cloud_smoothing (pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_in, pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_out)
 {
-    // Timer related stuff
-    auto start = chrono::steady_clock::now();
-
     pcl::search::KdTree<pcl::PointXYZRGB>::Ptr tree (new pcl::search::KdTree<pcl::PointXYZRGB>);
 
     // Output has the PointNormal type in order to store the normals calculated by MLS
@@ -369,7 +371,7 @@ void cloud_smoothing (pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_in, pcl::Poi
     // Init object (second point type is for the normals, even if unused)
     pcl::MovingLeastSquares<pcl::PointXYZRGB, pcl::PointXYZRGBNormal> mls;
     
-    cout << "Starting cloud smoothing" << endl;
+    //cout << "\nStarting cloud smoothing" << endl;
     
     mls.setComputeNormals (true);
     // Set parameters
@@ -382,12 +384,8 @@ void cloud_smoothing (pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_in, pcl::Poi
 
     // Reconstruct
     mls.process (mls_points);
-
-
-    // Timer related stuff
-    auto end = chrono::steady_clock::now();
-    auto diff = end - start;
-    cout << "Finished cloud smoothing in " << chrono::duration <double, milli> (diff).count() << " ms" << endl;
+    
+    //cout << "Finished cloud smoothing\n" << endl;
     
     // Alterar tipo da cloud para PointXYZRGB
     copyPointCloud(mls_points, *cloud_out);
@@ -400,12 +398,12 @@ void surface_normals (pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_in, pcl::Poi
     pcl::NormalEstimation<pcl::PointXYZRGB, pcl::Normal> ne;
     pcl::PointCloud<pcl::Normal>::Ptr cloud_normals (new pcl::PointCloud<pcl::Normal>);
 
-    cout << "Starting computing normals" << endl;
+    //cout << "\nStarting computing normals" << endl;
     ne.setInputCloud (cloud_in);
     ne.setSearchMethod (tree);
     ne.setRadiusSearch (0.03);
     ne.compute (*cloud_normals);
-    cout << "Finished computing normals" << endl;
+    //cout << "Finished computing normals\n" << endl;
 
     copyPointCloud(*cloud_in, *cloud_out);
         
@@ -419,8 +417,6 @@ void surface_normals (pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_in, pcl::Poi
 
 void parameterConfigure(cork_iris::PCLPointsConfig &config, uint32_t level) 
 {
-
-
     // General params
     display_type = config.type;
     live = config.live;
@@ -436,9 +432,6 @@ void parameterConfigure(cork_iris::PCLPointsConfig &config, uint32_t level)
     squared_dist = config.squared_dist;
     curv = config.curvature;
 
-
-
-
     displayed = false;
 }
 
@@ -451,6 +444,8 @@ void synced_callback(const sensor_msgs::ImageConstPtr& image,
 	cv_bridge::CvImagePtr cv_image_ptr;
     cv::Mat cv_image;
     cv::Mat cv_depth;
+
+    
 
     try
     {
@@ -479,22 +474,23 @@ void synced_callback(const sensor_msgs::ImageConstPtr& image,
 		ROS_ERROR("%s", e.what());
 		return;
 	}
-
     
     if (!displayed || live)
     {   
-        if (display_type == 0) // Original point Cloud
+        // Timer related stuff
+        auto start = chrono::steady_clock::now();
+
+        if (display_type == 0) // Original point cloud
         {
             viewer->updatePointCloud(cloud, "kinectcloud");
         }
-        else
-        {
-            // Original point cloud without the box
+        else // Original point cloud without the box
+        { 
             pcl::PointCloud<pcl::PointXYZRGB>::Ptr cork_pieces (new pcl::PointCloud<pcl::PointXYZRGB>);
             vector<cv::Point> corkContours = getCorkContours(cv_image);
             removeBox(cloud, cork_pieces, &corkContours);
 
-            if (smooth_cloud)
+            if (smooth_cloud) // Cloud smoothing
             {
                 cloud_smoothing(cork_pieces, cork_pieces);
             }
@@ -503,20 +499,26 @@ void synced_callback(const sensor_msgs::ImageConstPtr& image,
             {
                 surface_normals(cork_pieces, cork_pieces);
             }
-            else if (display_type == 3) // Clustering Extraction
+            else if (display_type == 3) // Clustering extraction
             {
                 cluster_extraction(cork_pieces, cork_pieces);
             }
-            
+            // Update the viewer and publish the processed pointcloud 
             viewer->updatePointCloud(cork_pieces, "kinectcloud");
+            
+            sensor_msgs::PointCloud2 published_pcd;
+            pcl::toROSMsg(*cork_pieces, published_pcd);
+            pub.publish(published_pcd);
         }
+
+        auto end = chrono::steady_clock::now();
+        auto diff = end - start;
+        cout << "PointCloud processed in " << chrono::duration <double, milli> (diff).count() << " ms" << endl;
 
         displayed = true; 
     }
     viewer->spinOnce (100);
 }
-
-
 
 int main (int argc, char** argv)
 {
@@ -551,11 +553,12 @@ int main (int argc, char** argv)
 	message_filters::Synchronizer<AproxSync> sync{static_cast<const AproxSync &>(mypolicy), image_sub, depth_sub, pointcloud_sub, camera_info};
     sync.registerCallback(boost::bind(&synced_callback, _1, _2, _3, _4));
 
+    // Initializing pcl viewer
     viewer = normals_vis();
     setViewerPointcloud(cloud);
 
     // Create a ROS publisher for the output point cloud
-    pub = n.advertise<sensor_msgs::PointCloud2> ("/newtopics/processed_depth", 1);
+    pub = n.advertise<sensor_msgs::PointCloud2> ("/cork_iris/processed_pointcloud", 1);
     ros::Rate loop_rate(10);
     // Spin
     ros::spin ();
