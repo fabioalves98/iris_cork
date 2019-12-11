@@ -73,6 +73,9 @@ double squared_dist;
 double curv;
 double leaf_size;
 double cluster_tolerance;
+
+double radius_search;
+
 int min_cluster_size;
 int max_cluster_size;
 
@@ -96,7 +99,7 @@ void drawImageContours(cv::Mat drawing, std::vector<std::vector<cv::Point>> cont
     }
 }
 
-pcl::visualization::PCLVisualizer::Ptr normals_vis()
+pcl::visualization::PCLVisualizer::Ptr normalsVis()
 {   
     pcl::visualization::PCLVisualizer::Ptr viewer (new pcl::visualization::PCLVisualizer ("3D Viewer"));
     viewer->setBackgroundColor (0, 0, 0);
@@ -271,7 +274,10 @@ bool enforceNormals (const pcl::PointXYZRGBNormal& point_a, const pcl::PointXYZR
     {
         if (enf_normal_diff >= normal_diff)
         {
-            return (true);
+            if (point_b.curvature < curv)
+            {
+                return (true);
+            }   
         }
     }
 
@@ -292,7 +298,7 @@ void cluster_extraction (pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_in, pcl::
     pcl::NormalEstimation<pcl::PointXYZRGB, pcl::PointXYZRGBNormal> ne;
     ne.setInputCloud (cloud_out);
     ne.setSearchMethod (search_tree);
-    ne.setRadiusSearch (0.03);
+    ne.setRadiusSearch (radius_search);
     ne.compute (*cloud_with_normals);
     
     pcl::ConditionalEuclideanClustering<pcl::PointXYZRGBNormal> cec (true);
@@ -401,7 +407,7 @@ void surface_normals (pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_in, pcl::Poi
     //cout << "\nStarting computing normals" << endl;
     ne.setInputCloud (cloud_in);
     ne.setSearchMethod (tree);
-    ne.setRadiusSearch (0.03);
+    ne.setRadiusSearch (radius_search);
     ne.compute (*cloud_normals);
     //cout << "Finished computing normals\n" << endl;
 
@@ -412,6 +418,28 @@ void surface_normals (pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_in, pcl::Poi
         cloud_out->points[i].r = abs(cloud_normals->points[i].normal[0]) * 255;
         cloud_out->points[i].g = abs(cloud_normals->points[i].normal[1]) * 255;
         cloud_out->points[i].b = abs(cloud_normals->points[i].normal[2]) * 255;
+    }
+}
+
+void surface_curvatures (pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_in, pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_out)
+{
+    // Compute normals
+    pcl::search::KdTree<pcl::PointXYZRGB>::Ptr tree (new pcl::search::KdTree<pcl::PointXYZRGB> ());
+    pcl::NormalEstimation<pcl::PointXYZRGB, pcl::Normal> ne;
+    pcl::PointCloud<pcl::Normal>::Ptr cloud_normals (new pcl::PointCloud<pcl::Normal>);
+
+    //cout << "\nStarting computing normals" << endl;
+    ne.setInputCloud (cloud_in);
+    ne.setSearchMethod (tree);
+    ne.setRadiusSearch (radius_search);
+    ne.compute (*cloud_normals);
+    //cout << "Finished computing normals\n" << endl;
+
+    copyPointCloud(*cloud_in, *cloud_out);
+        
+    for (int i = 0; i < cloud_in->size(); i++)
+    {
+        cloud_out->points[i].r = cloud_out->points[i].g = cloud_out->points[i].b = 55 + abs(cloud_normals->points[i].curvature / 0.3) * 200;
     }
 }
 
@@ -431,6 +459,8 @@ void parameterConfigure(cork_iris::PCLPointsConfig &config, uint32_t level)
     normal_diff = config.normal_diff;
     squared_dist = config.squared_dist;
     curv = config.curvature;
+    
+    radius_search = config.radius_search;
 
     displayed = false;
 }
@@ -499,7 +529,11 @@ void synced_callback(const sensor_msgs::ImageConstPtr& image,
             {
                 surface_normals(cork_pieces, cork_pieces);
             }
-            else if (display_type == 3) // Clustering extraction
+            else if(display_type == 3) // Surface curvature color
+            {
+                surface_curvatures(cork_pieces, cork_pieces);
+            }
+            else if (display_type == 4) // Clustering extraction
             {
                 cluster_extraction(cork_pieces, cork_pieces);
             }
@@ -554,7 +588,7 @@ int main (int argc, char** argv)
     sync.registerCallback(boost::bind(&synced_callback, _1, _2, _3, _4));
 
     // Initializing pcl viewer
-    viewer = normals_vis();
+    viewer = normalsVis();
     setViewerPointcloud(cloud);
 
     // Create a ROS publisher for the output point cloud
