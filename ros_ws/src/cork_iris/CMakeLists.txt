@@ -14,7 +14,7 @@ find_package(catkin REQUIRED COMPONENTS
 )
 
 generate_dynamic_reconfigure_options(
-  cfg/PCLPoints.cfg
+  cfg/PCLCork.cfg
 )
 
 ## Eventualmente esta versao nao precisa de estar aqui
@@ -37,8 +37,8 @@ add_definitions(${PCL_DEFINITIONS})
 add_executable(capture src/capture.cpp src/ImageParser.cpp src/box.cpp src/DepthParser.cpp)
 target_link_libraries(capture ${OpenCV_LIBS} ${catkin_LIBRARIES})
 
-add_executable(pcl_points src/pcl_points.cpp src/ImageParser.cpp src/box.cpp src/DepthParser.cpp)
-target_link_libraries(pcl_points ${catkin_LIBRARIES} ${PCL_LIBRARIES})
+add_executable(pcl_cork src/pcl_cork.cpp src/ImageParser.cpp src/box.cpp src/DepthParser.cpp)
+target_link_libraries(pcl_cork ${catkin_LIBRARIES} ${PCL_LIBRARIES})
 
-add_dependencies(pcl_points ${PROJECT_NAME}_gencfg)
+add_dependencies(pcl_cork ${PROJECT_NAME}_gencfg)
 

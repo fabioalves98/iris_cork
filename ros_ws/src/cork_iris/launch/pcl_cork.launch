@@ -1,6 +1,6 @@
 <launch>
 
-    <node pkg="cork_iris" type="pcl_points" name="pcl_functions" output="screen" />
+    <node pkg="cork_iris" type="pcl_cork" name="pcl_cork" output="screen" />
     
     <node pkg="rqt_reconfigure" type="rqt_reconfigure" name="configure_params" output="screen" /> 
 

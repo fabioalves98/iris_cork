@@ -1,8 +1,10 @@
- #include <stdio.h>
+#include <stdio.h>
 #include <chrono>
 #include <numeric>
+
 // ROS Common
 #include <ros/ros.h>
+
 // PCL specific includes
 #include <pcl/common/common.h>
 #include <pcl/io/pcd_io.h>
@@ -16,6 +18,7 @@
 #include <pcl/kdtree/kdtree_flann.h>
 #include <pcl/ModelCoefficients.h>
 #include <pcl/filters/conditional_removal.h>
+#include <pcl/filters/statistical_outlier_removal.h>
 #include <pcl/segmentation/extract_clusters.h>
 #include <pcl/segmentation/conditional_euclidean_clustering.h>
 #include <pcl/search/organized.h>
@@ -25,7 +28,7 @@
 
 //Dynamic Parameters Configure
 #include <dynamic_reconfigure/server.h>
-#include <cork_iris/PCLPointsConfig.h>
+#include <cork_iris/PCLCorkConfig.h>
 
 // ROS Sync
 #include <message_filters/time_synchronizer.h>
@@ -64,9 +67,10 @@ bool displayed = false;
 
 
 // Global parameter values
-bool smooth_cloud;
-bool live;
 int display_type;
+bool live;
+bool remove_stat_outliers;
+bool smooth_cloud;
 
 double normal_diff;
 double squared_dist;
@@ -242,9 +246,6 @@ void findCorkPiece(){
             } 
         }
 
-        //cout << aux_closed.size() << endl;
-        //cout << searchPointIdx << endl;
-
         searchPointIdx = aux_closed.back();
         searchPoint = cloud->points[searchPointIdx];
         aux_closed.pop_back();
@@ -255,7 +256,6 @@ void findCorkPiece(){
         iters++;
         if(iters == MAX_ITERS) break;
     }
-    
 }
 
 bool enforceNormals (const pcl::PointXYZRGBNormal& point_a, const pcl::PointXYZRGBNormal& point_b, float squared_distance)
@@ -266,9 +266,6 @@ bool enforceNormals (const pcl::PointXYZRGBNormal& point_a, const pcl::PointXYZR
     num_enforce++;
 
     double enf_normal_diff = point_a_normal.dot(point_b_normal);
-
-    //cout << "\nNormal Difference: "  << enf_normal_diff << endl;      
-    //cout << "Squared Distance: " << squared_distance << endl;
     
     if (squared_distance < squared_dist)
     {
@@ -286,7 +283,6 @@ bool enforceNormals (const pcl::PointXYZRGBNormal& point_a, const pcl::PointXYZR
 
 void cluster_extraction (pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_in, pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_out)
 {
-    //cout << "\nStaring Cluster Extraction" << endl;
     pcl::VoxelGrid<pcl::PointXYZRGB> vg;
     vg.setInputCloud (cloud_in);
     vg.setLeafSize (leaf_size, leaf_size, leaf_size);
@@ -363,8 +359,15 @@ void cluster_extraction (pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_in, pcl::
             }   
         }
     }
+}
 
-    //cout << "Finished Cluster Extration\n" << endl;
+void remove_outliers (pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_in, pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_out)
+{
+    pcl::StatisticalOutlierRemoval<pcl::PointXYZRGB> sor;
+    sor.setInputCloud (cloud_in);
+    sor.setMeanK (50);
+    sor.setStddevMulThresh (1.0);
+    sor.filter (*cloud_out);
 }
 
 void cloud_smoothing (pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_in, pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_out)
@@ -376,9 +379,7 @@ void cloud_smoothing (pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_in, pcl::Poi
 
     // Init object (second point type is for the normals, even if unused)
     pcl::MovingLeastSquares<pcl::PointXYZRGB, pcl::PointXYZRGBNormal> mls;
-    
-    //cout << "\nStarting cloud smoothing" << endl;
-    
+        
     mls.setComputeNormals (true);
     // Set parameters
     vector<int> test;
@@ -390,9 +391,7 @@ void cloud_smoothing (pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_in, pcl::Poi
 
     // Reconstruct
     mls.process (mls_points);
-    
-    //cout << "Finished cloud smoothing\n" << endl;
-    
+        
     // Alterar tipo da cloud para PointXYZRGB
     copyPointCloud(mls_points, *cloud_out);
 }
@@ -404,12 +403,10 @@ void surface_normals (pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_in, pcl::Poi
     pcl::NormalEstimation<pcl::PointXYZRGB, pcl::Normal> ne;
     pcl::PointCloud<pcl::Normal>::Ptr cloud_normals (new pcl::PointCloud<pcl::Normal>);
 
-    //cout << "\nStarting computing normals" << endl;
     ne.setInputCloud (cloud_in);
     ne.setSearchMethod (tree);
     ne.setRadiusSearch (radius_search);
     ne.compute (*cloud_normals);
-    //cout << "Finished computing normals\n" << endl;
 
     copyPointCloud(*cloud_in, *cloud_out);
         
@@ -428,12 +425,10 @@ void surface_curvatures (pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_in, pcl::
     pcl::NormalEstimation<pcl::PointXYZRGB, pcl::Normal> ne;
     pcl::PointCloud<pcl::Normal>::Ptr cloud_normals (new pcl::PointCloud<pcl::Normal>);
 
-    //cout << "\nStarting computing normals" << endl;
     ne.setInputCloud (cloud_in);
     ne.setSearchMethod (tree);
     ne.setRadiusSearch (radius_search);
     ne.compute (*cloud_normals);
-    //cout << "Finished computing normals\n" << endl;
 
     copyPointCloud(*cloud_in, *cloud_out);
         
@@ -443,25 +438,25 @@ void surface_curvatures (pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_in, pcl::
     }
 }
 
-void parameterConfigure(cork_iris::PCLPointsConfig &config, uint32_t level) 
+void parameterConfigure(cork_iris::PCLCorkConfig &config, uint32_t level) 
 {
     // General params
     display_type = config.type;
     live = config.live;
+    remove_stat_outliers = config.remove_outliers;
     smooth_cloud = config.smooth_cloud;
+
+    radius_search = config.radius_search;
 
     // Clustering params
     leaf_size = config.leaf_size;
     cluster_tolerance = config.cluster_tolerance;
-    
     min_cluster_size = config.min_cluster_size;
     max_cluster_size = config.max_cluster_size;
     normal_diff = config.normal_diff;
     squared_dist = config.squared_dist;
     curv = config.curvature;
     
-    radius_search = config.radius_search;
-
     displayed = false;
 }
 
@@ -520,11 +515,14 @@ void synced_callback(const sensor_msgs::ImageConstPtr& image,
             vector<cv::Point> corkContours = getCorkContours(cv_image);
             removeBox(cloud, cork_pieces, &corkContours);
 
+            if (remove_stat_outliers) // Remove Statistical Outliers
+            {
+                remove_outliers(cork_pieces, cork_pieces);
+            }
             if (smooth_cloud) // Cloud smoothing
             {
                 cloud_smoothing(cork_pieces, cork_pieces);
             }
-
             if (display_type == 2) // Surface normals color
             {
                 surface_normals(cork_pieces, cork_pieces);
@@ -556,14 +554,11 @@ void synced_callback(const sensor_msgs::ImageConstPtr& image,
 
 int main (int argc, char** argv)
 {
-
-    ros::init (argc, argv, "pcl_points");
+    ros::init (argc, argv, "pcl_cork");
     ros::NodeHandle n;
-
 
     image_transport::ImageTransport it(n);
 	parsed_pub = it.advertise("/corkiris/parsed", 1);
-
 
     // Creating subscribers for rgb, depth and cloud images, and syncing a callback for them
     message_filters::Subscriber<sensor_msgs::Image> image_sub(n, "/camera/rgb/image_raw", 1);
@@ -577,10 +572,9 @@ int main (int argc, char** argv)
                                                                      sensor_msgs::CameraInfo>;
     AproxSync mypolicy(32);
 
-
     // Dynamic reconfigure init and callback
-    dynamic_reconfigure::Server<cork_iris::PCLPointsConfig> server;
-    dynamic_reconfigure::Server<cork_iris::PCLPointsConfig>::CallbackType pclConfigCallback;
+    dynamic_reconfigure::Server<cork_iris::PCLCorkConfig> server;
+    dynamic_reconfigure::Server<cork_iris::PCLCorkConfig>::CallbackType pclConfigCallback;
     pclConfigCallback = boost::bind(&parameterConfigure, _1, _2);
     server.setCallback(pclConfigCallback);
 
