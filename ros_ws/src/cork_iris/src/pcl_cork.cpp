@@ -331,7 +331,6 @@ void cluster_extraction (pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_in, pcl::
             cloud_out->points[(*large_clusters)[i].indices[j]].r = 100;
             cloud_out->points[(*large_clusters)[i].indices[j]].g = 50;
             cloud_out->points[(*large_clusters)[i].indices[j]].b = 0;
-
         }
     }
 
@@ -535,8 +534,11 @@ void synced_callback(const sensor_msgs::ImageConstPtr& image,
             {
                 cluster_extraction(cork_pieces, cork_pieces);
             }
+
             // Update the viewer and publish the processed pointcloud 
-            viewer->updatePointCloud(cork_pieces, "kinectcloud");
+            viewer->addCube (0, 1, 0, 1, 0, 1, 1.0, 0, 0, "cube", 0);  
+            viewer->setShapeRenderingProperties(pcl::visualization::PCL_VISUALIZER_COLOR, 0.7, 0.7, 0, "cube");             viewer->updatePointCloud(cork_pieces, "kinectcloud");
+            viewer->setRepresentationToWireframeForAllActors(); 
             
             sensor_msgs::PointCloud2 published_pcd;
             pcl::toROSMsg(*cork_pieces, published_pcd);
