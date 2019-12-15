@@ -358,6 +358,43 @@ void cluster_extraction (pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_in, pcl::
             }   
         }
     }
+
+    
+    
+    pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_cluster (new pcl::PointCloud<pcl::PointXYZRGB>);
+    for (int j = 0; j < (*clusters)[0].indices.size (); ++j)
+    {
+        cloud_cluster->push_back(cloud_out->points[(*clusters)[0].indices[j]]);
+    }
+    
+    pcl::PointXYZRGB minPt, maxPt;
+    pcl::getMinMax3D (*cloud_cluster, minPt, maxPt);
+    std::cout << "Max x: " << maxPt.x << std::endl;
+    std::cout << "Max y: " << maxPt.y << std::endl;
+    std::cout << "Max z: " << maxPt.z << std::endl;
+    std::cout << "Min x: " << minPt.x << std::endl;
+    std::cout << "Min y: " << minPt.y << std::endl;
+    std::cout << "Min z: " << minPt.z << std::endl;
+
+    // Translation
+    Eigen::Vector3f translation(maxPt.x, maxPt.y, maxPt.z);
+    // Rotation
+    Eigen::Matrix<float, 3, 1> zAxis = Eigen::Matrix<float, 3, 1>(0.0f,0.0f,0.0f);
+    pcl::PointXYZRGBNormal n = cloud_with_normals->points((*clusters)[0].indices[5]);
+    cout << n.normal[0] << endl;
+    cout << n.normal[1] << endl;
+    cout << n.normal[2] << endl;
+    Eigen::Matrix<float, 3, 1> normVector = Eigen::Matrix<float, 3, 1>(cloud_normals);
+    Eigen::Quaternionf rotation = Eigen::Quaternionf::FromTwoVectors(zAxis,normVector); 
+    // Width
+
+    // Height
+
+    // Depth
+    viewer->addCube (translation, rotation, 0.1, 0.1, 0.1, "cube", 0);
+    viewer->addCube (minPt.x, maxPt.x, minPt.y, maxPt.y, minPt.z, maxPt.z, 1.0, 0, 0, "cube", 0);  
+    viewer->setShapeRenderingProperties(pcl::visualization::PCL_VISUALIZER_COLOR, 0.7, 0.7, 0, "cube");             
+    viewer->setRepresentationToWireframeForAllActors();
 }
 
 void remove_outliers (pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_in, pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_out)
@@ -536,9 +573,7 @@ void synced_callback(const sensor_msgs::ImageConstPtr& image,
             }
 
             // Update the viewer and publish the processed pointcloud 
-            viewer->addCube (0, 1, 0, 1, 0, 1, 1.0, 0, 0, "cube", 0);  
-            viewer->setShapeRenderingProperties(pcl::visualization::PCL_VISUALIZER_COLOR, 0.7, 0.7, 0, "cube");             viewer->updatePointCloud(cork_pieces, "kinectcloud");
-            viewer->setRepresentationToWireframeForAllActors(); 
+            viewer->updatePointCloud(cork_pieces, "kinectcloud");
             
             sensor_msgs::PointCloud2 published_pcd;
             pcl::toROSMsg(*cork_pieces, published_pcd);
