@@ -26,6 +26,14 @@
 #include <pcl/filters/extract_indices.h>
 #include <pcl/surface/mls.h>
 
+#include <pcl/point_cloud.h>
+#include <pcl/point_types.h>
+#include "pcl/common/centroid.h"
+#include <Eigen/Core>
+#include <Eigen/Geometry>
+#include <pcl/common/transforms.h>
+
+
 //Dynamic Parameters Configure
 #include <dynamic_reconfigure/server.h>
 #include <cork_iris/PCLCorkConfig.h>
@@ -359,41 +367,41 @@ void cluster_extraction (pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_in, pcl::
         }
     }
 
-    
-    
     pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_cluster (new pcl::PointCloud<pcl::PointXYZRGB>);
     for (int j = 0; j < (*clusters)[0].indices.size (); ++j)
     {
         cloud_cluster->push_back(cloud_out->points[(*clusters)[0].indices[j]]);
     }
     
-    pcl::PointXYZRGB minPt, maxPt;
-    pcl::getMinMax3D (*cloud_cluster, minPt, maxPt);
-    std::cout << "Max x: " << maxPt.x << std::endl;
-    std::cout << "Max y: " << maxPt.y << std::endl;
-    std::cout << "Max z: " << maxPt.z << std::endl;
-    std::cout << "Min x: " << minPt.x << std::endl;
-    std::cout << "Min y: " << minPt.y << std::endl;
-    std::cout << "Min z: " << minPt.z << std::endl;
+    // Compute principal directions
+    Eigen::Vector4f pcaCentroid;
+    pcl::compute3DCentroid(*cloud_cluster, pcaCentroid);
+    Eigen::Matrix3f covariance;
+    computeCovarianceMatrixNormalized(*cloud_cluster, pcaCentroid, covariance);
+    Eigen::SelfAdjointEigenSolver<Eigen::Matrix3f> eigen_solver(covariance, Eigen::ComputeEigenvectors);
+    Eigen::Matrix3f eigenVectorsPCA = eigen_solver.eigenvectors();
+    /// This line is necessary for proper orientation in some cases. The numbers come out the same without it, but
+    ///    the signs are different and the box doesn't get correctly oriented in some cases.
+    eigenVectorsPCA.col(2) = eigenVectorsPCA.col(0).cross(eigenVectorsPCA.col(1));  
+                                                                               
+    // Transform the original cloud to the origin where the principal components correspond to the axes.
+    Eigen::Matrix4f projectionTransform(Eigen::Matrix4f::Identity());
+    projectionTransform.block<3,3>(0,0) = eigenVectorsPCA.transpose();
+    projectionTransform.block<3,1>(0,3) = -1.f * (projectionTransform.block<3,3>(0,0) * pcaCentroid.head<3>());
+    pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloudPointsProjected (new pcl::PointCloud<pcl::PointXYZRGB>);
+    pcl::transformPointCloud(*cloud_cluster, *cloudPointsProjected, projectionTransform);
+    // Get the minimum and maximum points of the transformed cloud.
+    pcl::PointXYZRGB minPoint, maxPoint;
+    pcl::getMinMax3D(*cloudPointsProjected, minPoint, maxPoint);
+    const Eigen::Vector3f meanDiagonal = 0.5f*(maxPoint.getVector3fMap() + minPoint.getVector3fMap());
 
-    // Translation
-    Eigen::Vector3f translation(maxPt.x, maxPt.y, maxPt.z);
-    // Rotation
-    Eigen::Matrix<float, 3, 1> zAxis = Eigen::Matrix<float, 3, 1>(0.0f,0.0f,0.0f);
-    pcl::PointXYZRGBNormal n = cloud_with_normals->points((*clusters)[0].indices[5]);
-    cout << n.normal[0] << endl;
-    cout << n.normal[1] << endl;
-    cout << n.normal[2] << endl;
-    Eigen::Matrix<float, 3, 1> normVector = Eigen::Matrix<float, 3, 1>(cloud_normals);
-    Eigen::Quaternionf rotation = Eigen::Quaternionf::FromTwoVectors(zAxis,normVector); 
-    // Width
+    // Final transform
+    const Eigen::Quaternionf bboxQuaternion(eigenVectorsPCA); //Quaternions are a way to do rotations https://www.youtube.com/watch?v=mHVwd8gYLnI
+    const Eigen::Vector3f bboxTransform = eigenVectorsPCA * meanDiagonal + pcaCentroid.head<3>();
 
-    // Height
-
-    // Depth
-    viewer->addCube (translation, rotation, 0.1, 0.1, 0.1, "cube", 0);
-    viewer->addCube (minPt.x, maxPt.x, minPt.y, maxPt.y, minPt.z, maxPt.z, 1.0, 0, 0, "cube", 0);  
-    viewer->setShapeRenderingProperties(pcl::visualization::PCL_VISUALIZER_COLOR, 0.7, 0.7, 0, "cube");             
+    viewer->removeShape("bbox");
+    viewer->addCube(bboxTransform, bboxQuaternion, maxPoint.x - minPoint.x, maxPoint.y - minPoint.y, maxPoint.z - minPoint.z, "bbox", 0);   
+    viewer->setShapeRenderingProperties(pcl::visualization::PCL_VISUALIZER_COLOR, 1, 0, 0, "bbox");             
     viewer->setRepresentationToWireframeForAllActors();
 }
 
