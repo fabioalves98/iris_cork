@@ -289,6 +289,42 @@ bool enforceNormals (const pcl::PointXYZRGBNormal& point_a, const pcl::PointXYZR
     return (false);
 }
 
+void drawCloudBoundingBox(pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_in)
+{
+
+    // Compute principal directions
+    Eigen::Vector4f pcaCentroid;
+    pcl::compute3DCentroid(*cloud_in, pcaCentroid);
+    Eigen::Matrix3f covariance;
+    computeCovarianceMatrixNormalized(*cloud_in, pcaCentroid, covariance);
+    Eigen::SelfAdjointEigenSolver<Eigen::Matrix3f> eigen_solver(covariance, Eigen::ComputeEigenvectors);
+    Eigen::Matrix3f eigenVectorsPCA = eigen_solver.eigenvectors();
+    /// This line is necessary for proper orientation in some cases. The numbers come out the same without it, but
+    ///    the signs are different and the box doesn't get correctly oriented in some cases.
+    eigenVectorsPCA.col(2) = eigenVectorsPCA.col(0).cross(eigenVectorsPCA.col(1));  
+                                                                               
+    // Transform the original cloud to the origin where the principal components correspond to the axes.
+    Eigen::Matrix4f projectionTransform(Eigen::Matrix4f::Identity());
+    projectionTransform.block<3,3>(0,0) = eigenVectorsPCA.transpose();
+    projectionTransform.block<3,1>(0,3) = -1.f * (projectionTransform.block<3,3>(0,0) * pcaCentroid.head<3>());
+    pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloudPointsProjected (new pcl::PointCloud<pcl::PointXYZRGB>);
+    pcl::transformPointCloud(*cloud_in, *cloudPointsProjected, projectionTransform);
+    // Get the minimum and maximum points of the transformed cloud.
+    pcl::PointXYZRGB minPoint, maxPoint;
+    pcl::getMinMax3D(*cloudPointsProjected, minPoint, maxPoint);
+    const Eigen::Vector3f meanDiagonal = 0.5f*(maxPoint.getVector3fMap() + minPoint.getVector3fMap());
+
+    // Final transform
+    const Eigen::Quaternionf bboxQuaternion(eigenVectorsPCA);
+    const Eigen::Vector3f bboxTransform = eigenVectorsPCA * meanDiagonal + pcaCentroid.head<3>();
+
+    viewer->removeShape("bbox");
+    viewer->addCube(bboxTransform, bboxQuaternion, maxPoint.x - minPoint.x, maxPoint.y - minPoint.y, maxPoint.z - minPoint.z, "bbox", 0);   
+    viewer->setShapeRenderingProperties(pcl::visualization::PCL_VISUALIZER_COLOR, 1, 0, 0, "bbox");             
+    viewer->setRepresentationToWireframeForAllActors();
+
+}
+
 void cluster_extraction (pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_in, pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_out)
 {
     pcl::VoxelGrid<pcl::PointXYZRGB> vg;
@@ -367,42 +403,14 @@ void cluster_extraction (pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_in, pcl::
         }
     }
 
+    // Transforming the cluster into a cloud
     pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_cluster (new pcl::PointCloud<pcl::PointXYZRGB>);
     for (int j = 0; j < (*clusters)[0].indices.size (); ++j)
     {
         cloud_cluster->push_back(cloud_out->points[(*clusters)[0].indices[j]]);
     }
     
-    // Compute principal directions
-    Eigen::Vector4f pcaCentroid;
-    pcl::compute3DCentroid(*cloud_cluster, pcaCentroid);
-    Eigen::Matrix3f covariance;
-    computeCovarianceMatrixNormalized(*cloud_cluster, pcaCentroid, covariance);
-    Eigen::SelfAdjointEigenSolver<Eigen::Matrix3f> eigen_solver(covariance, Eigen::ComputeEigenvectors);
-    Eigen::Matrix3f eigenVectorsPCA = eigen_solver.eigenvectors();
-    /// This line is necessary for proper orientation in some cases. The numbers come out the same without it, but
-    ///    the signs are different and the box doesn't get correctly oriented in some cases.
-    eigenVectorsPCA.col(2) = eigenVectorsPCA.col(0).cross(eigenVectorsPCA.col(1));  
-                                                                               
-    // Transform the original cloud to the origin where the principal components correspond to the axes.
-    Eigen::Matrix4f projectionTransform(Eigen::Matrix4f::Identity());
-    projectionTransform.block<3,3>(0,0) = eigenVectorsPCA.transpose();
-    projectionTransform.block<3,1>(0,3) = -1.f * (projectionTransform.block<3,3>(0,0) * pcaCentroid.head<3>());
-    pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloudPointsProjected (new pcl::PointCloud<pcl::PointXYZRGB>);
-    pcl::transformPointCloud(*cloud_cluster, *cloudPointsProjected, projectionTransform);
-    // Get the minimum and maximum points of the transformed cloud.
-    pcl::PointXYZRGB minPoint, maxPoint;
-    pcl::getMinMax3D(*cloudPointsProjected, minPoint, maxPoint);
-    const Eigen::Vector3f meanDiagonal = 0.5f*(maxPoint.getVector3fMap() + minPoint.getVector3fMap());
-
-    // Final transform
-    const Eigen::Quaternionf bboxQuaternion(eigenVectorsPCA); //Quaternions are a way to do rotations https://www.youtube.com/watch?v=mHVwd8gYLnI
-    const Eigen::Vector3f bboxTransform = eigenVectorsPCA * meanDiagonal + pcaCentroid.head<3>();
-
-    viewer->removeShape("bbox");
-    viewer->addCube(bboxTransform, bboxQuaternion, maxPoint.x - minPoint.x, maxPoint.y - minPoint.y, maxPoint.z - minPoint.z, "bbox", 0);   
-    viewer->setShapeRenderingProperties(pcl::visualization::PCL_VISUALIZER_COLOR, 1, 0, 0, "bbox");             
-    viewer->setRepresentationToWireframeForAllActors();
+    drawCloudBoundingBox(cloud_cluster);
 }
 
 void remove_outliers (pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_in, pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_out)
