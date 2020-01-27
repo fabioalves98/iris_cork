@@ -6,7 +6,7 @@ static_targets:
      target_type: 0
      circle_dia: 0.000000
      target_frame: target_frame
-     transform_interface: ros_lti
+     transform_interface: ros_bti
      xyz_aaxis_pose: [ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
      target_rows: 7
      target_cols: 9

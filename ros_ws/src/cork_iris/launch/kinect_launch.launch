@@ -1,0 +1,21 @@
+<?xml version="1.0" ?>
+<launch>
+
+<!--<node name="rviz" pkg="rviz" type="rviz" args="-d $(find industrial_extrinsic_cal)/config/industrial_extrinsic_calibration.rviz" required="true" />-->
+
+  <!-- Kinect camera node   -->
+  <include  file="$(find freenect_launch)/launch/freenect.launch">
+    <arg name="camera" default="kinect" />
+    <arg name="publish_tf" default="false" />
+  </include>
+
+  <!-- Define location of camera relative to world_frame  -->
+  <node pkg="tf" type="static_transform_publisher" 
+                 name="kinect_rgb_frame" 
+                 args="0 0 0 0 0 0 world kinect_rgb_optical_frame 100" />
+
+  <node pkg="tf" type="static_transform_publisher" 
+                 name="kinect_frame" 
+                 args="0 0 0 0 0 0 world kinect_depth_optical_frame 100" />
+
+</launch>

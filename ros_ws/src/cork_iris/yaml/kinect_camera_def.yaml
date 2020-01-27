@@ -2,10 +2,13 @@
 
 static_cameras:
  -
-    camera_name: kinect
+    camera_name: kinect/rgb
     camera_optical_frame: /kinect_rgb_optical_frame
     camera_intermediate_frame: /kinect_link
-    image_topic: /kinect/rgb/image_raw
+    trigger: NO_WAIT_TRIGGER
+    image_directory: /kinect
+    image_topic: /rgb/image_raw
+    transform_interface: ros_bti
     angle_axis_ax: 1.0
     angle_axis_ay: 1.1
     angle_axis_az: 1.2
