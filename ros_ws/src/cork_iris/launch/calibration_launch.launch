@@ -1,7 +1,6 @@
 <?xml version="1.0" ?>
 <launch>
 
-
     <!-- Launch service which is called to to indicate scene is ready   -->
     <node pkg="industrial_extrinsic_cal" type="trigger_service" name="rosSceneTrigger" output="screen" />
 

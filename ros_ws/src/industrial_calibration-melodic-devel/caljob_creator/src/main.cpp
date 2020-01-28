@@ -63,7 +63,7 @@ private:
     os << "     observations:\n";
     os << "     -\n";
     os << "          camera: " << camera_name_ << "\n";
-    os << "          target: modified_circle_10x10\n";
+    os << "          target: " << target_name_ << "\n";
     os << "          roi_x_min: 0\n";
     os << "          roi_x_max: " << image_height_ << "\n";
     os << "          roi_y_min: 0\n";
