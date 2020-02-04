@@ -1,4 +1,4 @@
-
+#!/usr/bin/env python3
 f = open("../yaml/ur10_kinect_caljob.yaml", "r")
 lines = f.readlines()
 
