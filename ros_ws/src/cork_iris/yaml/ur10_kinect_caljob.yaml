@@ -5,12 +5,14 @@ scenes:
      trigger: ROS_ROBOT_JOINT_VALUES_ACTION_TRIGGER
      trig_action_server: rosRobotSceneTrigger_joint_values
      joint_values:
-        - 0.152982
-        - -0.94698
-        - -1.90773
-        - -1.81022
-        - 1.36598
-        - 1.69197
+        - -0.0860195
+        - -0.158854
+        - 0.276219
+        - -0.117613
+        - -0.0849859
+        - 0.0136283
+        - 3.15347e-09
+        - -2.04075e-09
      observations:
      -
           camera: kinect/rgb
@@ -24,12 +26,14 @@ scenes:
      trigger: ROS_ROBOT_JOINT_VALUES_ACTION_TRIGGER
      trig_action_server: rosRobotSceneTrigger_joint_values
      joint_values:
-        - 0.061408
-        - -0.949203
-        - -2.16585
-        - -1.53107
-        - 1.37121
-        - 1.59864
+        - -0.0859628
+        - -0.183963
+        - 0.227136
+        - -0.0434212
+        - -0.0849293
+        - 0.0136286
+        - 4.24847e-09
+        - -3.09196e-09
      observations:
      -
           camera: kinect/rgb
@@ -43,50 +47,14 @@ scenes:
      trigger: ROS_ROBOT_JOINT_VALUES_ACTION_TRIGGER
      trig_action_server: rosRobotSceneTrigger_joint_values
      joint_values:
-        - 0.0521107
-        - -1.27287
-        - -1.9744
-        - -1.39699
-        - 1.3718
-        - 1.58917
-     observations:
-     -
-          camera: kinect/rgb
-          target: Checkerboard
-          roi_x_min: 0
-          roi_x_max: 640
-          roi_y_min: 0
-          roi_y_max: 480
-          cost_type: LinkTargetCameraReprjErrorPK
--
-     trigger: ROS_ROBOT_JOINT_VALUES_ACTION_TRIGGER
-     trig_action_server: rosRobotSceneTrigger_joint_values
-     joint_values:
-        - 0.459061
-        - -1.23921
-        - -2.05154
-        - -1.43898
-        - 1.36095
-        - 2.00478
-     observations:
-     -
-          camera: kinect/rgb
-          target: Checkerboard
-          roi_x_min: 0
-          roi_x_max: 640
-          roi_y_min: 0
-          roi_y_max: 480
-          cost_type: LinkTargetCameraReprjErrorPK
--
-     trigger: ROS_ROBOT_JOINT_VALUES_ACTION_TRIGGER
-     trig_action_server: rosRobotSceneTrigger_joint_values
-     joint_values:
-        - 0.642014
-        - -1.31851
-        - -2.00039
-        - -1.95839
-        - 0.851418
-        - 2.42973
+        - -0.248197
+        - -0.150806
+        - 0.15898
+        - -0.00710293
+        - -0.247151
+        - 0.0123551
+        - 4.69125e-09
+        - -3.51555e-09
      observations:
      -
           camera: kinect/rgb
