@@ -1,0 +1,7 @@
+<launch>
+# this file might be empty
+# It might contain static transform publishers that were updated through calibration
+# Often, transform interfaces use some other mechanism to update themselves
+<node pkg="tf" type="static_transform_publisher" name="/kinect_rgb_optical_frame_tf_broadcaster" args="-0.176317 -0.251864 -0.0201434 0.152434 -0.162117 0.00810539 0.974893 world /kinect_rgb_optical_frame 100" />
+
+</launch> 

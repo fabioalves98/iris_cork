@@ -1,5 +1,0 @@
-## Launching UR10e Gazebo + MoveIt sim
-1.   roslaunch ur_e_gazebo ur10e.launch limited:=true
-2.   roslaunch ur10_e_moveit_config ur10_e_moveit_planning_execution.launch sim:=true limited:=true
-3.   export LC_NUMERIC="en_US.UTF-8"
-3.1. roslaunch ur10_e_moveit_config moveit_rviz.launch config:=true 

@@ -9,7 +9,7 @@
     <arg name="publish_tf" default="false" />
   </include>
 
-  <!-- Define location of camera relative to world_frame  -->
+  <!-- Define location of camera relative to world_frame
   <node pkg="tf" type="static_transform_publisher" 
                  name="kinect_rgb_frame" 
                  args="3 3 3 0 0 0 world kinect_rgb_optical_frame 100" />
@@ -17,5 +17,6 @@
   <node pkg="tf" type="static_transform_publisher" 
                  name="kinect_frame" 
                  args="3 3 3 0 0 0 world kinect_depth_optical_frame 100" />
+  -->
 
 </launch>

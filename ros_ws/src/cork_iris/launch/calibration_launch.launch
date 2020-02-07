@@ -14,8 +14,12 @@
         camera_file: "kinect_camera_def.yaml"
         target_file: "checkerboard7x9_target.yaml"
         cal_job_file: "ur10_kinect_caljob.yaml"
-        results_file: "/home/fabio/Dropbox/Universidade/Bolsa/shared-ect/ros_ws/src/cork_iris/yaml/results.launch"
+        results_file: "/home/fabio/Dropbox/Universidade/Bolsa/shared-ect/ros_ws/src/cork_iris/launch/kinect_transform.launch"
         </rosparam>
     </node>
+
+    <node pkg="tf" type="static_transform_publisher" 
+          name="target_frame" 
+          args="0.0 0.0 0.25 1.57 1.57 1.57 tool0 target_frame 100" />
 
 </launch>

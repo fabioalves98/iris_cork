@@ -5,14 +5,12 @@ scenes:
      trigger: ROS_ROBOT_JOINT_VALUES_ACTION_TRIGGER
      trig_action_server: rosRobotSceneTrigger_joint_values
      joint_values:
-        - -0.0860195
-        - -0.158854
-        - 0.276219
-        - -0.117613
-        - -0.0849859
-        - 0.0136283
-        - 3.15347e-09
-        - -2.04075e-09
+        - 0.308451
+        - -1.76273
+        - 2.10021
+        - 0.0247432
+        - 1.21999
+        - 1.28595
      observations:
      -
           camera: kinect/rgb
@@ -26,14 +24,12 @@ scenes:
      trigger: ROS_ROBOT_JOINT_VALUES_ACTION_TRIGGER
      trig_action_server: rosRobotSceneTrigger_joint_values
      joint_values:
-        - -0.0859628
-        - -0.183963
-        - 0.227136
-        - -0.0434212
-        - -0.0849293
-        - 0.0136286
-        - 4.24847e-09
-        - -3.09196e-09
+        - 0.375411
+        - -1.58521
+        - 2.00018
+        - -0.0604285
+        - 1.2828
+        - 1.31063
      observations:
      -
           camera: kinect/rgb
@@ -47,14 +43,12 @@ scenes:
      trigger: ROS_ROBOT_JOINT_VALUES_ACTION_TRIGGER
      trig_action_server: rosRobotSceneTrigger_joint_values
      joint_values:
-        - -0.248197
-        - -0.150806
-        - 0.15898
-        - -0.00710293
-        - -0.247151
-        - 0.0123551
-        - 4.69125e-09
-        - -3.51555e-09
+        - 0.763921
+        - -1.5078
+        - 1.97403
+        - -0.126062
+        - 1.64841
+        - 1.4429
      observations:
      -
           camera: kinect/rgb

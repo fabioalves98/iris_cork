@@ -10,7 +10,7 @@ def reorder_caljob(filename, default_joint_order, published_joint_order):
     new_lines = list(lines)
     for i in range(0, len(lines)):
         if 'joint_values:' in lines[i]:
-            for j in range(0, 8):
+            for j in range(0, 6):
                 joint_value = lines[i+(j+1)]
                 original_joint = published_joint_order[j]
                 new_idx = default_joint_order.index(original_joint)
@@ -25,18 +25,13 @@ def reorder_caljob(filename, default_joint_order, published_joint_order):
     file_write.close()
 
 
-        
-
-
-
-
 def main():
 
     rospy.init_node('caljob_joint_reorder', anonymous=True)
     joint_state = rospy.wait_for_message("/joint_states", JointState)    
     
-    
-    DEFAULT_JOINT_ORDER = ['shoulder_pan_joint', 
+    '''
+    SIM_JOINT_ORDER = ['shoulder_pan_joint', 
                        'shoulder_lift_joint', 
                        'elbow_joint', 
                        'wrist_1_joint', 
@@ -44,6 +39,14 @@ def main():
                        'wrist_3_joint', 
                        'left_finger_joint',
                        'right_finger_joint']
+    '''
+
+    DEFAULT_JOINT_ORDER = ['shoulder_pan_joint', 
+                       'shoulder_lift_joint', 
+                       'elbow_joint', 
+                       'wrist_1_joint', 
+                       'wrist_2_joint', 
+                       'wrist_3_joint']
 
     rospack = rospkg.RosPack()
     path = rospack.get_path('cork_iris')    
