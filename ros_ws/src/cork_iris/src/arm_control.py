@@ -126,12 +126,17 @@ def main():
     # poseGoal([0.4, 0.3, 0.4])
 
     simpleMove([0, 1, 0], [0.1, 0.1, 0])
+    rospy.set_param('/caljob_creator/capture_scene', True)
     time.sleep(2.0)
     simpleRotate([0, 1, 0], [0, pi/3, 0])
+    rospy.set_param('/caljob_creator/capture_scene', True)
     time.sleep(2.0)
     simpleRotate([1, 0, 0], [pi, 0, 0])
+    rospy.set_param('/caljob_creator/capture_scene', True)
     time.sleep(2.0)
     simpleMove([0, 1, 0], [0.1, -0.1, 0])
+    rospy.set_param('/caljob_creator/quit', True)
+
 
 
 if __name__ == "__main__":
