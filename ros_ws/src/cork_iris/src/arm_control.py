@@ -2,11 +2,12 @@
 
 import sys
 import copy
+import time
 import rospy
 import moveit_commander
 import moveit_msgs.msg
 import geometry_msgs.msg
-from math import pi, cos, sin
+from math import pi
 from std_msgs.msg import String
 from moveit_commander.conversions import pose_to_list
 from tf.transformations import euler_from_quaternion, quaternion_from_euler
@@ -48,39 +49,46 @@ def poseGoal(pose):
     move_group.clear_pose_targets()
 
 
-def cartesianGoal():
-    waypoints = []
-
-    wpose = move_group.get_current_pose().pose
-    wpose.position.z += -0.1  # First move up (z)
-    waypoints.append(copy.deepcopy(wpose))
-
-    # angle = pi/6
-    # ax, ay, az = 0, 1, 0
-    # wpose.orientation.x = ax * sin(angle/2)
-    # wpose.orientation.y = ay * sin(angle/2)
-    # wpose.orientation.z = az * sin(angle/2)
-    # wpose.orientation.w = cos(angle/2)
-    quat = geometry_msgs.msg.Quaternion(*quaternion_from_euler(0, pi/6, 0))
-    wpose.orientation = quat
-     
-    waypoints.append(copy.deepcopy(wpose))
-
-    #wpose.position.y += -0.1  # Third move sideways (y)
-    #waypoints.append(copy.deepcopy(wpose))
-
-    # We want the Cartesian path to be interpolated at a resolution of 1 cm
-    # which is why we will specify 0.01 as the eef_step in Cartesian
-    # translation.  We will disable the jump threshold by setting it to 0.0,
-    # ignoring the check for infeasible jumps in joint space, which is sufficient
-    # for this tutorial.
+def cartesianGoal(waypoints):
+    # waypoints = []
     (plan, fraction) = move_group.compute_cartesian_path(
                                     waypoints,   # waypoints to follow
-                                    0.01,        # eef_step
+                                    0.05,        # eef_step
                                     0.0)         # jump_threshold
-
+    time.sleep(1.0) # Gives time for plan to show
     move_group.execute(plan, wait=True)
-    print(move_group.get_current_joint_values())
+
+
+# direction should be an array like: [0, 0, 1]
+# where the components that need to be moved should be 1
+# Every movement is parallel to x,y or z. Never diagonal
+def simpleMove(direction, distance):
+    
+    waypoints = []
+    wpose = move_group.get_current_pose().pose
+    
+    if direction[0] == 1:
+        wpose.position.x += distance[0] * direction[0] 
+        waypoints.append(copy.deepcopy(wpose)) 
+    if direction[1] == 1:
+        wpose.position.y += distance[1] * direction[1] 
+        waypoints.append(copy.deepcopy(wpose))
+    if direction[2] == 1:  
+        wpose.position.z += distance[2] * direction[2]
+        waypoints.append(copy.deepcopy(wpose)) 
+
+    cartesianGoal(waypoints)
+
+def simpleRotate(axis, angle):
+    
+    waypoints = []
+    wpose = move_group.get_current_pose().pose
+
+    quat = geometry_msgs.msg.Quaternion(*quaternion_from_euler(axis[0] * angle[0], axis[1] * angle[1], axis[2] * angle[2]))
+    wpose.orientation = quat
+    waypoints.append(copy.deepcopy(wpose))
+    
+    cartesianGoal(waypoints)
 
 
 def main():
@@ -112,11 +120,18 @@ def main():
     # robot:
     print "============ Printing robot state"
     print robot.get_current_state()
-    print ""
 
-    jointGoal([0, -pi/2, pi/2, 0.5, pi/2, -pi])
+
+    jointGoal([0, -pi/2, pi/2, 0.5, pi/2, -pi/2])
     # poseGoal([0.4, 0.3, 0.4])
-    # cartesianGoal()
+
+    simpleMove([0, 1, 0], [0.1, 0.1, 0])
+    time.sleep(2.0)
+    simpleRotate([0, 1, 0], [0, pi/3, 0])
+    time.sleep(2.0)
+    simpleRotate([1, 0, 0], [pi, 0, 0])
+    time.sleep(2.0)
+    simpleMove([0, 1, 0], [0.1, -0.1, 0])
 
 
 if __name__ == "__main__":
