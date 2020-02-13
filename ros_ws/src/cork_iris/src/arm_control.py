@@ -56,38 +56,41 @@ def cartesianGoal(waypoints):
                                     0.05,        # eef_step
                                     0.0)         # jump_threshold
     time.sleep(1.0) # Gives time for plan to show
+    print("Executing Cartesian Plan")
     move_group.execute(plan, wait=True)
 
 
 # direction should be an array like: [0, 0, 1]
 # where the components that need to be moved should be 1
 # Every movement is parallel to x,y or z. Never diagonal
-def simpleMove(direction, distance):
+def simpleMove(movement):
     
     waypoints = []
     wpose = move_group.get_current_pose().pose
     
-    if direction[0] == 1:
-        wpose.position.x += distance[0] * direction[0] 
+    if movement[0] != 0:
+        wpose.position.x += movement[0] 
         waypoints.append(copy.deepcopy(wpose)) 
-    if direction[1] == 1:
-        wpose.position.y += distance[1] * direction[1] 
+    if movement[1] != 0:
+        wpose.position.y += movement[1] 
         waypoints.append(copy.deepcopy(wpose))
-    if direction[2] == 1:  
-        wpose.position.z += distance[2] * direction[2]
+    if movement[2] != 0:  
+        wpose.position.z += movement[2]
         waypoints.append(copy.deepcopy(wpose)) 
 
+    print("Sending Cartesian Goal")
     cartesianGoal(waypoints)
 
-def simpleRotate(axis, angle):
+def simpleRotate(rotation):
     
     waypoints = []
     wpose = move_group.get_current_pose().pose
 
-    quat = geometry_msgs.msg.Quaternion(*quaternion_from_euler(axis[0] * angle[0], axis[1] * angle[1], axis[2] * angle[2]))
+    quat = geometry_msgs.msg.Quaternion(*quaternion_from_euler(rotation[0], rotation[1], rotation[2]))
     wpose.orientation = quat
     waypoints.append(copy.deepcopy(wpose))
     
+    print("Sending Cartesian Goal")
     cartesianGoal(waypoints)
 
 
@@ -122,10 +125,14 @@ def main():
     print robot.get_current_state()
 
 
-    jointGoal([0, -pi/2, pi/2, 0.5, pi/2, -pi/2])
+    # jointGoal([0, -pi/2, pi/2, 0.5, pi/2, -pi/2])
     # poseGoal([0.4, 0.3, 0.4])
 
-    simpleMove([0, 1, 0], [0.1, 0.1, 0])
+    simpleMove([0, 0, -0.1])
+
+    #simpleRotate([-pi/2, 0, pi/6])
+
+    '''
     rospy.set_param('/caljob_creator/capture_scene', True)
     time.sleep(2.0)
     simpleRotate([0, 1, 0], [0, pi/3, 0])
@@ -136,6 +143,7 @@ def main():
     time.sleep(2.0)
     simpleMove([0, 1, 0], [0.1, -0.1, 0])
     rospy.set_param('/caljob_creator/quit', True)
+    '''
 
 
 
