@@ -7,7 +7,7 @@ import rospy
 import moveit_commander
 import moveit_msgs.msg
 import geometry_msgs.msg
-from math import pi
+from math import pi, cos, sin
 from std_msgs.msg import String
 from moveit_commander.conversions import pose_to_list
 from tf.transformations import euler_from_quaternion, quaternion_from_euler
@@ -67,12 +67,15 @@ def simpleMove(movement):
     
     waypoints = []
     wpose = move_group.get_current_pose().pose
-    
+    joint_values = move_group.get_current_joint_values()
+
     if movement[0] != 0:
-        wpose.position.x += movement[0] 
+        wpose.position.x += movement[0] * cos(pi/4)
+        wpose.position.y += movement[0] * sin(pi/4)
         waypoints.append(copy.deepcopy(wpose)) 
     if movement[1] != 0:
-        wpose.position.y += movement[1] 
+        wpose.position.x += movement[1] * -sin(pi/4)
+        wpose.position.y += movement[1] * cos(pi/4)
         waypoints.append(copy.deepcopy(wpose))
     if movement[2] != 0:  
         wpose.position.z += movement[2]
@@ -125,11 +128,11 @@ def main():
     print robot.get_current_state()
 
 
-    # jointGoal([0, -pi/2, pi/2, 0.5, pi/2, -pi/2])
+    # jointGoal([pi/, -pi/2, pi/2, 0.5, pi/2, -pi/2])
     # poseGoal([0.4, 0.3, 0.4])
 
-    simpleMove([0, 0, -0.1])
-
+    simpleMove([0.1, 0, 0])
+    simpleMove([0, 0.2, 0])
     #simpleRotate([-pi/2, 0, pi/6])
 
     '''
