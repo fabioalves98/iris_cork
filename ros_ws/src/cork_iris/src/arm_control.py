@@ -10,7 +10,7 @@ import geometry_msgs.msg
 from math import pi, cos, sin
 from std_msgs.msg import String
 from moveit_commander.conversions import pose_to_list
-from tf.transformations import euler_from_quaternion, quaternion_from_euler
+from tf.transformations import euler_from_quaternion, quaternion_from_euler, quaternion_multiply
 
 move_group = None
 robot = None
@@ -63,19 +63,19 @@ def cartesianGoal(waypoints):
 # direction should be an array like: [0, 0, 1]
 # where the components that need to be moved should be 1
 # Every movement is parallel to x,y or z. Never diagonal
-def simpleMove(movement):
+def simpleMove(movement, direction):
     
     waypoints = []
     wpose = move_group.get_current_pose().pose
     joint_values = move_group.get_current_joint_values()
 
     if movement[0] != 0:
-        wpose.position.x += movement[0] * cos(pi/4)
-        wpose.position.y += movement[0] * sin(pi/4)
+        wpose.position.x += movement[0] * cos(direction)
+        wpose.position.y += movement[0] * sin(direction)
         waypoints.append(copy.deepcopy(wpose)) 
     if movement[1] != 0:
-        wpose.position.x += movement[1] * -sin(pi/4)
-        wpose.position.y += movement[1] * cos(pi/4)
+        wpose.position.x += movement[1] * -sin(direction)
+        wpose.position.y += movement[1] * cos(direction)
         waypoints.append(copy.deepcopy(wpose))
     if movement[2] != 0:  
         wpose.position.z += movement[2]
@@ -89,8 +89,15 @@ def simpleRotate(rotation):
     waypoints = []
     wpose = move_group.get_current_pose().pose
 
-    quat = geometry_msgs.msg.Quaternion(*quaternion_from_euler(rotation[0], rotation[1], rotation[2]))
-    wpose.orientation = quat
+    orignal = quaternion_from_euler(0, 0, 0)
+    orignal[0] = wpose.orientation.x
+    orignal[1] = wpose.orientation.y
+    orignal[2] = wpose.orientation.z
+    orignal[3] = wpose.orientation.w
+
+    quat = quaternion_from_euler(rotation[0], rotation[1], rotation[2])
+    
+    wpose.orientation = geometry_msgs.msg.Quaternion(*quaternion_multiply(orignal, quat))
     waypoints.append(copy.deepcopy(wpose))
     
     print("Sending Cartesian Goal")
@@ -112,28 +119,40 @@ def main():
 
     # We can get the name of the reference frame for this robot:
     planning_frame = move_group.get_planning_frame()
-    print "============ Planning frame: %s" % planning_frame
+    print("============ Planning frame: ", planning_frame)
 
     # We can also print the name of the end-effector link for this group:
     eef_link = move_group.get_end_effector_link()
-    print "============ End effector link: %s" % eef_link
+    print("============ End effector link: ", eef_link)
 
     # We can get a list of all the groups in the robot:
     group_names = robot.get_group_names()
-    print "============ Available Planning Groups:", robot.get_group_names()
+    print("============ Available Planning Groups:", robot.get_group_names())
 
     # Sometimes for debugging it is useful to print the entire state of the
     # robot:
-    print "============ Printing robot state"
-    print robot.get_current_state()
+    print("============ Printing robot state")
+    print(robot.get_current_state())
 
+    # Default joint goal for Simulation
+    #jointGoal([pi/4, -pi/2, pi/2, 0.5, pi/2, -pi/2])
 
-    # jointGoal([pi/, -pi/2, pi/2, 0.5, pi/2, -pi/2])
-    # poseGoal([0.4, 0.3, 0.4])
+    # Default joint goal for Calibraion with real robot
+    jointGoal([0.391, -1.553, 2.165, -0.226, 1.232, -1.654])
 
-    simpleMove([0.1, 0, 0])
-    simpleMove([0, 0.2, 0])
-    #simpleRotate([-pi/2, 0, pi/6])
+    # To be tested
+    #poseGoal([0.4, 0.3, 0.4])
+
+    # X limit
+    #simpleMove([-0.3, 0, 0], pi/4)
+    # Y limit
+    #simpleMove([0, -0.3, 0], pi/4)
+    # Z limit
+    #simpleMove([0, 0, 0.3], pi/4)
+    # Horizontal align
+    #simpleRotate([0, 0, pi/8])
+    # X rotate
+    #simpleRotate([-pi/6, 0, 0])
 
     '''
     rospy.set_param('/caljob_creator/capture_scene', True)
