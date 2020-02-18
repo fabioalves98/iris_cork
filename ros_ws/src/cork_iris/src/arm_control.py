@@ -20,7 +20,13 @@ display_trajectory_publisher= None
 def jointGoal(joints):
     
     joint_goal = move_group.get_current_joint_values()
-    joint_goal = joints
+
+    for i in range(0, len(joints)):
+        if (joints[i]):
+            joint_goal[i] = joints[i]
+    
+
+    # joint_goal = joints
 
     # # The go command can be called with joint values, poses, or without any
     # # parameters if you have already set the pose or joint target for the group
@@ -138,7 +144,8 @@ def main():
     #jointGoal([pi/4, -pi/2, pi/2, 0.5, pi/2, -pi/2])
 
     # Default joint goal for Calibraion with real robot
-    jointGoal([0.391, -1.553, 2.165, -0.226, 1.232, -1.654])
+    # jointGoal([0.391, -1.553, 2.165, -0.226, 1.232, -1.654])
+    jointGoal([pi, None, None, None, None, None])
 
     # To be tested
     #poseGoal([0.4, 0.3, 0.4])
