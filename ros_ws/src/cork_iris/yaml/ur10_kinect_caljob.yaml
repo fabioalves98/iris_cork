@@ -5,14 +5,12 @@ scenes:
      trigger: ROS_ROBOT_JOINT_VALUES_ACTION_TRIGGER
      trig_action_server: rosRobotSceneTrigger_joint_values
      joint_values:
-        - 1.49932
-        - -5.93421e-08
-        - 5.8467e-08
-        - -1.50112
-        - 0.185986
-        - 0.509155
-        - 1.73424
-        - -1.48056
+        - 0.390949
+        - -1.55308
+        - 2.16508
+        - -0.225944
+        - 1.23197
+        - -1.65402
      observations:
      -
           camera: kinect/rgb
@@ -26,14 +24,12 @@ scenes:
      trigger: ROS_ROBOT_JOINT_VALUES_ACTION_TRIGGER
      trig_action_server: rosRobotSceneTrigger_joint_values
      joint_values:
-        - 1.23132
-        - 2.53708e-09
-        - -8.22928e-10
-        - -1.31284
-        - 0.164936
-        - 1.13464
-        - 1.65298
-        - -2.99843
+        - 0.463106
+        - -1.39116
+        - 1.98151
+        - -0.212905
+        - 1.29915
+        - -1.62585
      observations:
      -
           camera: kinect/rgb
@@ -47,14 +43,126 @@ scenes:
      trigger: ROS_ROBOT_JOINT_VALUES_ACTION_TRIGGER
      trig_action_server: rosRobotSceneTrigger_joint_values
      joint_values:
-        - 1.75291
-        - -1.42498e-09
-        - 3.0586e-09
-        - -1.62291
-        - 0.193754
-        - -0.129987
-        - 1.76455
-        - -4.53975e-05
+        - -0.171917
+        - -2.12276
+        - 2.57006
+        - 0.116509
+        - 0.726898
+        - -1.96109
+     observations:
+     -
+          camera: kinect/rgb
+          target: Checkerboard
+          roi_x_min: 0
+          roi_x_max: 640
+          roi_y_min: 0
+          roi_y_max: 480
+          cost_type: LinkTargetCameraReprjErrorPK
+-
+     trigger: ROS_ROBOT_JOINT_VALUES_ACTION_TRIGGER
+     trig_action_server: rosRobotSceneTrigger_joint_values
+     joint_values:
+        - 0.430871
+        - -1.46957
+        - 2.07452
+        - -0.223959
+        - 1.26922
+        - -1.6383
+     observations:
+     -
+          camera: kinect/rgb
+          target: Checkerboard
+          roi_x_min: 0
+          roi_x_max: 640
+          roi_y_min: 0
+          roi_y_max: 480
+          cost_type: LinkTargetCameraReprjErrorPK
+-
+     trigger: ROS_ROBOT_JOINT_VALUES_ACTION_TRIGGER
+     trig_action_server: rosRobotSceneTrigger_joint_values
+     joint_values:
+        - 0.917603
+        - -1.38552
+        - 1.97377
+        - -0.220659
+        - 1.72339
+        - -1.46122
+     observations:
+     -
+          camera: kinect/rgb
+          target: Checkerboard
+          roi_x_min: 0
+          roi_x_max: 640
+          roi_y_min: 0
+          roi_y_max: 480
+          cost_type: LinkTargetCameraReprjErrorPK
+-
+     trigger: ROS_ROBOT_JOINT_VALUES_ACTION_TRIGGER
+     trig_action_server: rosRobotSceneTrigger_joint_values
+     joint_values:
+        - 0.0196714
+        - -1.35547
+        - 1.94676
+        - -0.118249
+        - 0.893656
+        - -1.83016
+     observations:
+     -
+          camera: kinect/rgb
+          target: Checkerboard
+          roi_x_min: 0
+          roi_x_max: 640
+          roi_y_min: 0
+          roi_y_max: 480
+          cost_type: LinkTargetCameraReprjErrorPK
+-
+     trigger: ROS_ROBOT_JOINT_VALUES_ACTION_TRIGGER
+     trig_action_server: rosRobotSceneTrigger_joint_values
+     joint_values:
+        - 0.430919
+        - -1.46946
+        - 2.07445
+        - -0.223924
+        - 1.26924
+        - -1.63808
+     observations:
+     -
+          camera: kinect/rgb
+          target: Checkerboard
+          roi_x_min: 0
+          roi_x_max: 640
+          roi_y_min: 0
+          roi_y_max: 480
+          cost_type: LinkTargetCameraReprjErrorPK
+-
+     trigger: ROS_ROBOT_JOINT_VALUES_ACTION_TRIGGER
+     trig_action_server: rosRobotSceneTrigger_joint_values
+     joint_values:
+        - 0.512923
+        - -1.37279
+        - 1.48743
+        - 0.258159
+        - 1.34555
+        - -1.60693
+     observations:
+     -
+          camera: kinect/rgb
+          target: Checkerboard
+          roi_x_min: 0
+          roi_x_max: 640
+          roi_y_min: 0
+          roi_y_max: 480
+          cost_type: LinkTargetCameraReprjErrorPK
+-
+     trigger: ROS_ROBOT_JOINT_VALUES_ACTION_TRIGGER
+     trig_action_server: rosRobotSceneTrigger_joint_values
+     joint_values:
+        - 0.431183
+        - -1.46955
+        - 2.0744
+        - -0.223754
+        - 1.26945
+        - -1.63808
      observations:
      -
           camera: kinect/rgb
