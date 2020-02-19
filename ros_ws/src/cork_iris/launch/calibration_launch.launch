@@ -13,7 +13,7 @@
         yaml_file_path: "/home/fabio/Dropbox/Universidade/Bolsa/shared-ect/ros_ws/src/cork_iris/yaml/"
         camera_file: "kinect_camera_def.yaml"
         target_file: "checkerboard7x9_target.yaml"
-        cal_job_file: "ur10_kinect_caljob.yaml"
+        cal_job_file: "ur10_kinect_caljob_jointfixed.yaml"
         results_file: "/home/fabio/Dropbox/Universidade/Bolsa/shared-ect/ros_ws/src/cork_iris/launch/kinect_transform.launch"
         </rosparam>
     </node>

@@ -5,12 +5,12 @@ scenes:
      trigger: ROS_ROBOT_JOINT_VALUES_ACTION_TRIGGER
      trig_action_server: rosRobotSceneTrigger_joint_values
      joint_values:
-        - 0.390949
+        - 2.16561
         - -1.55308
-        - 2.16508
-        - -0.225944
-        - 1.23197
-        - -1.65402
+        - 0.390793
+        - -0.226411
+        - 1.2318
+        - -1.69997
      observations:
      -
           camera: kinect/rgb
@@ -24,12 +24,12 @@ scenes:
      trigger: ROS_ROBOT_JOINT_VALUES_ACTION_TRIGGER
      trig_action_server: rosRobotSceneTrigger_joint_values
      joint_values:
-        - 0.463106
-        - -1.39116
-        - 1.98151
-        - -0.212905
-        - 1.29915
-        - -1.62585
+        - 1.5265
+        - -1.40549
+        - 0.581897
+        - 0.246859
+        - 1.40955
+        - -1.62747
      observations:
      -
           camera: kinect/rgb
@@ -43,12 +43,12 @@ scenes:
      trigger: ROS_ROBOT_JOINT_VALUES_ACTION_TRIGGER
      trig_action_server: rosRobotSceneTrigger_joint_values
      joint_values:
-        - -0.171917
-        - -2.12276
-        - 2.57006
-        - 0.116509
-        - 0.726898
-        - -1.96109
+        - 1.52652
+        - -1.40544
+        - 0.581838
+        - 0.246919
+        - 1.40952
+        - -1.10347
      observations:
      -
           camera: kinect/rgb
@@ -62,12 +62,12 @@ scenes:
      trigger: ROS_ROBOT_JOINT_VALUES_ACTION_TRIGGER
      trig_action_server: rosRobotSceneTrigger_joint_values
      joint_values:
-        - 0.430871
-        - -1.46957
-        - 2.07452
-        - -0.223959
-        - 1.26922
-        - -1.6383
+        - 1.52651
+        - -1.40543
+        - 0.58185
+        - 0.246967
+        - 1.40952
+        - -2.15087
      observations:
      -
           camera: kinect/rgb
@@ -81,12 +81,12 @@ scenes:
      trigger: ROS_ROBOT_JOINT_VALUES_ACTION_TRIGGER
      trig_action_server: rosRobotSceneTrigger_joint_values
      joint_values:
-        - 0.917603
-        - -1.38552
-        - 1.97377
-        - -0.220659
-        - 1.72339
-        - -1.46122
+        - 1.52656
+        - -1.40542
+        - 0.58185
+        - 0.246955
+        - 1.40953
+        - -1.62723
      observations:
      -
           camera: kinect/rgb
@@ -100,12 +100,12 @@ scenes:
      trigger: ROS_ROBOT_JOINT_VALUES_ACTION_TRIGGER
      trig_action_server: rosRobotSceneTrigger_joint_values
      joint_values:
-        - 0.0196714
-        - -1.35547
-        - 1.94676
-        - -0.118249
-        - 0.893656
-        - -1.83016
+        - 1.72728
+        - -1.48169
+        - 0.579109
+        - -0.275801
+        - 1.39768
+        - -1.56013
      observations:
      -
           camera: kinect/rgb
@@ -119,12 +119,12 @@ scenes:
      trigger: ROS_ROBOT_JOINT_VALUES_ACTION_TRIGGER
      trig_action_server: rosRobotSceneTrigger_joint_values
      joint_values:
-        - 0.430919
-        - -1.46946
-        - 2.07445
-        - -0.223924
-        - 1.26924
-        - -1.63808
+        - 1.30478
+        - -1.27883
+        - 0.591219
+        - 0.736303
+        - 1.44995
+        - -1.67801
      observations:
      -
           camera: kinect/rgb
@@ -138,31 +138,12 @@ scenes:
      trigger: ROS_ROBOT_JOINT_VALUES_ACTION_TRIGGER
      trig_action_server: rosRobotSceneTrigger_joint_values
      joint_values:
-        - 0.512923
-        - -1.37279
-        - 1.48743
-        - 0.258159
-        - 1.34555
-        - -1.60693
-     observations:
-     -
-          camera: kinect/rgb
-          target: Checkerboard
-          roi_x_min: 0
-          roi_x_max: 640
-          roi_y_min: 0
-          roi_y_max: 480
-          cost_type: LinkTargetCameraReprjErrorPK
--
-     trigger: ROS_ROBOT_JOINT_VALUES_ACTION_TRIGGER
-     trig_action_server: rosRobotSceneTrigger_joint_values
-     joint_values:
-        - 0.431183
-        - -1.46955
-        - 2.0744
-        - -0.223754
-        - 1.26945
-        - -1.63808
+        - 1.5269
+        - -1.40571
+        - 0.581814
+        - 0.246477
+        - 1.40936
+        - -1.62679
      observations:
      -
           camera: kinect/rgb

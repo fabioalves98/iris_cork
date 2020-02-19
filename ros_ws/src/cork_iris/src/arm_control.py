@@ -77,15 +77,16 @@ def simpleMove(movement, direction):
     if movement[0] != 0:
         wpose.position.x += movement[0] * cos(direction)
         wpose.position.y += movement[0] * sin(direction)
-        waypoints.append(copy.deepcopy(wpose)) 
+        #waypoints.append(copy.deepcopy(wpose)) 
     if movement[1] != 0:
         wpose.position.x += movement[1] * -sin(direction)
         wpose.position.y += movement[1] * cos(direction)
-        waypoints.append(copy.deepcopy(wpose))
+        #waypoints.append(copy.deepcopy(wpose))
     if movement[2] != 0:  
         wpose.position.z += movement[2]
-        waypoints.append(copy.deepcopy(wpose)) 
+        #waypoints.append(copy.deepcopy(wpose)) 
 
+    waypoints.append(copy.deepcopy(wpose))
     print("Sending Cartesian Goal")
     cartesianGoal(waypoints)
 
@@ -143,8 +144,8 @@ def main():
     #jointGoal([pi/4, -pi/2, pi/2, 0.5, pi/2, -pi/2])
 
     # Default joint goal for Calibraion with real robot
-    # jointGoal([0.391, -1.553, 2.165, -0.226, 1.232, -1.654])
-    jointGoal([pi, None, None, None, None, None])
+    jointGoal([0.391, -1.553, 2.165, -0.226, 1.232, -1.70])
+    # jointGoal([pi, None, None, None, None, None])
 
     # To be tested
     #poseGoal([0.4, 0.3, 0.4])
@@ -161,8 +162,10 @@ def main():
     #simpleRotate([-pi/6, 0, 0])
 
     
+
     # Caljob Example
     rospy.set_param('/caljob_creator/capture_scene', True)
+    '''
     # Move X
     simpleMove([0.1, 0, 0], pi/4)
     time.sleep(.5)
@@ -175,7 +178,7 @@ def main():
     simpleMove([0.3, 0, 0], pi/4)
     time.sleep(.5)
     rospy.set_param('/caljob_creator/capture_scene', True)
-    '''
+
     # Rotate X in the center
     simpleRotate([-pi/6, 0, 0])
     time.sleep(.5)
@@ -214,12 +217,12 @@ def main():
     simpleRotate([0, 0, pi/8])
     time.sleep(.5)
     rospy.set_param('/caljob_creator/capture_scene', True)
-    '''
+    
     # Move Y in the center
     simpleMove([0, 0.25, 0], pi/4)
     time.sleep(.5)
     rospy.set_param('/caljob_creator/capture_scene', True)
-    '''
+    
     # Rotate in the side
     simpleRotate([-pi/6, 0, 0])
     time.sleep(.5)
@@ -232,11 +235,11 @@ def main():
     simpleRotate([-pi/6, 0, 0])
     time.sleep(.5)
     rospy.set_param('/caljob_creator/capture_scene', True)
-    '''
+    
     simpleMove([0, -0.5, 0], pi/4)
     time.sleep(.5)
     rospy.set_param('/caljob_creator/capture_scene', True)
-    '''
+    
     # Rotate in the side 
     simpleRotate([pi/6, 0, 0])
     time.sleep(.5)
@@ -249,21 +252,43 @@ def main():
     simpleRotate([pi/6, 0, 0])
     time.sleep(.5)
     rospy.set_param('/caljob_creator/capture_scene', True)
-    '''
+    
 
     simpleMove([0, 0.25, 0], pi/4)
     time.sleep(.5)
     rospy.set_param('/caljob_creator/capture_scene', True)
-    
+    '''
+
     # Move Z
-    simpleMove([0.15, 0, 0.25], pi/4)
+    simpleMove([0.18, 0.05, 0.25], pi/4)
     time.sleep(.5)
     rospy.set_param('/caljob_creator/capture_scene', True)
+
     
-    simpleMove([-0.15, 0, -0.25], pi/4)
+    simpleRotate([pi/6, 0, 0])
     time.sleep(.5)
     rospy.set_param('/caljob_creator/capture_scene', True)
-    
+
+    simpleRotate([-pi/3, 0, 0])
+    time.sleep(.5)
+    rospy.set_param('/caljob_creator/capture_scene', True)
+
+    simpleRotate([pi/6, 0, 0])
+    time.sleep(.5)
+    rospy.set_param('/caljob_creator/capture_scene', True)
+
+    simpleRotate([0, 0, pi/8])
+    time.sleep(.5)
+    rospy.set_param('/caljob_creator/capture_scene', True)
+
+    simpleRotate([0, 0, -pi/4])
+    time.sleep(.5)
+    rospy.set_param('/caljob_creator/capture_scene', True)
+
+    simpleRotate([0, 0, pi/8])
+    time.sleep(.5)
+    rospy.set_param('/caljob_creator/capture_scene', True)
+
     
     rospy.set_param('/caljob_creator/quit', True)
 

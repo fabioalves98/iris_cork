@@ -4,7 +4,7 @@ from sensor_msgs.msg import JointState
 
 
 def reorder_caljob(filename, default_joint_order, published_joint_order):
-    f = open(filename, "r")
+    f = open(filename + ".yaml", "r")
     lines = f.readlines()
 
     new_lines = list(lines)
@@ -14,11 +14,11 @@ def reorder_caljob(filename, default_joint_order, published_joint_order):
                 joint_value = lines[i+(j+1)]
                 original_joint = published_joint_order[j]
                 new_idx = default_joint_order.index(original_joint)
-                new_lines[i+(new_idx+1)] = joint_value + " #" + original_joint
+                new_lines[i+(new_idx+1)] = joint_value + " #" + original_joint + '\n'
 
     f.close()
 
-    file_write = open(filename + "_jointfixed", "w")
+    file_write = open(filename + "_jointfixed.yaml", "w")
 
     for l in new_lines:
         file_write.write(l)
@@ -50,7 +50,7 @@ def main():
 
     rospack = rospkg.RosPack()
     path = rospack.get_path('cork_iris')    
-    CALJOB_FILENAME = path + '/yaml/ur10_kinect_caljob.yaml'
+    CALJOB_FILENAME = path + '/yaml/ur10_kinect_caljob'
 
 
     ## This array contains the published order of the joints. Should be the original order

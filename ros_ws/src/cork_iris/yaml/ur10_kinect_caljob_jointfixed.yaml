@@ -1,0 +1,104 @@
+---
+reference_frame: world
+scenes:
+-
+     trigger: ROS_ROBOT_JOINT_VALUES_ACTION_TRIGGER
+     trig_action_server: rosRobotSceneTrigger_joint_values
+     joint_values:
+        - 0.581897
+ #shoulder_pan_joint
+        - -1.40549
+ #shoulder_lift_joint
+        - 1.5265
+ #elbow_joint
+        - 0.246859
+ #wrist_1_joint
+        - 1.40955
+ #wrist_2_joint
+        - -1.62747
+ #wrist_3_joint
+     observations:
+     -
+          camera: kinect/rgb
+          target: Checkerboard
+          roi_x_min: 0
+          roi_x_max: 640
+          roi_y_min: 0
+          roi_y_max: 480
+          cost_type: LinkTargetCameraReprjErrorPK
+-
+     trigger: ROS_ROBOT_JOINT_VALUES_ACTION_TRIGGER
+     trig_action_server: rosRobotSceneTrigger_joint_values
+     joint_values:
+        - 0.581838
+ #shoulder_pan_joint
+        - -1.40544
+ #shoulder_lift_joint
+        - 1.52652
+ #elbow_joint
+        - 0.246919
+ #wrist_1_joint
+        - 1.40952
+ #wrist_2_joint
+        - -1.10347
+ #wrist_3_joint
+     observations:
+     -
+          camera: kinect/rgb
+          target: Checkerboard
+          roi_x_min: 0
+          roi_x_max: 640
+          roi_y_min: 0
+          roi_y_max: 480
+          cost_type: LinkTargetCameraReprjErrorPK
+-
+     trigger: ROS_ROBOT_JOINT_VALUES_ACTION_TRIGGER
+     trig_action_server: rosRobotSceneTrigger_joint_values
+     joint_values:
+        - 0.58185
+ #shoulder_pan_joint
+        - -1.40543
+ #shoulder_lift_joint
+        - 1.52651
+ #elbow_joint
+        - 0.246967
+ #wrist_1_joint
+        - 1.40952
+ #wrist_2_joint
+        - -2.15087
+ #wrist_3_joint
+     observations:
+     -
+          camera: kinect/rgb
+          target: Checkerboard
+          roi_x_min: 0
+          roi_x_max: 640
+          roi_y_min: 0
+          roi_y_max: 480
+          cost_type: LinkTargetCameraReprjErrorPK
+-
+     trigger: ROS_ROBOT_JOINT_VALUES_ACTION_TRIGGER
+     trig_action_server: rosRobotSceneTrigger_joint_values
+     joint_values:
+        - 0.58185
+ #shoulder_pan_joint
+        - -1.40542
+ #shoulder_lift_joint
+        - 1.52656
+ #elbow_joint
+        - 0.246955
+ #wrist_1_joint
+        - 1.40953
+ #wrist_2_joint
+        - -1.62723
+ #wrist_3_joint
+     observations:
+     -
+          camera: kinect/rgb
+          target: Checkerboard
+          roi_x_min: 0
+          roi_x_max: 640
+          roi_y_min: 0
+          roi_y_max: 480
+          cost_type: LinkTargetCameraReprjErrorPK
+          
