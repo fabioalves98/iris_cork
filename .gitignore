@@ -8,4 +8,6 @@ venv/
 ros_ws/build
 ros_ws/devel
 ros_ws/bags
+ros_ws/logs
 .vscode
+.catkin_tools
