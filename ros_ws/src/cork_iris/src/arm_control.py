@@ -66,8 +66,7 @@ def cartesianGoal(waypoints):
     move_group.execute(plan, wait=True)
 
 
-# direction should be an array like: [0, 0, 1]
-# where the components that need to be moved should be 1
+
 # Every movement is parallel to x,y or z. Never diagonal
 def simpleMove(movement, direction):
     

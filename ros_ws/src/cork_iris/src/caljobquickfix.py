@@ -14,11 +14,11 @@ def reorder_caljob(filename, default_joint_order, published_joint_order):
                 joint_value = lines[i+(j+1)]
                 original_joint = published_joint_order[j]
                 new_idx = default_joint_order.index(original_joint)
-                new_lines[i+(new_idx+1)] = joint_value
+                new_lines[i+(new_idx+1)] = joint_value + " #" + original_joint
 
     f.close()
 
-    file_write = open(filename, "w")
+    file_write = open(filename + "_jointfixed", "w")
 
     for l in new_lines:
         file_write.write(l)
