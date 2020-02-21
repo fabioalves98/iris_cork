@@ -7,7 +7,7 @@
 
   <!-- ur10e -->
   <xacro:include filename="$(find ur_e_description)/urdf/ur10e.urdf.xacro" />
-
+  
   <!-- arm -->
   <xacro:ur10e_robot prefix="" joint_limited="true"
 		 shoulder_pan_lower_limit="${-pi}" shoulder_pan_upper_limit="${pi}"
@@ -29,6 +29,12 @@
       <origin xyz="1 1 1"
               rpy="0 ${pi/4} -${3*pi/4}"/>
   </xacro:sensor_astra>
+<!-- 
+  <xacro:include filename="$(find ur_e_description)/urdf/target.urdf" />
+  <xacro:target_chess parent="gripper_link" prefix="target">
+      <origin xyz="0.15 0 -0.1"
+              rpy="0 0 ${pi/2}"/>
+  </xacro:target_chess> -->
 
   <link name="world" />
 
