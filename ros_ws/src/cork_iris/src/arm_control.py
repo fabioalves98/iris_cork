@@ -22,7 +22,7 @@ def jointGoal(joints):
     joint_goal = move_group.get_current_joint_values()
 
     for i in range(0, len(joints)):
-        if (joints[i]):
+        if (joints[i] != None):
             joint_goal[i] = joints[i]
     
 
@@ -141,10 +141,11 @@ def main():
     print(robot.get_current_state())
 
     # Default joint goal for Simulation
-    #jointGoal([pi/4, -pi/2, pi/2, 0.5, pi/2, -pi/2])
+    jointGoal([pi/4, -pi/2, pi/2, 0.5, pi/2, -pi/2])
+    # jointGoal([pi/4, -pi/2, 0, 0, pi/2, 0])
 
     # Default joint goal for Calibraion with real robot
-    jointGoal([0.391, -1.553, 2.165, -0.226, 1.232, -1.70])
+    # jointGoal([0.391, -1.553, 2.165, -0.226, 1.232, -1.70])
     # jointGoal([pi, None, None, None, None, None])
 
     # To be tested
@@ -164,133 +165,137 @@ def main():
     
 
     # Caljob Example
-    rospy.set_param('/caljob_creator/capture_scene', True)
-    '''
+    # rospy.set_param('/caljob_creator/capture_scene', True)
+    
     # Move X
     simpleMove([0.1, 0, 0], pi/4)
-    time.sleep(.5)
-    rospy.set_param('/caljob_creator/capture_scene', True)
+    # time.sleep(.5)
+    d = raw_input("Press a key...")
+    # rospy.set_param('/caljob_creator/capture_scene', True)
     
     simpleMove([-0.4, 0, 0], pi/4)
-    time.sleep(.5)
-    rospy.set_param('/caljob_creator/capture_scene', True)
+    # time.sleep(.5)
+    d = raw_input("Press a key...")
+    # rospy.set_param('/caljob_creator/capture_scene', True)
 
     simpleMove([0.3, 0, 0], pi/4)
     time.sleep(.5)
-    rospy.set_param('/caljob_creator/capture_scene', True)
+    d = raw_input("Press a key...")
 
-    # Rotate X in the center
-    simpleRotate([-pi/6, 0, 0])
-    time.sleep(.5)
-    rospy.set_param('/caljob_creator/capture_scene', True)
+    # rospy.set_param('/caljob_creator/capture_scene', True)
 
-    simpleRotate([pi/3, 0, 0])
-    time.sleep(.5)
-    rospy.set_param('/caljob_creator/capture_scene', True)
+    # # Rotate X in the center
+    # simpleRotate([-pi/6, 0, 0])
+    # time.sleep(.5)
+    # rospy.set_param('/caljob_creator/capture_scene', True)
 
-    simpleRotate([-pi/6, 0, 0])
-    time.sleep(.5)
-    rospy.set_param('/caljob_creator/capture_scene', True)
+    # simpleRotate([pi/3, 0, 0])
+    # time.sleep(.5)
+    # rospy.set_param('/caljob_creator/capture_scene', True)
+
+    # simpleRotate([-pi/6, 0, 0])
+    # time.sleep(.5)
+    # rospy.set_param('/caljob_creator/capture_scene', True)
     
-    # Rotate Y in the center
-    simpleRotate([0, -pi/6, 0])
-    time.sleep(.5)
-    rospy.set_param('/caljob_creator/capture_scene', True)
+    # # Rotate Y in the center
+    # simpleRotate([0, -pi/6, 0])
+    # time.sleep(.5)
+    # rospy.set_param('/caljob_creator/capture_scene', True)
 
-    simpleRotate([0, pi/3, 0])
-    time.sleep(.5)
-    rospy.set_param('/caljob_creator/capture_scene', True)
+    # simpleRotate([0, pi/3, 0])
+    # time.sleep(.5)
+    # rospy.set_param('/caljob_creator/capture_scene', True)
 
-    simpleRotate([0, -pi/6, 0])
-    time.sleep(.5)
-    rospy.set_param('/caljob_creator/capture_scene', True)
+    # simpleRotate([0, -pi/6, 0])
+    # time.sleep(.5)
+    # rospy.set_param('/caljob_creator/capture_scene', True)
 
-    # Rotate Z in the center
-    simpleRotate([0, 0, pi/8])
-    time.sleep(.5)
-    rospy.set_param('/caljob_creator/capture_scene', True)
+    # # Rotate Z in the center
+    # simpleRotate([0, 0, pi/8])
+    # time.sleep(.5)
+    # rospy.set_param('/caljob_creator/capture_scene', True)
 
-    simpleRotate([0, 0, -pi/4])
-    time.sleep(.5)
-    rospy.set_param('/caljob_creator/capture_scene', True)
+    # simpleRotate([0, 0, -pi/4])
+    # time.sleep(.5)
+    # rospy.set_param('/caljob_creator/capture_scene', True)
 
-    simpleRotate([0, 0, pi/8])
-    time.sleep(.5)
-    rospy.set_param('/caljob_creator/capture_scene', True)
+    # simpleRotate([0, 0, pi/8])
+    # time.sleep(.5)
+    # rospy.set_param('/caljob_creator/capture_scene', True)
     
-    # Move Y in the center
-    simpleMove([0, 0.25, 0], pi/4)
-    time.sleep(.5)
-    rospy.set_param('/caljob_creator/capture_scene', True)
+    # # Move Y in the center
+    # simpleMove([0, 0.25, 0], pi/4)
+    # time.sleep(.5)
+    # rospy.set_param('/caljob_creator/capture_scene', True)
     
-    # Rotate in the side
-    simpleRotate([-pi/6, 0, 0])
-    time.sleep(.5)
-    rospy.set_param('/caljob_creator/capture_scene', True)
+    # # Rotate in the side
+    # simpleRotate([-pi/6, 0, 0])
+    # time.sleep(.5)
+    # rospy.set_param('/caljob_creator/capture_scene', True)
 
-    simpleRotate([pi/3, 0, 0])
-    time.sleep(.5)
-    rospy.set_param('/caljob_creator/capture_scene', True)
+    # simpleRotate([pi/3, 0, 0])
+    # time.sleep(.5)
+    # rospy.set_param('/caljob_creator/capture_scene', True)
 
-    simpleRotate([-pi/6, 0, 0])
-    time.sleep(.5)
-    rospy.set_param('/caljob_creator/capture_scene', True)
+    # simpleRotate([-pi/6, 0, 0])
+    # time.sleep(.5)
+    # rospy.set_param('/caljob_creator/capture_scene', True)
     
-    simpleMove([0, -0.5, 0], pi/4)
-    time.sleep(.5)
-    rospy.set_param('/caljob_creator/capture_scene', True)
+    # simpleMove([0, -0.5, 0], pi/4)
+    # time.sleep(.5)
+    # rospy.set_param('/caljob_creator/capture_scene', True)
     
-    # Rotate in the side 
-    simpleRotate([pi/6, 0, 0])
-    time.sleep(.5)
-    rospy.set_param('/caljob_creator/capture_scene', True)
+    # # Rotate in the side 
+    # simpleRotate([pi/6, 0, 0])
+    # time.sleep(.5)
+    # rospy.set_param('/caljob_creator/capture_scene', True)
 
-    simpleRotate([-pi/3, 0, 0])
-    time.sleep(.5)
-    rospy.set_param('/caljob_creator/capture_scene', True)
+    # simpleRotate([-pi/3, 0, 0])
+    # time.sleep(.5)
+    # rospy.set_param('/caljob_creator/capture_scene', True)
 
-    simpleRotate([pi/6, 0, 0])
-    time.sleep(.5)
-    rospy.set_param('/caljob_creator/capture_scene', True)
+    # simpleRotate([pi/6, 0, 0])
+    # time.sleep(.5)
+    # rospy.set_param('/caljob_creator/capture_scene', True)
     
 
-    simpleMove([0, 0.25, 0], pi/4)
-    time.sleep(.5)
-    rospy.set_param('/caljob_creator/capture_scene', True)
-    '''
+    # simpleMove([0, 0.25, 0], pi/4)
+    # time.sleep(.5)
+    # rospy.set_param('/caljob_creator/capture_scene', True)
+
 
     # Move Z
-    simpleMove([0.18, 0.05, 0.25], pi/4)
-    time.sleep(.5)
-    rospy.set_param('/caljob_creator/capture_scene', True)
+    # simpleMove([0.18, 0.05, 0.25], pi/4)
+    # time.sleep(.5)
+    # rospy.set_param('/caljob_creator/capture_scene', True)
 
     
-    simpleRotate([pi/6, 0, 0])
-    time.sleep(.5)
-    rospy.set_param('/caljob_creator/capture_scene', True)
+    # simpleRotate([pi/6, 0, 0])
+    # time.sleep(.5)
+    # rospy.set_param('/caljob_creator/capture_scene', True)
 
-    simpleRotate([-pi/3, 0, 0])
-    time.sleep(.5)
-    rospy.set_param('/caljob_creator/capture_scene', True)
+    # simpleRotate([-pi/3, 0, 0])
+    # time.sleep(.5)
+    # rospy.set_param('/caljob_creator/capture_scene', True)
 
-    simpleRotate([pi/6, 0, 0])
-    time.sleep(.5)
-    rospy.set_param('/caljob_creator/capture_scene', True)
+    # simpleRotate([pi/6, 0, 0])
+    # time.sleep(.5)
+    # rospy.set_param('/caljob_creator/capture_scene', True)
 
-    simpleRotate([0, 0, pi/8])
-    time.sleep(.5)
-    rospy.set_param('/caljob_creator/capture_scene', True)
+    # simpleRotate([0, 0, pi/8])
+    # time.sleep(.5)
+    # rospy.set_param('/caljob_creator/capture_scene', True)
 
-    simpleRotate([0, 0, -pi/4])
-    time.sleep(.5)
-    rospy.set_param('/caljob_creator/capture_scene', True)
+    # simpleRotate([0, 0, -pi/4])
+    # time.sleep(.5)
+    # rospy.set_param('/caljob_creator/capture_scene', True)
 
-    simpleRotate([0, 0, pi/8])
-    time.sleep(.5)
-    rospy.set_param('/caljob_creator/capture_scene', True)
+    # simpleRotate([0, 0, pi/8])
+    # time.sleep(.5)
+    # rospy.set_param('/caljob_creator/capture_scene', True)
 
     
-    rospy.set_param('/caljob_creator/quit', True)
+    # rospy.set_param('/caljob_creator/quit', True)
 
 if __name__ == "__main__":
    main() 

@@ -1,0 +1,9 @@
+<launch>
+
+  <include file="$(find easy_handeye)/launch/publish.launch">
+  <arg name="eye_on_hand" value="false"/>
+  <arg name="robot_base_frame" value="base_link"/>
+  <arg name="tracking_base_frame" value="camera_link"/>
+    <!-- <arg name="namespace" value="my_eob_calib"/> use the same namespace that you used during calibration! -->
+  </include>
+</launch>

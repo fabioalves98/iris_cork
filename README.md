@@ -13,3 +13,9 @@ rosrun target_finder target_gen _target_rows:=7 _target_cols:=9 _target_spacing:
 ## Set Robot Speed
 rosservice call /ur_hardware_interface/set_speed_slider "speed_slider_fraction: 0.1"
 
+## Hand eye calibration steps
+1. roslaunch cork_iris handeye_calibrate.launch
+1.1. Run multiple movements and take samples on each of them
+2. Hit the "Compute" button
+3. Close the calibrate node and launch the publish one. roslaunch cork_iris handeye_publish.launch
+
