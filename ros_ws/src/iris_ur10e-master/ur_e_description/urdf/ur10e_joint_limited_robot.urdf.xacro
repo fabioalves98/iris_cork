@@ -36,6 +36,12 @@
               rpy="0 0 ${pi/2}"/>
   </xacro:target_chess> -->
 
+  <xacro:include filename="$(find ur_e_description)/urdf/aruco.urdf.xacro" />
+  <xacro:aruco parent="ee_link" prefix="marker">
+      <origin xyz="0.03 0.0 0.04"
+              rpy="3.13766148064 0.0 0.0"/>
+  </xacro:aruco>
+
   <link name="world" />
 
   <joint name="world_joint" type="fixed">
