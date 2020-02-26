@@ -26,7 +26,7 @@
   </xacro:sensor_astra> -->
   <xacro:include filename="$(find ur_e_description)/urdf/astra.urdf.xacro" />
   <xacro:sensor_astra parent="world" prefix="camera">
-      <origin xyz="1 1 1"
+      <origin xyz="0.75 0.75 0.75"
               rpy="0 ${pi/4} -${3*pi/4}"/>
   </xacro:sensor_astra>
 <!-- 
@@ -35,13 +35,19 @@
       <origin xyz="0.15 0 -0.1"
               rpy="0 0 ${pi/2}"/>
   </xacro:target_chess> -->
-
+<!--
   <xacro:include filename="$(find ur_e_description)/urdf/aruco.urdf.xacro" />
   <xacro:aruco parent="ee_link" prefix="marker">
       <origin xyz="0.03 0.0 0.04"
               rpy="3.13766148064 0.0 0.0"/>
-  </xacro:aruco>
+  </xacro:aruco> -->
 
+  <xacro:include filename="$(find ur_e_description)/urdf/charuco.urdf.xacro" />
+  <xacro:charuco parent="ee_link" prefix="marker">
+      <origin xyz="0.15 0.0 0.04"
+              rpy="3.13766148064 0.0 0.0"/>
+  </xacro:charuco>
+  
   <link name="world" />
 
   <joint name="world_joint" type="fixed">
