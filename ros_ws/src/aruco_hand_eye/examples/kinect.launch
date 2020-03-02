@@ -3,14 +3,14 @@
   <arg name="ee_frame"/>
 
   <!-- Bring up a kinect -->
-  <include file="$(find freenect_launch)/launch/freenect.launch">
+  <!-- <include file="$(find freenect_launch)/launch/freenect.launch">
     <arg name="publish_tf" value="false"/>
     <arg name="depth_registration" value="true"/>
-  </include>
+  </include> -->
 
   <!-- Calibrate the extrinsics for a kinect mounted to a robot base -->
   <include file="$(find aruco_hand_eye)/launch/aruco_hand_eye.launch">
-    <arg name="markerid"   value="582"/>
+    <arg name="markerid"   value="12"/>
     <arg name="markersize" value="0.141"/>
     <arg name="publish_tf" value="true"/>
 

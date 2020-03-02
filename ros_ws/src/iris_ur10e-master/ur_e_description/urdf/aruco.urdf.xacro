@@ -10,7 +10,7 @@
       <visual>
         <origin xyz="0.0 0.0 0.0" rpy="${pi} 0 ${pi/2}"/>
         <geometry>
-          <mesh filename="package://ur_e_description/meshes/aruco/aruco300.dae" scale="1 1 1"/>
+          <mesh filename="package://ur_e_description/meshes/aruco/aruco300.dae" scale="2 2 2"/>
         </geometry>
       </visual>
       <collision>
