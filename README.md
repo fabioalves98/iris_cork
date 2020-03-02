@@ -1,3 +1,6 @@
+## Install project dependencies
+rosdep install -iyr --from-paths src
+
 ## Launching UR10e Gazebo + MoveIt sim
 1.   roslaunch ur_e_gazebo ur10e.launch limited:=true
 2.   roslaunch ur10_e_moveit_config ur10_e_moveit_planning_execution.launch sim:=true limited:=true
