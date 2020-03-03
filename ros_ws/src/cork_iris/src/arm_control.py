@@ -9,8 +9,10 @@ import moveit_msgs.msg
 import geometry_msgs.msg
 from math import pi, cos, sin
 from std_msgs.msg import String
+from sensor_msgs.msg import Image
 from moveit_commander.conversions import pose_to_list
 from tf.transformations import euler_from_quaternion, quaternion_from_euler, quaternion_multiply
+from easy_handeye.srv import *
 
 move_group = None
 robot = None
@@ -124,9 +126,42 @@ def parseParams(args):
             print("Wrong arguments provided! Check the help command.")
     elif("help" in args[0]):
         print("help")
+    # else:
+        # default_caljob()
 
-        
 
+def print_samples(samples):
+    print("Translation" + "\t" + "Rotation")
+    for sample in samples:
+        print("x: " + str(sample.translation.x)[:8] + "\t" + str(sample.rotation.x)[:8])
+        print("y: " + str(sample.translation.y)[:8] + "\t" + str(sample.rotation.y)[:8])
+        print("z: " + str(sample.translation.z)[:8] + "\t" + str(sample.rotation.z)[:8])
+        print("=========================================")
+
+def take_sample():
+    rospy.wait_for_service('/easy_handeye_eye_on_base/take_sample')
+    take_sample_srv = rospy.ServiceProxy('/easy_handeye_eye_on_base/take_sample', TakeSample)
+    vals = take_sample_srv()
+    print("New sample taken: ")
+    transforms = vals.samples.camera_marker_samples.transforms
+    print_samples([transforms[len(transforms)-1]])
+
+def compute_calibration():
+    
+    # get sample list - /easy_handeye_eye_on_base/get_sample_list
+    # chamar servico compute - /easy_handeye_eye_on_base/compute_calibration
+    rospy.wait_for_service('/easy_handeye_eye_on_base/compute_calibration')
+    compute_calibration_srv = rospy.ServiceProxy('/easy_handeye_eye_on_base/compute_calibration', ComputeCalibration)
+    print("Computing calibration")
+    result = compute_calibration_srv()
+    print("Finished calibration")
+    print(result)
+    # chamar servico save - /easy_handeye_eye_on_base/save_calibration
+
+## Subscribing to the aruco result data is needed for him to publish the
+## marker transform.
+def aruco_callback(data):
+    pass
 
 def main():
     moveit_commander.roscpp_initialize(sys.argv)
@@ -140,6 +175,7 @@ def main():
 
     move_group = moveit_commander.MoveGroupCommander("manipulator")
 
+    rospy.Subscriber("/aruco_tracker/result", Image, aruco_callback)
     display_trajectory_publisher = rospy.Publisher('/move_group/display_planned_path',
                                                moveit_msgs.msg.DisplayTrajectory,
                                                queue_size=20)
@@ -173,57 +209,15 @@ def main():
     # poseGoal([0.4, 0.3, 0.4])
 
     # Caljob Example
-    # rospy.set_param('/caljob_creator/capture_scene', True)
-    d = raw_input("Press a key...")
-
     # Move X
     simpleMove([-0.05, 0, 0], pi/4)
+    take_sample()
     # time.sleep(.5)
-    d = raw_input("Press a key...")
-    # rospy.set_param('/caljob_creator/capture_scene', True)
     simpleMove([0, 0, 0.1], pi/4)
+    take_sample()
     simpleRotate([0, -pi/6, 0])
-    d = raw_input("Press a key...")
-    simpleRotate([0, 0, -pi/4])
-    d = raw_input("Press a key...")
-    simpleRotate([0, 0, pi/8])
-    d = raw_input("Press a key...")
-    simpleMove([0.05, 0, 0], pi/4)
-    d = raw_input("Press a key...")
-    # time.sleep(.5)
-    # rospy.set_param('/caljob_creator/capture_scene', True)
-
-    simpleMove([0, 0, -0.05], pi/4)
-    simpleRotate([0, -pi/6, 0])
-    d = raw_input("Press a key...")
-    simpleRotate([0, 0, -pi/4])
-    d = raw_input("Press a key...")
-    simpleRotate([0, 0, pi/8])
-    d = raw_input("Press a key...")
-    simpleRotate([0, pi/3, 0])
-    d = raw_input("Press a key...")
-    simpleRotate([0, 0, -pi/4])
-    d = raw_input("Press a key...")
-    simpleRotate([0, 0, pi/8])
-    d = raw_input("Press a key...")
-    simpleRotate([-pi/6, 0, 0])
-    d = raw_input("Press a key...")
-
-
-    
-    # d = raw_input("Press a key...")
-    # simpleMove([-0.05, 0, 0], pi/4)
-    # d = raw_input("Press a key...")
-    # simpleMove([0, 0, 0.1], pi/4)
-    # d = raw_input("Press a key...")
-    # simpleRotate([0, -pi/6, 0])
-    # d = raw_input("Press a key...")
-    # simpleRotate([0, 0, -pi/4])
-    # d = raw_input("Press a key...")
-    # simpleRotate([0, 0, pi/8])
-    # d = raw_input("Press a key...")
-    # simpleMove([0.05, 0, 0], pi/4)
-    # d = raw_input("Press a key...")
+    take_sample()
+    compute_calibration()
     
 
 if __name__ == "__main__":
