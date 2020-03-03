@@ -8,9 +8,9 @@
         <remap from="/camera_info" to="/camera/rgb/camera_info" />
         <remap from="/image" to="/camera/rgb/image_raw" />
         <param name="image_is_rectified" value="true"/>
-        <param name="marker_size"        value="1"/>
+        <param name="marker_size"        value="0.078"/>
         <param name="marker_id"          value="12"/>
-        <param name="reference_frame"    value="camera_link"/>
+        <!-- <param name="reference_frame"    value="camera_link"/> -->
         <param name="camera_frame"       value="camera_rgb_optical_frame"/>
         <param name="marker_frame"       value="camera_marker" />
     </node>

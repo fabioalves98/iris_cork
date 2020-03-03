@@ -163,7 +163,7 @@ def main():
 
     # Default joint goal for Simulation
     jointGoal([pi/4, -pi/2, pi/2, 0.7, pi/2, pi])
-    simpleMove([0.1, -0.12, -0.05], pi/4)
+    simpleMove([0.1, -0.12, -0.2], pi/4)
     
     # Default joint goal for Calibraion with real robot
     # jointGoal([0.391, -1.553, 2.165, -0.226, 1.232, -1.70])
@@ -172,12 +172,16 @@ def main():
     # To be tested
     # poseGoal([0.4, 0.3, 0.4])
 
-    '''
+    # Caljob Example
+    # rospy.set_param('/caljob_creator/capture_scene', True)
     d = raw_input("Press a key...")
+
+    # Move X
     simpleMove([-0.05, 0, 0], pi/4)
+    # time.sleep(.5)
     d = raw_input("Press a key...")
+    # rospy.set_param('/caljob_creator/capture_scene', True)
     simpleMove([0, 0, 0.1], pi/4)
-    d = raw_input("Press a key...")
     simpleRotate([0, -pi/6, 0])
     d = raw_input("Press a key...")
     simpleRotate([0, 0, -pi/4])
@@ -186,7 +190,41 @@ def main():
     d = raw_input("Press a key...")
     simpleMove([0.05, 0, 0], pi/4)
     d = raw_input("Press a key...")
-    '''
+    # time.sleep(.5)
+    # rospy.set_param('/caljob_creator/capture_scene', True)
+
+    simpleMove([0, 0, -0.05], pi/4)
+    simpleRotate([0, -pi/6, 0])
+    d = raw_input("Press a key...")
+    simpleRotate([0, 0, -pi/4])
+    d = raw_input("Press a key...")
+    simpleRotate([0, 0, pi/8])
+    d = raw_input("Press a key...")
+    simpleRotate([0, pi/3, 0])
+    d = raw_input("Press a key...")
+    simpleRotate([0, 0, -pi/4])
+    d = raw_input("Press a key...")
+    simpleRotate([0, 0, pi/8])
+    d = raw_input("Press a key...")
+    simpleRotate([-pi/6, 0, 0])
+    d = raw_input("Press a key...")
+
+
+    
+    # d = raw_input("Press a key...")
+    # simpleMove([-0.05, 0, 0], pi/4)
+    # d = raw_input("Press a key...")
+    # simpleMove([0, 0, 0.1], pi/4)
+    # d = raw_input("Press a key...")
+    # simpleRotate([0, -pi/6, 0])
+    # d = raw_input("Press a key...")
+    # simpleRotate([0, 0, -pi/4])
+    # d = raw_input("Press a key...")
+    # simpleRotate([0, 0, pi/8])
+    # d = raw_input("Press a key...")
+    # simpleMove([0.05, 0, 0], pi/4)
+    # d = raw_input("Press a key...")
+    
 
 if __name__ == "__main__":
    main() 
