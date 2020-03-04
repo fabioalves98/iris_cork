@@ -12,11 +12,15 @@ from std_msgs.msg import String
 from sensor_msgs.msg import Image
 from moveit_commander.conversions import pose_to_list
 from tf.transformations import euler_from_quaternion, quaternion_from_euler, quaternion_multiply
-from easy_handeye.srv import *
+from easy_handeye.srv import TakeSample, ComputeCalibration
+from std_srvs.srv import Empty
 
 move_group = None
 robot = None
 display_trajectory_publisher= None
+
+DEFAULT_HANDEYE_NAMESPACE = '/easy_handeye_eye_on_base'
+CALIBRATION_FILEPATH = '~/.ros/easy_handeye' + DEFAULT_HANDEYE_NAMESPACE + ".yaml"
 
 
 def jointValues():
@@ -142,8 +146,8 @@ def print_samples(samples):
         print("=========================================")
 
 def take_sample():
-    rospy.wait_for_service('/easy_handeye_eye_on_base/take_sample')
-    take_sample_srv = rospy.ServiceProxy('/easy_handeye_eye_on_base/take_sample', TakeSample)
+    rospy.wait_for_service(DEFAULT_HANDEYE_NAMESPACE + '/take_sample')
+    take_sample_srv = rospy.ServiceProxy(DEFAULT_HANDEYE_NAMESPACE + '/take_sample', TakeSample)
     vals = take_sample_srv()
     print("New sample taken: ")
     transforms = vals.samples.camera_marker_samples.transforms
@@ -153,13 +157,18 @@ def compute_calibration():
     
     # get sample list - /easy_handeye_eye_on_base/get_sample_list
     # chamar servico compute - /easy_handeye_eye_on_base/compute_calibration
-    rospy.wait_for_service('/easy_handeye_eye_on_base/compute_calibration')
-    compute_calibration_srv = rospy.ServiceProxy('/easy_handeye_eye_on_base/compute_calibration', ComputeCalibration)
+    rospy.wait_for_service(DEFAULT_HANDEYE_NAMESPACE + '/compute_calibration')
+    compute_calibration_srv = rospy.ServiceProxy(DEFAULT_HANDEYE_NAMESPACE + '/compute_calibration', ComputeCalibration)
     print("Computing calibration")
     result = compute_calibration_srv()
-    print("Finished calibration")
+    print("Finished calibration.")
     print(result)
-    # chamar servico save - /easy_handeye_eye_on_base/save_calibration
+    print("Saving calibration to: " + CALIBRATION_FILEPATH)
+    rospy.wait_for_service(DEFAULT_HANDEYE_NAMESPACE + '/save_calibration')
+    save_calibration = rospy.ServiceProxy(DEFAULT_HANDEYE_NAMESPACE + '/save_calibration', Empty)
+    save_calibration()
+    
+
 
 ## Subscribing to the aruco result data is needed for him to publish the
 ## marker transform.
@@ -211,31 +220,31 @@ def main():
     init_pos = [-2.0818731710312974, -1.8206561665659304, -1.590893522490271, -0.5344753089586067, 1.377946515231355, 0.19641783200394514]
     jointGoal(init_pos)
 
-    # X Rotation
-    for i in range(3):
-        simpleRotate([pi/9, 0, 0])
+    # # X Rotation
+    # for i in range(3):
+    #     simpleRotate([pi/9, 0, 0])
     
-    jointGoal(init_pos)
+    # jointGoal(init_pos)
 
-    for i in range(3):
-        simpleRotate([-pi/9, 0, 0])
+    # for i in range(3):
+    #     simpleRotate([-pi/9, 0, 0])
     
-    jointGoal(init_pos)
+    # jointGoal(init_pos)
     
-    # Y Rotation
-    for i in range(3):
-        simpleRotate([0, pi/9, 0])
-        simpleMove([-0.02, 0, 0], pi/4)
+    # # Y Rotation
+    # for i in range(3):
+    #     simpleRotate([0, pi/9, 0])
+    #     simpleMove([-0.02, 0, 0], pi/4)
     
-    jointGoal(init_pos)
+    # jointGoal(init_pos)
 
-    for i in range(3):
-        simpleRotate([0, -pi/9, 0])
-        simpleMove([0.01, 0, 0], pi/4)
+    # for i in range(3):
+    #     simpleRotate([0, -pi/9, 0])
+    #     simpleMove([0.01, 0, 0], pi/4)
     
-    jointGoal(init_pos)
+    # jointGoal(init_pos)
 
-    simpleMove([-0.03, 0, -0.03], pi/4)
+    # simpleMove([-0.03, 0, -0.03], pi/4)
 
     # Z Rotation
     for i in range(3):
@@ -246,7 +255,10 @@ def main():
 
     for i in range(3):
         simpleRotate([0, 0, -pi/9])
-    
+
+    take_sample()
+    compute_calibration()
+
     jointGoal(init_pos)
 
 if __name__ == "__main__":
