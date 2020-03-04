@@ -28,6 +28,19 @@ def jointValues():
     return move_group.get_current_joint_values()
 
 
+
+## TEST THIS!
+def setSpeed(speed):
+    rospy.wait_for_service('/ur_hardware_interface/set_speed_slider')
+    ## Empty might be a different thing
+    set_speed = rospy.ServiceProxy('/ur_hardware_interface/set_speed_slider', Empty)
+    set_speed(speed)
+
+## TEST THIS!
+def getSpeed():
+    pass
+
+
 def jointGoal(joints):
     joint_goal = move_group.get_current_joint_values()
 
@@ -128,9 +141,13 @@ def parseParams(args):
         
         elif("caljob" in args[0]):
             caljob()
-        
-        elif("help" in args[0]):
-            print("help")
+        else:
+            print("Usage: rosrun cork_iris arm_control.py <command> <command_params>")
+            print("Available commands:")
+            print("\tmove   <x> <y> <z> -> Cartesian, simple movement relative to last position")
+            print("\trotate <x> <y> <z> -> Simple rotation relative to last position")
+            print("\tinitial            -> Joint goal to the default initial position")
+            print("\tcaljob             -> Calibration job.")
 
     except Exception as e:
         if len(args) == 0:
@@ -256,10 +273,13 @@ def main():
     rospy.init_node('arm_control', anonymous=True)
 
     global move_group, robot, display_trajectory_publisher
-    robot = moveit_commander.RobotCommander()
-
-    move_group = moveit_commander.MoveGroupCommander("manipulator")
-
+    try:
+        robot = moveit_commander.RobotCommander()
+        move_group = moveit_commander.MoveGroupCommander("manipulator")
+    except Exception as e:
+        print("Couldn't load robot arm or move_group")
+        sys.exit(0)
+    
     rospy.Subscriber("/aruco_tracker/result", Image, aruco_callback)
     display_trajectory_publisher = rospy.Publisher('/move_group/display_planned_path',
                                                moveit_msgs.msg.DisplayTrajectory,
