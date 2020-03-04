@@ -19,6 +19,10 @@ robot = None
 display_trajectory_publisher= None
 
 
+def jointValues():
+    return move_group.get_current_joint_values()
+
+
 def jointGoal(joints):
     
     joint_goal = move_group.get_current_joint_values()
@@ -32,6 +36,7 @@ def jointGoal(joints):
 
     # # The go command can be called with joint values, poses, or without any
     # # parameters if you have already set the pose or joint target for the group
+    print("Sending Joint Action - ", joints)
     plan = move_group.go(joint_goal, wait=True)
 
     # # Calling ``stop()`` ensures that there is no residual movement
@@ -64,12 +69,9 @@ def cartesianGoal(waypoints):
                                     0.05,        # eef_step
                                     0.0)         # jump_threshold
     time.sleep(1.0) # Gives time for plan to show
-    print("Executing Cartesian Plan")
     move_group.execute(plan, wait=True)
 
 
-
-# Every movement is parallel to x,y or z. Never diagonal
 def simpleMove(movement, direction):
     
     waypoints = []
@@ -89,8 +91,9 @@ def simpleMove(movement, direction):
         #waypoints.append(copy.deepcopy(wpose)) 
 
     waypoints.append(copy.deepcopy(wpose))
-    print("Sending Cartesian Goal")
+    print("Sending Move Action - ", movement)
     cartesianGoal(waypoints)
+
 
 def simpleRotate(rotation):
     
@@ -108,7 +111,7 @@ def simpleRotate(rotation):
     wpose.orientation = geometry_msgs.msg.Quaternion(*quaternion_multiply(orignal, quat))
     waypoints.append(copy.deepcopy(wpose))
     
-    print("Sending Cartesian Goal")
+    print("Sending Rotate Action - ", rotation)
     cartesianGoal(waypoints)
 
 
@@ -181,44 +184,70 @@ def main():
                                                queue_size=20)
 
     # We can get the name of the reference frame for this robot:
-    planning_frame = move_group.get_planning_frame()
-    print("============ Planning frame: ", planning_frame)
+    #print("============ Planning frame: ", move_group.get_planning_frame())
 
     # We can also print the name of the end-effector link for this group:
-    eef_link = move_group.get_end_effector_link()
-    print("============ End effector link: ", eef_link)
+    #print("============ End effector link: ", move_group.get_end_effector_link())
 
     # We can get a list of all the groups in the robot:
-    group_names = robot.get_group_names()
-    print("============ Available Planning Groups:", robot.get_group_names())
+    #print("============ Available Planning Groups:", robot.get_group_names())
 
-    # Sometimes for debugging it is useful to print the entire state of the
-    # robot:
-    print("============ Printing robot state")
-    print(robot.get_current_state())
-
-    # Default joint goal for Simulation
-    jointGoal([pi/4, -pi/2, pi/2, 0.7, pi/2, pi])
-    simpleMove([0.1, -0.12, -0.2], pi/4)
-    
-    # Default joint goal for Calibraion with real robot
-    # jointGoal([0.391, -1.553, 2.165, -0.226, 1.232, -1.70])
-    # jointGoal([pi, None, None, None, None, None])
+    # Sometimes for debugging it is useful to print the entire state of the robot:
+    #print("============ Printing robot state:", robot.get_current_state())
 
     # To be tested
     # poseGoal([0.4, 0.3, 0.4])
 
-    # Caljob Example
-    # Move X
-    simpleMove([-0.05, 0, 0], pi/4)
-    take_sample()
-    # time.sleep(.5)
-    simpleMove([0, 0, 0.1], pi/4)
-    take_sample()
-    simpleRotate([0, -pi/6, 0])
-    take_sample()
-    compute_calibration()
+    # Default joint goal for Calibraion with real robot
+    # jointGoal([0.391, -1.553, 2.165, -0.226, 1.232, -1.70])
+    # jointGoal([pi, None, None, None, None, None])
+
+    # Default joint goal for Simulation
+    # jointGoal([-3*pi/4, -pi/2, -pi/2, 0, pi/2, 0])
+    # simpleMove([0.18, 0.22, -0.34], pi/4)
+    # simpleRotate([0, pi/4, 0])
+
+    # Saved Position
+    init_pos = [-2.0818731710312974, -1.8206561665659304, -1.590893522490271, -0.5344753089586067, 1.377946515231355, 0.19641783200394514]
+    jointGoal(init_pos)
+
+    # X Rotation
+    for i in range(3):
+        simpleRotate([pi/9, 0, 0])
     
+    jointGoal(init_pos)
+
+    for i in range(3):
+        simpleRotate([-pi/9, 0, 0])
+    
+    jointGoal(init_pos)
+    
+    # Y Rotation
+    for i in range(3):
+        simpleRotate([0, pi/9, 0])
+        simpleMove([-0.02, 0, 0], pi/4)
+    
+    jointGoal(init_pos)
+
+    for i in range(3):
+        simpleRotate([0, -pi/9, 0])
+        simpleMove([0.01, 0, 0], pi/4)
+    
+    jointGoal(init_pos)
+
+    simpleMove([-0.03, 0, -0.03], pi/4)
+
+    # Z Rotation
+    for i in range(3):
+        simpleRotate([0, 0, pi/9])
+    
+    jointGoal(init_pos)
+    simpleMove([-0.03, 0, -0.03], pi/4)
+
+    for i in range(3):
+        simpleRotate([0, 0, -pi/9])
+    
+    jointGoal(init_pos)
 
 if __name__ == "__main__":
    main() 
