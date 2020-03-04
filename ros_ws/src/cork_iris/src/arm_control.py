@@ -21,6 +21,7 @@ display_trajectory_publisher= None
 
 DEFAULT_HANDEYE_NAMESPACE = '/easy_handeye_eye_on_base'
 CALIBRATION_FILEPATH = '~/.ros/easy_handeye' + DEFAULT_HANDEYE_NAMESPACE + ".yaml"
+init_sim_pos = [-2.0818731710312974, -1.8206561665659304, -1.590893522490271, -0.5344753089586067, 1.377946515231355, 0.19641783200394514]
 
 
 def jointValues():
@@ -28,7 +29,6 @@ def jointValues():
 
 
 def jointGoal(joints):
-    
     joint_goal = move_group.get_current_joint_values()
 
     for i in range(0, len(joints)):
@@ -47,12 +47,13 @@ def jointGoal(joints):
     move_group.stop()
 
 
-def poseGoal(pose):
+def poseGoal(coordinates, orientation):
     pose_goal = geometry_msgs.msg.Pose()
-    pose_goal.orientation.w = 1.0
-    pose_goal.position.x = pose[0]
-    pose_goal.position.y = pose[1]
-    pose_goal.position.z = pose[2]
+    pose_goal.position.x = coordinates[0]
+    pose_goal.position.y = coordinates[1]
+    pose_goal.position.z = coordinates[2]
+
+    pose_goal.orientation = geometry_msgs.msg.Quaternion(*quaternion_from_euler(orientation[0], orientation[1], orientation[2]))
 
     move_group.set_pose_target(pose_goal)
 
@@ -67,7 +68,6 @@ def poseGoal(pose):
 
 
 def cartesianGoal(waypoints):
-    # waypoints = []
     (plan, fraction) = move_group.compute_cartesian_path(
                                     waypoints,   # waypoints to follow
                                     0.05,        # eef_step
@@ -77,7 +77,6 @@ def cartesianGoal(waypoints):
 
 
 def simpleMove(movement, direction):
-    
     waypoints = []
     wpose = move_group.get_current_pose().pose
     joint_values = move_group.get_current_joint_values()
@@ -85,22 +84,19 @@ def simpleMove(movement, direction):
     if movement[0] != 0:
         wpose.position.x += movement[0] * cos(direction)
         wpose.position.y += movement[0] * sin(direction)
-        #waypoints.append(copy.deepcopy(wpose)) 
     if movement[1] != 0:
         wpose.position.x += movement[1] * -sin(direction)
         wpose.position.y += movement[1] * cos(direction)
-        #waypoints.append(copy.deepcopy(wpose))
     if movement[2] != 0:  
         wpose.position.z += movement[2]
-        #waypoints.append(copy.deepcopy(wpose)) 
 
     waypoints.append(copy.deepcopy(wpose))
+    
     print("Sending Move Action - ", movement)
     cartesianGoal(waypoints)
 
 
 def simpleRotate(rotation):
-    
     waypoints = []
     wpose = move_group.get_current_pose().pose
 
@@ -120,22 +116,71 @@ def simpleRotate(rotation):
 
 
 def parseParams(args):
-    
-    if("move" in args[0]):
-        try:
+    try:
+        if("move" in args[0]):
             simpleMove([args[1], args[2], args[3]], pi/4)
-        except Exception as e:
-            print("Wrong arguments provided! Check the help command.")
-    elif("rotate" in args[0]):
-        try:
+        
+        elif("rotate" in args[0]):
             simpleRotate([args[1], args[2], args[3]])
-        except Exception as e:
-            print("Wrong arguments provided! Check the help command.")
-    elif("help" in args[0]):
-        print("help")
-    # else:
-        # default_caljob()
+        
+        elif("initial" in args[0]):
+            jointGoal(init_sim_pos)
+        
+        elif("caljob" in args[0]):
+            caljob()
+        
+        elif("help" in args[0]):
+            print("help")
 
+    except Exception as e:
+        if len(args) == 0:
+            test()
+        else:
+            print("Wrong arguments provided! Check the help command")
+
+
+def caljob():
+    init_pos = init_sim_pos
+    # Saved Position
+    jointGoal(init_pos)
+
+    # X Rotation
+    for i in range(3):
+        simpleRotate([pi/9, 0, 0])
+    
+    jointGoal(init_pos)
+
+    for i in range(3):
+        simpleRotate([-pi/9, 0, 0])
+    
+    jointGoal(init_pos)
+    
+    # Y Rotation
+    for i in range(3):
+        simpleRotate([0, pi/9, 0])
+        simpleMove([-0.02, 0, 0], pi/4)
+    
+    jointGoal(init_pos)
+
+    for i in range(3):
+        simpleRotate([0, -pi/9, 0])
+        simpleMove([0.01, 0, 0], pi/4)
+    
+    jointGoal(init_pos)
+
+    simpleMove([-0.03, 0, -0.03], pi/4)
+
+    # Z Rotation
+    for i in range(3):
+        simpleRotate([0, 0, pi/9])
+    
+    jointGoal(init_pos)
+    simpleMove([-0.03, 0, -0.03], pi/4)
+
+    for i in range(3):
+        simpleRotate([0, 0, -pi/9])
+    
+    jointGoal(init_pos)
 
 def print_samples(samples):
     print("Translation" + "\t" + "Rotation")
@@ -175,23 +220,8 @@ def compute_calibration():
 def aruco_callback(data):
     pass
 
-def main():
-    moveit_commander.roscpp_initialize(sys.argv)
-    rospy.init_node('arm_control', anonymous=True)
 
-    # parseParams(sys.argv[1:])
-    # input("dsa")
-
-    global move_group, robot, display_trajectory_publisher
-    robot = moveit_commander.RobotCommander()
-
-    move_group = moveit_commander.MoveGroupCommander("manipulator")
-
-    rospy.Subscriber("/aruco_tracker/result", Image, aruco_callback)
-    display_trajectory_publisher = rospy.Publisher('/move_group/display_planned_path',
-                                               moveit_msgs.msg.DisplayTrajectory,
-                                               queue_size=20)
-
+def test():
     # We can get the name of the reference frame for this robot:
     #print("============ Planning frame: ", move_group.get_planning_frame())
 
@@ -213,53 +243,30 @@ def main():
 
     # Default joint goal for Simulation
     # jointGoal([-3*pi/4, -pi/2, -pi/2, 0, pi/2, 0])
+    # poseGoal([0.5, 0.5, 0.1], [0, pi/2, 0])
     # simpleMove([0.18, 0.22, -0.34], pi/4)
     # simpleRotate([0, pi/4, 0])
 
-    # Saved Position
-    init_pos = [-2.0818731710312974, -1.8206561665659304, -1.590893522490271, -0.5344753089586067, 1.377946515231355, 0.19641783200394514]
-    jointGoal(init_pos)
+    jointGoal(init_sim_pos)
+    poseGoal([0.5, 0.5, 0.1], [0, pi/2, 0])
 
-    # # X Rotation
-    # for i in range(3):
-    #     simpleRotate([pi/9, 0, 0])
+
+def main():
+    moveit_commander.roscpp_initialize(sys.argv)
+    rospy.init_node('arm_control', anonymous=True)
+
+    global move_group, robot, display_trajectory_publisher
+    robot = moveit_commander.RobotCommander()
+
+    move_group = moveit_commander.MoveGroupCommander("manipulator")
+
+    rospy.Subscriber("/aruco_tracker/result", Image, aruco_callback)
+    display_trajectory_publisher = rospy.Publisher('/move_group/display_planned_path',
+                                               moveit_msgs.msg.DisplayTrajectory,
+                                               queue_size=20)
     
-    # jointGoal(init_pos)
+    parseParams(sys.argv[1:])
 
-    # for i in range(3):
-    #     simpleRotate([-pi/9, 0, 0])
-    
-    # jointGoal(init_pos)
-    
-    # # Y Rotation
-    # for i in range(3):
-    #     simpleRotate([0, pi/9, 0])
-    #     simpleMove([-0.02, 0, 0], pi/4)
-    
-    # jointGoal(init_pos)
-
-    # for i in range(3):
-    #     simpleRotate([0, -pi/9, 0])
-    #     simpleMove([0.01, 0, 0], pi/4)
-    
-    # jointGoal(init_pos)
-
-    # simpleMove([-0.03, 0, -0.03], pi/4)
-
-    # Z Rotation
-    for i in range(3):
-        simpleRotate([0, 0, pi/9])
-    
-    jointGoal(init_pos)
-    simpleMove([-0.03, 0, -0.03], pi/4)
-
-    for i in range(3):
-        simpleRotate([0, 0, -pi/9])
-
-    take_sample()
-    compute_calibration()
-
-    jointGoal(init_pos)
 
 if __name__ == "__main__":
    main() 
