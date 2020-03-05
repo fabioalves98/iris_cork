@@ -14,6 +14,7 @@ from moveit_commander.conversions import pose_to_list
 from tf.transformations import euler_from_quaternion, quaternion_from_euler, quaternion_multiply
 from easy_handeye.srv import TakeSample, ComputeCalibration
 from std_srvs.srv import Empty
+from ur_msgs.srv import SetSpeedSliderFraction
 
 move_group = None
 robot = None
@@ -22,19 +23,19 @@ display_trajectory_publisher= None
 DEFAULT_HANDEYE_NAMESPACE = '/easy_handeye_eye_on_base'
 CALIBRATION_FILEPATH = '~/.ros/easy_handeye' + DEFAULT_HANDEYE_NAMESPACE + ".yaml"
 init_sim_pos = [-2.0818731710312974, -1.8206561665659304, -1.590893522490271, -0.5344753089586067, 1.377946515231355, 0.19641783200394514]
+init_live_pos = [0.5634922981262207, -0.8251841825297852, 0.5779731909381312, 1.0192360120960693, 1.4324259757995605, -0.187751595173971]
 
 
 def jointValues():
     return move_group.get_current_joint_values()
 
 
-
-## TEST THIS!
 def setSpeed(speed):
     rospy.wait_for_service('/ur_hardware_interface/set_speed_slider')
     ## Empty might be a different thing
-    set_speed = rospy.ServiceProxy('/ur_hardware_interface/set_speed_slider', Empty)
-    set_speed(speed)
+    set_speed = rospy.ServiceProxy('/ur_hardware_interface/set_speed_slider', SetSpeedSliderFraction)
+    print(set_speed(speed))
+
 
 ## TEST THIS!
 def getSpeed():
@@ -138,15 +139,16 @@ def parseRotationArgs(args):
 
 def parseParams(args):
     try:
+        print (args)
         if("move" in args[0]):
-            simpleMove([args[1], args[2], args[3]], pi/4)
+            simpleMove([float(args[1]), float(args[2]), float(args[3])], pi/4)
         
         elif("rotate" in args[0]):
             args = parseRotationArgs(args[1:4])
             simpleRotate([args[0], args[1], args[2]])
         
         elif("initial" in args[0]):
-            jointGoal(init_sim_pos)
+            jointGoal(init_live_pos)
         
         elif("caljob" in args[0]):
             caljob()
@@ -162,51 +164,56 @@ def parseParams(args):
         if len(args) == 0:
             test()
         else:
+            print(e)
             print("Wrong arguments provided! Check the help command")
 
 
 def caljob():
-    init_pos = init_sim_pos
+    init_pos = init_live_pos
     # Saved Position
     jointGoal(init_pos)
+    take_sample()
 
     # X Rotation
     for i in range(3):
         simpleRotate([pi/9, 0, 0])
+        take_sample()
     
     jointGoal(init_pos)
 
     for i in range(3):
         simpleRotate([-pi/9, 0, 0])
+        take_sample()
     
     jointGoal(init_pos)
     
     # Y Rotation
     for i in range(3):
         simpleRotate([0, pi/9, 0])
-        simpleMove([-0.02, 0, 0], pi/4)
-    
-    jointGoal(init_pos)
-
-    for i in range(3):
-        simpleRotate([0, -pi/9, 0])
-        simpleMove([0.01, 0, 0], pi/4)
+        #simpleMove([-0.02, 0, 0], pi/4)
+        take_sample()
     
     jointGoal(init_pos)
 
     simpleMove([-0.03, 0, -0.03], pi/4)
+    take_sample()
 
     # Z Rotation
     for i in range(3):
         simpleRotate([0, 0, pi/9])
+        take_sample()
     
     jointGoal(init_pos)
     simpleMove([-0.03, 0, -0.03], pi/4)
 
     for i in range(3):
         simpleRotate([0, 0, -pi/9])
+        take_sample()
     
     jointGoal(init_pos)
+
+    compute_calibration()
+
 
 def print_samples(samples):
     print("Translation" + "\t" + "Rotation")
@@ -273,15 +280,14 @@ def test():
     # simpleMove([0.18, 0.22, -0.34], pi/4)
     # simpleRotate([0, pi/4, 0])
 
-    jointGoal(init_sim_pos)
-    poseGoal([0.5, 0.5, 0.1], [0, pi/2, 0])
+    # setSpeed(0.1)
+
+    print(jointValues())
 
 
 def main():
     moveit_commander.roscpp_initialize(sys.argv)
     rospy.init_node('arm_control', anonymous=True)
-    parseParams(sys.argv[1:])
-
 
     global move_group, robot, display_trajectory_publisher
     try:
