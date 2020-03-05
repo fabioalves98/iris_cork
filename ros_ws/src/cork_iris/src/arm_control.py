@@ -128,13 +128,22 @@ def simpleRotate(rotation):
     cartesianGoal(waypoints)
 
 
+def parseRotationArgs(args):
+
+    for i in range(0, len(args)):
+        args[i] = eval(args[i].replace('pi', str(pi)))
+    return args
+
+
+
 def parseParams(args):
     try:
         if("move" in args[0]):
             simpleMove([args[1], args[2], args[3]], pi/4)
         
         elif("rotate" in args[0]):
-            simpleRotate([args[1], args[2], args[3]])
+            args = parseRotationArgs(args[1:4])
+            simpleRotate([args[0], args[1], args[2]])
         
         elif("initial" in args[0]):
             jointGoal(init_sim_pos)
@@ -144,7 +153,7 @@ def parseParams(args):
         else:
             print("Usage: rosrun cork_iris arm_control.py <command> <command_params>")
             print("Available commands:")
-            print("\tmove   <x> <y> <z> -> Cartesian, simple movement relative to last position")
+            print("\tmove   <x> <y> <z> -> Simple cartesian movement relative to last position")
             print("\trotate <x> <y> <z> -> Simple rotation relative to last position")
             print("\tinitial            -> Joint goal to the default initial position")
             print("\tcaljob             -> Calibration job.")
@@ -271,6 +280,8 @@ def test():
 def main():
     moveit_commander.roscpp_initialize(sys.argv)
     rospy.init_node('arm_control', anonymous=True)
+    parseParams(sys.argv[1:])
+
 
     global move_group, robot, display_trajectory_publisher
     try:
