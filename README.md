@@ -22,3 +22,12 @@ rosservice call /ur_hardware_interface/set_speed_slider "speed_slider_fraction: 
 2. Hit the "Compute" button
 3. Close the calibrate node and launch the publish one. roslaunch cork_iris handeye_publish.launch
 
+## Standard launch
+1. roslaunch iris_ur10e live.launch
+2. roslaunch cork_iris kinect_launch.launch
+### Calibration steps (Don't run these if calibration is already saved to the .ros directory)
+3. roslaunch cork_iris handeye_calibrate.launch
+4. rosrun    cork_iris arm_control.py caljob
+### After the calibration is done
+5. Close roslaunch cork_iris handeye_calibrate.launch
+6. roslaunch cork_iris handeye_publish.launch
