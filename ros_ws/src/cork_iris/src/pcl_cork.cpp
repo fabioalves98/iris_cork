@@ -614,10 +614,10 @@ int main (int argc, char** argv)
 	parsed_pub = it.advertise("/corkiris/parsed", 1);
 
     // Creating subscribers for rgb, depth and cloud images, and syncing a callback for them
-    message_filters::Subscriber<sensor_msgs::Image> image_sub(n, "/kinect/rgb/image_raw", 1);
-    message_filters::Subscriber<sensor_msgs::Image> depth_sub(n, "/kinect/depth_registered/image_raw", 1);
-    message_filters::Subscriber<sensor_msgs::PointCloud2> pointcloud_sub(n, "/kinect/depth_registered/points", 1);
-    message_filters::Subscriber<sensor_msgs::CameraInfo> camera_info(n, "/kinect/depth_registered/camera_info", 1);
+    message_filters::Subscriber<sensor_msgs::Image> image_sub(n, "/camera/rgb/image_raw", 1);
+    message_filters::Subscriber<sensor_msgs::Image> depth_sub(n, "/camera/depth_registered/image_raw", 1);
+    message_filters::Subscriber<sensor_msgs::PointCloud2> pointcloud_sub(n, "/camera/depth_registered/points", 1);
+    message_filters::Subscriber<sensor_msgs::CameraInfo> camera_info(n, "/camera/depth_registered/camera_info", 1);
     
     using AproxSync = message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, 
                                                                      sensor_msgs::Image, 

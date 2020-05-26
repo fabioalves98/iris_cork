@@ -3,8 +3,7 @@
 
   <!-- Kinect camera node   -->
   <include  file="$(find openni_launch)/launch/openni.launch">
-    <arg name="camera" default="kinect" />
-    <arg name="depth_registration" default="true" />
+      <arg name="depth_registration" default="true" />
   </include>
 
 </launch>

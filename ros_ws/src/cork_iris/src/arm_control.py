@@ -23,7 +23,8 @@ display_trajectory_publisher= None
 DEFAULT_HANDEYE_NAMESPACE = '/easy_handeye_eye_on_base'
 CALIBRATION_FILEPATH = '~/.ros/easy_handeye' + DEFAULT_HANDEYE_NAMESPACE + ".yaml"
 init_sim_pos = [-2.0818731710312974, -1.8206561665659304, -1.590893522490271, -0.5344753089586067, 1.377946515231355, 0.19641783200394514]
-init_live_pos = [0.5634922981262207, -0.8251841825297852, 0.5779731909381312, 1.0192360120960693, 1.4324259757995605, -0.187751595173971]
+init_live_pos = [0.508063793182373, -1.2333410543254395, 1.8473342100726526, -0.37647326410327153, 1.3200550079345703, -0.05201179185976201]
+out_of_camera_pos = [0.036165714263916016, -2.1434017620482386, 2.26279861131777, 0.18486802160229487, 0.8645825386047363, -0.19302159944643194]
 
 
 def jointValues():
@@ -140,6 +141,9 @@ def parseRotationArgs(args):
 def parseParams(args):
     try:
         print (args)
+        # X > 0 - Forward
+        # y > 0 - Left
+        # Z > 0 - Upwards
         if("move" in args[0]):
             simpleMove([float(args[1]), float(args[2]), float(args[3])], pi/4)
         
@@ -284,6 +288,8 @@ def test():
 
     print(jointValues())
 
+    jointGoal(out_of_camera_pos)
+
 
 def main():
     moveit_commander.roscpp_initialize(sys.argv)
@@ -302,6 +308,7 @@ def main():
                                                moveit_msgs.msg.DisplayTrajectory,
                                                queue_size=20)
     
+    setSpeed(0.1)
     parseParams(sys.argv[1:])
 
 
