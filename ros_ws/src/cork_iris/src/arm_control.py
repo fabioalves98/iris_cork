@@ -4,12 +4,14 @@ import sys
 import copy
 import time
 import rospy
+import tf
 import moveit_commander
 import moveit_msgs.msg
 import geometry_msgs.msg
 from math import pi, cos, sin
 from std_msgs.msg import String
 from sensor_msgs.msg import Image
+from geometry_msgs.msg import Point
 from moveit_commander.conversions import pose_to_list
 from tf.transformations import euler_from_quaternion, quaternion_from_euler, quaternion_multiply
 from easy_handeye.srv import TakeSample, ComputeCalibration
@@ -29,6 +31,9 @@ out_of_camera_pos = [0.036165714263916016, -2.1434017620482386, 2.26279861131777
 
 def jointValues():
     return move_group.get_current_joint_values()
+
+def getPose():
+    return move_group.get_current_pose().pose
 
 
 def setSpeed(speed):
@@ -257,6 +262,16 @@ def compute_calibration():
 def aruco_callback(data):
     pass
 
+def robot2cork(data):
+    print ("Cork Center")
+    print (data)
+    print ("Robot Pose")
+    print (getPose)
+    print ("Kinect Transform")
+    listener = tf.TransformListener()
+    (trans, rot) = listener.lookupTransform('/base_link', '/camera_link', rospy.Time(0))
+    print (trans, rot)
+    
 
 def test():
     # We can get the name of the reference frame for this robot:
@@ -284,7 +299,7 @@ def test():
     # simpleMove([0.18, 0.22, -0.34], pi/4)
     # simpleRotate([0, pi/4, 0])
 
-    # setSpeed(0.1)
+    setSpeed(0.1)
 
     print(jointValues())
 
@@ -304,12 +319,15 @@ def main():
         sys.exit(0)
     
     rospy.Subscriber("/aruco_tracker/result", Image, aruco_callback)
+    rospy.Subscriber("/cork_iris/cork_center", Point, robot2cork)
     display_trajectory_publisher = rospy.Publisher('/move_group/display_planned_path',
                                                moveit_msgs.msg.DisplayTrajectory,
                                                queue_size=20)
     
     setSpeed(0.1)
     parseParams(sys.argv[1:])
+
+    rospy.spin()
 
 
 if __name__ == "__main__":

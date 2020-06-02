@@ -13,17 +13,17 @@
 #include <pcl/point_types.h>
 #include <pcl/visualization/pcl_visualizer.h>
 #include <pcl/features/normal_3d.h>
-#include <pcl/features/intensity_gradient.h>
-#include <pcl/features/normal_3d_omp.h>
+//#include <pcl/features/intensity_gradient.h>
+//#include <pcl/features/normal_3d_omp.h>
 #include <pcl/kdtree/kdtree_flann.h>
 #include <pcl/ModelCoefficients.h>
 #include <pcl/filters/conditional_removal.h>
 #include <pcl/filters/statistical_outlier_removal.h>
 #include <pcl/segmentation/extract_clusters.h>
 #include <pcl/segmentation/conditional_euclidean_clustering.h>
-#include <pcl/search/organized.h>
+//#include <pcl/search/organized.h>
 #include <pcl/filters/voxel_grid.h>
-#include <pcl/filters/extract_indices.h>
+//#include <pcl/filters/extract_indices.h>
 #include <pcl/surface/mls.h>
 
 #include <pcl/point_cloud.h>
@@ -40,7 +40,6 @@
 
 // ROS Sync
 #include <message_filters/time_synchronizer.h>
-#include <message_filters/time_synchronizer.h>
 #include <message_filters/sync_policies/approximate_time.h>
 #include <message_filters/subscriber.h>
 // ROS Msgs
@@ -48,6 +47,7 @@
 #include <sensor_msgs/image_encodings.h>
 #include <sensor_msgs/Image.h>
 #include <sensor_msgs/CameraInfo.h>
+#include <geometry_msgs/Point.h>
 #include <image_transport/image_transport.h>
 // OpenCV
 #include <cv_bridge/cv_bridge.h>
@@ -94,6 +94,7 @@ int max_cluster_size;
 int num_enforce = 0;
 
 ros::Publisher pub;
+ros::Publisher point_pub;
 
 // PointXYZRGB cloud
 pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud (new pcl::PointCloud<pcl::PointXYZRGB>);
@@ -211,60 +212,6 @@ int getHighestPoint()
 
 }
 
-// void -> it draws the point cloud directly for now
-// http://www.pointclouds.org/documentation/tutorials/#segmentation-tutorial
-void findCorkPiece(){
-
-    int highestPointIdx = getHighestPoint();
-    pcl::PointXYZRGB highestPoint = cloud->points[highestPointIdx];
-    // quanto menor o z mais alto ele esta
-    // with kdtree get nearest points to the current one
-    pcl::KdTreeFLANN<pcl::PointXYZRGB> kdtree;
-    int searchPointIdx = highestPointIdx;
-    pcl::PointXYZRGB searchPoint = highestPoint;
-
-    kdtree.setInputCloud (cloud);
-    
-    int K = 100 ;
-    std::vector<int> pointIdxNKNSearch(K);
-    std::vector<float> pointNKNSquaredDistance(K);
-
-    std::vector<int> closed_points;
-
-    // Aqui para garantir que nao bloqueamos no while (que nao deve acontecer)
-    // TODO: A ideia e agora adicionar algumas verificacoes com as normais
-    // para garantir que selecionamos APENAS o traco e nao alguns "redores" dele
-    int MAX_ITERS = 50;
-    int iters = 0;
-    while (kdtree.nearestKSearch (searchPoint, K, pointIdxNKNSearch, pointNKNSquaredDistance) > 0)
-    {  
-        
-        std::vector<int> aux_closed;
-        for (size_t i = 0; i < pointIdxNKNSearch.size(); ++i)
-        {
-            if (find(closed_points.begin(), closed_points.end(), pointIdxNKNSearch[i]) != closed_points.end()) continue;
-
-            if (abs(searchPoint.z - cloud->points[pointIdxNKNSearch[i]].z) < 0.05)
-            {    
-                aux_closed.push_back(pointIdxNKNSearch[i]);
-                // Paint the point. its a cork piece point
-                cloud->points[pointIdxNKNSearch[i]].r = 0;
-                cloud->points[pointIdxNKNSearch[i]].g = 255;
-                cloud->points[pointIdxNKNSearch[i]].b = 0;       
-            } 
-        }
-
-        searchPointIdx = aux_closed.back();
-        searchPoint = cloud->points[searchPointIdx];
-        aux_closed.pop_back();
-        closed_points.insert(closed_points.end(), aux_closed.begin(), aux_closed.end());
-
-        pointIdxNKNSearch.clear();
-        pointNKNSquaredDistance.clear();
-        iters++;
-        if(iters == MAX_ITERS) break;
-    }
-}
 
 bool enforceNormals (const pcl::PointXYZRGBNormal& point_a, const pcl::PointXYZRGBNormal& point_b, float squared_distance)
 {
@@ -295,6 +242,7 @@ void drawCloudBoundingBox(pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_in)
     // Compute principal directions
     Eigen::Vector4f pcaCentroid;
     pcl::compute3DCentroid(*cloud_in, pcaCentroid);
+
     Eigen::Matrix3f covariance;
     computeCovarianceMatrixNormalized(*cloud_in, pcaCentroid, covariance);
     Eigen::SelfAdjointEigenSolver<Eigen::Matrix3f> eigen_solver(covariance, Eigen::ComputeEigenvectors);
@@ -411,6 +359,22 @@ void cluster_extraction (pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_in, pcl::
     }
     
     drawCloudBoundingBox(cloud_cluster);
+
+    Eigen::Vector4f pcaCentroid;
+    pcl::compute3DCentroid(*cloud_cluster, pcaCentroid);
+
+    geometry_msgs::Point center;
+    center.x = pcaCentroid.x();
+    center.y = pcaCentroid.y();
+    center.z = pcaCentroid.z();
+    
+    // center.r = 255;
+    // center.g = 0;
+    // center.b = 0;
+    
+    // cloud_out->push_back(center);
+
+    point_pub.publish(center);
 }
 
 void remove_outliers (pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_in, pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_out)
@@ -640,6 +604,7 @@ int main (int argc, char** argv)
 
     // Create a ROS publisher for the output point cloud
     pub = n.advertise<sensor_msgs::PointCloud2> ("/cork_iris/processed_pointcloud", 1);
+    point_pub = n.advertise<geometry_msgs::Point> ("/cork_iris/cork_center", 1);
     ros::Rate loop_rate(10);
     // Spin
     ros::spin ();
