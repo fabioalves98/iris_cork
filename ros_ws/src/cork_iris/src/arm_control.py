@@ -4,14 +4,14 @@ import sys
 import copy
 import time
 import rospy
-import tf
+import tf2_ros, tf2_geometry_msgs
 import moveit_commander
 import moveit_msgs.msg
 import geometry_msgs.msg
 from math import pi, cos, sin
 from std_msgs.msg import String
 from sensor_msgs.msg import Image
-from geometry_msgs.msg import Point
+from geometry_msgs.msg import Point, TransformStamped
 from moveit_commander.conversions import pose_to_list
 from tf.transformations import euler_from_quaternion, quaternion_from_euler, quaternion_multiply
 from easy_handeye.srv import TakeSample, ComputeCalibration
@@ -263,14 +263,40 @@ def aruco_callback(data):
     pass
 
 def robot2cork(data):
-    print ("Cork Center")
-    print (data)
-    print ("Robot Pose")
-    print (getPose)
-    print ("Kinect Transform")
-    listener = tf.TransformListener()
-    (trans, rot) = listener.lookupTransform('/base_link', '/camera_link', rospy.Time(0))
-    print (trans, rot)
+    print ("\nCork Center")
+    print ("X: " + str(data.x) + ", Y: " + str(data.y) + " Z: " + str(data.z))
+    
+    print ("\nRobot Pose")
+    pos = getPose().position
+    ori = getPose().orientation
+    print ("X: " + str(pos.x) + ", Y: " + str(pos.y) + " Z: " + str(pos.z))
+    print ("X: " + str(ori.x) + ", Y: " + str(ori.y) + " Z: " + str(ori.z) + " W: " + str(ori.w))
+
+    print ("\nKinect Transform")
+
+    tf_buffer = tf2_ros.Buffer(rospy.Duration(1200))
+    listener = tf2_ros.TransformListener(tf_buffer)
+    rate = rospy.Rate(10.0)
+    trans = None
+    while not rospy.is_shutdown():
+        try:
+            trans = tf_buffer.lookup_transform('base_link', 'camera_depth_optical_frame', rospy.Time(0))
+            #print (trans, rot)
+            break
+        except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException):
+            continue
+    
+    pose = geometry_msgs.msg.PoseStamped()
+    pose.header.frame_id = "string"
+    pose.header.stamp = rospy.Time.now()
+    pose.pose.position = data
+    pose.pose.orientation.x = 0
+    pose.pose.orientation.y = 0
+    pose.pose.orientation.z = 0
+    pose.pose.orientation.w = 1
+    
+    print (tf2_geometry_msgs.do_transform_pose(pose, trans))
+    
     
 
 def test():

@@ -1,5 +1,5 @@
 ## Install project dependencies
-rosdep install -iyr --from-paths src
+rosdep install -iyr --from-paths src (--os ubuntu:bionic)
 
 ## Launch Kinect
 
