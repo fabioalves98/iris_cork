@@ -182,13 +182,19 @@ def parseParams(args):
         
         elif("caljob" in args[0]):
             caljob()
+        elif("grip" in args[0]):
+            grip()
+        elif("release" in args[0]):
+            release()
         else:
             print("Usage: rosrun cork_iris arm_control.py <command> <command_params>")
             print("Available commands:")
             print("\tmove   <x> <y> <z> -> Simple cartesian movement relative to last position")
             print("\trotate <x> <y> <z> -> Simple rotation relative to last position")
             print("\tinitial            -> Joint goal to the default initial position")
-            print("\tcaljob             -> Calibration job.")
+            print("\tcaljob             -> Calibration job")
+            print("\tgrip               -> Grip the gripper")
+            print("\trelease            -> Release the gripper")
 
     except Exception as e:
         if len(args) == 0:
@@ -350,7 +356,9 @@ def test():
 
     print(jointValues())
 
-    jointGoal(out_of_camera_pos)
+    rospy.spin()
+
+    # jointGoal(out_of_camera_pos)
 
 
 def main():
@@ -373,8 +381,6 @@ def main():
     
     setSpeed(0.1)
     parseParams(sys.argv[1:])
-
-    rospy.spin()
 
 
 if __name__ == "__main__":
