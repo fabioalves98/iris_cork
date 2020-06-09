@@ -37,18 +37,25 @@ def getPose():
     return move_group.get_current_pose().pose
 
 
-def grip():
+
+def load_and_play_program(program_filename):
     rospy.wait_for_service('/ur_hardware_interface/dashboard/load_program')
     load_program = rospy.ServiceProxy('/ur_hardware_interface/dashboard/load_program', Load)
-    print(load_program('grip.urp'))
+    print(load_program(program_filename))
 
     rospy.wait_for_service('/ur_hardware_interface/dashboard/play')
     play_program = rospy.ServiceProxy('/ur_hardware_interface/dashboard/play', Trigger)
-    print(play_program())
+    print(play_program()) 
+
+
+def grip():
+    load_and_play_program('grip.urp')
 
 
 
-#def release():
+def release():
+    load_and_play_program('release.urp')
+
 
 
 def setSpeed(speed):
