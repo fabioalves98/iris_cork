@@ -15,8 +15,9 @@ from geometry_msgs.msg import Point, TransformStamped
 from moveit_commander.conversions import pose_to_list
 from tf.transformations import euler_from_quaternion, quaternion_from_euler, quaternion_multiply
 from easy_handeye.srv import TakeSample, ComputeCalibration
-from std_srvs.srv import Empty
+from std_srvs.srv import Empty, Trigger
 from ur_msgs.srv import SetSpeedSliderFraction
+from ur_dashboard_msgs.srv import Load
 
 move_group = None
 robot = None
@@ -36,9 +37,22 @@ def getPose():
     return move_group.get_current_pose().pose
 
 
+def grip():
+    rospy.wait_for_service('/ur_hardware_interface/dashboard/load_program')
+    load_program = rospy.ServiceProxy('/ur_hardware_interface/dashboard/load_program', Load)
+    print(load_program('grip.urp'))
+
+    rospy.wait_for_service('/ur_hardware_interface/dashboard/play')
+    play_program = rospy.ServiceProxy('/ur_hardware_interface/dashboard/play', Trigger)
+    print(play_program())
+
+
+
+#def release():
+
+
 def setSpeed(speed):
     rospy.wait_for_service('/ur_hardware_interface/set_speed_slider')
-    ## Empty might be a different thing
     set_speed = rospy.ServiceProxy('/ur_hardware_interface/set_speed_slider', SetSpeedSliderFraction)
     print(set_speed(speed))
 
