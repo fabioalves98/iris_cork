@@ -17,8 +17,7 @@ generate_dynamic_reconfigure_options(
   cfg/PCLCork.cfg
 )
 
-## Eventualmente esta versao nao precisa de estar aqui
-find_package(OpenCV 3.2.0 REQUIRED COMPONENTS
+find_package(OpenCV REQUIRED COMPONENTS
   core
   highgui 
   imgproc 

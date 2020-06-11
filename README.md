@@ -29,9 +29,9 @@ rosrun camera_calibration cameracalibrator.py --size 7x9 --square 0.019 image:=/
 ## Standard launch
 1. roslaunch iris_ur10e live.launch
 2. roslaunch cork_iris kinect_launch.launch
-### Calibration steps (Don't run these if calibration is already saved to the .ros directory)
+## Calibration steps (Don't run these if calibration is already saved to the .ros directory)
 3. roslaunch cork_iris handeye_calibrate.launch
 4. rosrun    cork_iris arm_control.py caljob
-### After the calibration is done
+## After the calibration is done
 5. Close roslaunch cork_iris handeye_calibrate.launch
 6. roslaunch cork_iris handeye_publish.launch
