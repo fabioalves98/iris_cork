@@ -1,9 +1,7 @@
 #!/usr/bin/env python
 
-import sys
-import copy
-import time
-import rospy
+import sys, copy, time, yaml
+import rospy, rospkg, rosparam
 import tf2_ros, tf2_geometry_msgs
 import moveit_commander
 import moveit_msgs.msg
@@ -20,19 +18,22 @@ from ur_msgs.srv import SetSpeedSliderFraction
 from ur_dashboard_msgs.srv import Load
 from ArmControl import ArmControl
 
-# move_group = None
-# robot = None
-# display_trajectory_publisher= None
-
 arm = None
 
-
+CORK_IRIS_BASE_DIR = rospkg.RosPack().get_path('cork_iris')
 DEFAULT_HANDEYE_NAMESPACE = '/easy_handeye_eye_on_base'
 CALIBRATION_FILEPATH = '~/.ros/easy_handeye' + DEFAULT_HANDEYE_NAMESPACE + ".yaml"
-init_sim_pos = [-2.0818731710312974, -1.8206561665659304, -1.590893522490271, -0.5344753089586067, 1.377946515231355, 0.19641783200394514]
-init_live_pos = [0.508063793182373, -1.2333410543254395, 1.8473342100726526, -0.37647326410327153, 1.3200550079345703, -0.05201179185976201]
-out_of_camera_pos = [0.036165714263916016, -2.1434017620482386, 2.26279861131777, 0.18486802160229487, 0.8645825386047363, -0.19302159944643194]
+positions = {}
 
+def load_positions(path):
+    '''Returns tuple with keys of all possible positions and the dict with the positions previously
+       saved in a yaml file'''
+
+    print(CORK_IRIS_BASE_DIR)
+    data = rosparam.load_file(CORK_IRIS_BASE_DIR + "/yaml/positions.yaml")
+    k = data[0][0].keys()
+
+    return k, data[0][0]
 
 def parseRotationArgs(args):
 
@@ -40,9 +41,8 @@ def parseRotationArgs(args):
         args[i] = eval(args[i].replace('pi', str(pi)))
     return args
 
-
-
 def parseParams(args):
+    global positions
     print("PARSING ARGS")
     try:
         print (args)
@@ -57,7 +57,7 @@ def parseParams(args):
             arm.simpleRotate([args[0], args[1], args[2]])
         
         elif("initial" in args[0]):
-            arm.jointGoal(init_live_pos)
+            arm.jointGoal(positions['init_live_pos'])
         
         elif("caljob" in args[0]):
             caljob()
@@ -84,7 +84,8 @@ def parseParams(args):
 
 
 def caljob():
-    init_pos = init_live_pos
+    global positions
+    init_pos = positions['init_live_pos']
     # Saved Position
     arm.jointGoal(init_pos)
     take_sample()
@@ -206,6 +207,8 @@ def robot2cork(data):
     
 
 def test():
+    global positions
+
     # We can get the name of the reference frame for this robot:
     #print("============ Planning frame: ", move_group.get_planning_frame())
 
@@ -230,30 +233,29 @@ def test():
     # poseGoal([0.5, 0.5, 0.1], [0, pi/2, 0])
     # simpleMove([0.18, 0.22, -0.34], pi/4)
     # simpleRotate([0, pi/4, 0])
-
     arm.setSpeed(0.1)
-    arm.jointGoal(init_sim_pos)
+    arm.jointGoal(positions['init_sim_pos'])
     arm.grip()
     # print(arm.jointValues())
 
     # rospy.spin()
 
-    # jointGoal(out_of_camera_pos)
+    # arm.jointGoal(positions['out_of_camera_pos'])
 
 
 def main():
     # moveit_commander.roscpp_initialize(sys.argv)
     rospy.init_node('arm_control', anonymous=True)
-    print(rospy)
+
+    global arm, positions
+    position_names, positions = load_positions(CORK_IRIS_BASE_DIR + "/yaml/positions.yaml")
+    # rospy.Subscriber("/aruco_tracker/result", Image, aruco_callback)
+    # rospy.Subscriber("/cork_iris/cork_center", Point, robot2cork)
+    # # display_trajectory_publisher = rospy.Publisher('/move_group/display_planned_path',
+    # #                                            moveit_msgs.msg.DisplayTrajectory,
+    # #                                            queue_size=20)
     
-    rospy.Subscriber("/aruco_tracker/result", Image, aruco_callback)
-    rospy.Subscriber("/cork_iris/cork_center", Point, robot2cork)
-    # display_trajectory_publisher = rospy.Publisher('/move_group/display_planned_path',
-    #                                            moveit_msgs.msg.DisplayTrajectory,
-    #                                            queue_size=20)
-    
-    global arm
-    arm = ArmControl(rospy)
+    # arm = ArmControl(rospy)
 
     parseParams(sys.argv[1:])
 

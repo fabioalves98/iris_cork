@@ -6,9 +6,10 @@ from std_srvs.srv import Empty, Trigger
 from ur_msgs.srv import SetSpeedSliderFraction
 
 
-import sys, time, copy
+import sys, time, copy, socket, struct, fcntl
 
 from math import pi, cos, sin
+import subprocess
 
 
 
@@ -128,11 +129,11 @@ class ArmControl:
         print(load_program(program_filename))
 
         try:
-            rospy.wait_for_service('/ur_hardware_interface/dashboard/play', timeout=2.5)
+            self.rospy.wait_for_service('/ur_hardware_interface/dashboard/play', timeout=2.5)
         except Exception as e:
             self.rospy.logwarn("[CORK-IRIS] Service for starting a program is not available. Can't start '%s'", program_filename)
             return
-        play_program = rospy.ServiceProxy('/ur_hardware_interface/dashboard/play', Trigger)
+        play_program = self.rospy.ServiceProxy('/ur_hardware_interface/dashboard/play', Trigger)
         print(play_program()) 
 
     def grip(self):
@@ -157,7 +158,7 @@ class ArmControl:
         if(not self.currentSpeed):
             print("Current speed unknown!")
             return
-        print(self.currentSpeed)
+        return self.currentSpeed
 
 
 
