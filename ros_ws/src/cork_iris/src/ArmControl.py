@@ -160,6 +160,11 @@ class ArmControl:
             return
         return self.currentSpeed
 
+    def saveJointPosition(self, path, position_name):
+        hs = open(path,"a")
+        hs.write(position_name + " : " + self.getJointValues())
+        hs.close() 
+
 
 
   

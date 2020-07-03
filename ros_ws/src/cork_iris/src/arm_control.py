@@ -233,9 +233,11 @@ def test():
     # poseGoal([0.5, 0.5, 0.1], [0, pi/2, 0])
     # simpleMove([0.18, 0.22, -0.34], pi/4)
     # simpleRotate([0, pi/4, 0])
-    arm.setSpeed(0.1)
+    # arm.setSpeed(0.1)
     arm.jointGoal(positions['init_sim_pos'])
-    arm.grip()
+    arm.simpleMove([0, 0, -0.1], pi/4)
+    arm.saveJointPosition(CORK_IRIS_BASE_DIR + "/yaml/positions.yaml", "test_position")
+    # arm.grip()
     # print(arm.jointValues())
 
     # rospy.spin()
