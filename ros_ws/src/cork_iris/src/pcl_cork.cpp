@@ -266,8 +266,13 @@ void drawCloudBoundingBox(pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_in)
     const Eigen::Quaternionf bboxQuaternion(eigenVectorsPCA);
     const Eigen::Vector3f bboxTransform = eigenVectorsPCA * meanDiagonal + pcaCentroid.head<3>();
 
+    // degub prints
+    cout << bboxTransform << endl << endl << bboxQuaternion.w() << endl << bboxQuaternion.vec() << endl;
+    auto euler = bboxQuaternion.toRotationMatrix().eulerAngles(0, 1, 2);
+    std::cout << "Euler from quaternion in roll, pitch, yaw"<< std::endl << euler << std::endl;
+
     viewer->removeShape("bbox");
-    viewer->addCube(bboxTransform, bboxQuaternion, maxPoint.x - minPoint.x, maxPoint.y - minPoint.y, maxPoint.z - minPoint.z, "bbox", 0);   
+    viewer->addCube(bboxTransform, bboxQuaternion, maxPoint.x - minPoint.x, maxPoint.y - minPoint.y, maxPoint.z - minPoint.z, "bbox", 0);  
     viewer->setShapeRenderingProperties(pcl::visualization::PCL_VISUALIZER_COLOR, 1, 0, 0, "bbox");             
     viewer->setRepresentationToWireframeForAllActors();
 
@@ -367,6 +372,8 @@ void cluster_extraction (pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_in, pcl::
     center.x = pcaCentroid.x();
     center.y = pcaCentroid.y();
     center.z = pcaCentroid.z();
+
+    cout << pcaCentroid << endl;
     
     // center.r = 255;
     // center.g = 0;

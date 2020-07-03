@@ -162,7 +162,7 @@ class ArmControl:
 
     def saveJointPosition(self, path, position_name):
         hs = open(path,"a")
-        hs.write(position_name + " : " + self.getJointValues())
+        hs.write(position_name + " : " + str(self.getJointValues()))
         hs.close() 
 
 

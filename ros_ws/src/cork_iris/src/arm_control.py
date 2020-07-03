@@ -23,6 +23,7 @@ arm = None
 CORK_IRIS_BASE_DIR = rospkg.RosPack().get_path('cork_iris')
 DEFAULT_HANDEYE_NAMESPACE = '/easy_handeye_eye_on_base'
 CALIBRATION_FILEPATH = '~/.ros/easy_handeye' + DEFAULT_HANDEYE_NAMESPACE + ".yaml"
+
 positions = {}
 
 def load_positions(path):
@@ -207,7 +208,7 @@ def robot2cork(data):
     
 
 def test():
-    global positions
+    global positions, arm
 
     # We can get the name of the reference frame for this robot:
     #print("============ Planning frame: ", move_group.get_planning_frame())
@@ -234,9 +235,16 @@ def test():
     # simpleMove([0.18, 0.22, -0.34], pi/4)
     # simpleRotate([0, pi/4, 0])
     # arm.setSpeed(0.1)
-    arm.jointGoal(positions['init_sim_pos'])
-    arm.simpleMove([0, 0, -0.1], pi/4)
-    arm.saveJointPosition(CORK_IRIS_BASE_DIR + "/yaml/positions.yaml", "test_position")
+    # arm.jointGoal(positions['out_of_camera_pos'])
+    # arm.simpleMove([0, 0, -0.05], pi/4)
+    # arm.saveJointPosition(CORK_IRIS_BASE_DIR + "/yaml/positions.yaml", "test_position")
+    
+    # arm.jointGoal(positions['out_of_camera_pos'])
+
+    arm.jointGoal(positions['vert_pick_pos'])
+    
+    print(arm.getPose())
+
     # arm.grip()
     # print(arm.jointValues())
 
@@ -251,13 +259,10 @@ def main():
 
     global arm, positions
     position_names, positions = load_positions(CORK_IRIS_BASE_DIR + "/yaml/positions.yaml")
-    # rospy.Subscriber("/aruco_tracker/result", Image, aruco_callback)
-    # rospy.Subscriber("/cork_iris/cork_center", Point, robot2cork)
-    # # display_trajectory_publisher = rospy.Publisher('/move_group/display_planned_path',
-    # #                                            moveit_msgs.msg.DisplayTrajectory,
-    # #                                            queue_size=20)
+    rospy.Subscriber("/aruco_tracker/result", Image, aruco_callback)
+    rospy.Subscriber("/cork_iris/cork_center", Point, robot2cork)
     
-    # arm = ArmControl(rospy)
+    arm = ArmControl(rospy)
 
     parseParams(sys.argv[1:])
 
