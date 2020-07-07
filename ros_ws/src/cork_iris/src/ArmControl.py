@@ -74,7 +74,6 @@ class ArmControl:
         self.move_group.clear_pose_targets()
 
 
-
     def simpleMove(self, movement, direction):
         waypoints = []
         wpose = self.move_group.get_current_pose().pose
@@ -118,7 +117,6 @@ class ArmControl:
     def getPose(self):
         return self.move_group.get_current_pose().pose
 
-
     def load_and_play_program(self, program_filename):
         try:
             self.rospy.wait_for_service('/ur_hardware_interface/dashboard/load_program', timeout=2.5)
@@ -141,8 +139,7 @@ class ArmControl:
 
     def release(self):
         self.load_and_play_program('release.urp')
-
-    
+  
     def setSpeed(self, speed):
         try:
             self.rospy.wait_for_service('/ur_hardware_interface/set_speed_slider', timeout=2.5)

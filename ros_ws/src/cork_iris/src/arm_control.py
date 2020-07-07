@@ -1,11 +1,12 @@
 #!/usr/bin/env python
 
-import sys, copy, time, yaml
+import sys, copy, time, yaml, csv, json
 import rospy, rospkg, rosparam
 import tf2_ros, tf2_geometry_msgs
 import moveit_commander
 import moveit_msgs.msg
 import geometry_msgs.msg
+from ast import literal_eval
 from math import pi, cos, sin
 from std_msgs.msg import String
 from sensor_msgs.msg import Image
@@ -23,6 +24,8 @@ arm = None
 CORK_IRIS_BASE_DIR = rospkg.RosPack().get_path('cork_iris')
 DEFAULT_HANDEYE_NAMESPACE = '/easy_handeye_eye_on_base'
 CALIBRATION_FILEPATH = '~/.ros/easy_handeye' + DEFAULT_HANDEYE_NAMESPACE + ".yaml"
+## Fast control variable just for debugging purposes
+SIM = True
 
 positions = {}
 
@@ -47,42 +50,97 @@ def parseParams(args):
     print("PARSING ARGS")
     try:
         print (args)
+        command = args[0]
         # X > 0 - Forward
         # y > 0 - Left
         # Z > 0 - Upwards
-        if("move" in args[0]):
+        if("move" in command):
             arm.simpleMove([float(args[1]), float(args[2]), float(args[3])], pi/4)
-        
-        elif("rotate" in args[0]):
+        elif("rotate" in command):
             args = parseRotationArgs(args[1:4])
             arm.simpleRotate([args[0], args[1], args[2]])
-        
-        elif("initial" in args[0]):
+        elif("initial" in command):
             arm.jointGoal(positions['init_live_pos'])
-        
-        elif("caljob" in args[0]):
+        elif("caljob" in command):
             caljob()
-        elif("grip" in args[0]):
+        elif("grip" in command):
             arm.grip()
-        elif("release" in args[0]):
+        elif("release" in command):
             arm.release()
+        elif("save" in command):
+            pos_name = args[1]
+            arm.saveJointPosition(CORK_IRIS_BASE_DIR + "/yaml/positions.yaml", pos_name)
+        elif("actionlist" in args[0]):
+            actionlist_file = args[1]
+            actions = parseActionlist(actionlist_file)
+            runActionlist(actions)
+
         else:
             print("Usage: rosrun cork_iris arm_control.py <command> <command_params>")
             print("Available commands:")
             print("\tmove   <x> <y> <z> -> Simple cartesian movement relative to last position")
             print("\trotate <x> <y> <z> -> Simple rotation relative to last position")
-            print("\tinitial            -> Joint goal to the default initial position")
-            print("\tcaljob             -> Calibration job")
             print("\tgrip               -> Grip the gripper")
             print("\trelease            -> Release the gripper")
+            print("\tinitial            -> Joint goal to the default initial position")
+            print("\tcaljob             -> Calibration job")
+            print("\tsave   <pos_name>  -> Save the current joint values of the arm")
+            print("\actionlist <file>   -> Run movements defined in action list <file>")
+
 
     except Exception as e:
         if len(args) == 0:
             test()
         else:
+            print("An error occured while parsing the arguments:")
             print(e)
-            print("Wrong arguments provided! Check the help command")
+            print("Check the help command for more information.")   
 
+
+
+def parseActionlist(filename):
+    try:
+        action_file = open(filename, 'r')
+    except Exception as e:
+        try:
+            action_file = open(CORK_IRIS_BASE_DIR + "/actionlists/" + filename)
+        except OSError:
+            sys.exit(0)
+    
+    csv_reader = csv.reader(action_file, delimiter=',')
+    actions = []
+    line_nr = 0
+    for row in csv_reader:
+        if(line_nr != 0):
+            if("[" in row[2]): # If the arguments column is an array of x, y, z information
+                # transform it into a python array of x,y,z information and use the 
+                # parseRotationArgs to transform string values (pi/2 -> 1.57 etc) into real numbers
+                arguments = parseRotationArgs(row[2].replace("[", "").replace("]", "").split(" "))
+            else: arguments = row[2]
+            actions.append((row[0], row[1], arguments, row[3]))
+        line_nr += 1
+
+    return actions
+
+
+def runActionlist(actions):
+    global arm
+    for action in actions:
+        reps, cmd, argums, sample = action
+        print(action)
+        print(int(reps))
+        for i in range(0, int(reps)):
+            if "jointGoal" in cmd:
+                arm.jointGoal(positions[argums])
+            elif "rotate" in cmd:
+                arm.simpleRotate(argums)
+            elif "move" in cmd:
+                arm.simpleMove(argums, pi/4)
+            elif "compute" in cmd and not SIM:
+                compute_calibration()
+
+            if(sample and not SIM): take_sample()
+        
 
 def caljob():
     global positions
@@ -141,7 +199,7 @@ def print_samples(samples):
         print("=========================================")
 
 def take_sample():
-    rospy.wait_for_service(DEFAULT_HANDEYE_NAMESPACE + '/take_sample')
+    rospy.wait_for_service(DEFAULT_HANDEYE_NAMESPACE + '/take_sample', timeout=2.5)
     take_sample_srv = rospy.ServiceProxy(DEFAULT_HANDEYE_NAMESPACE + '/take_sample', TakeSample)
     vals = take_sample_srv()
     print("New sample taken: ")
@@ -152,14 +210,14 @@ def compute_calibration():
     
     # get sample list - /easy_handeye_eye_on_base/get_sample_list
     # chamar servico compute - /easy_handeye_eye_on_base/compute_calibration
-    rospy.wait_for_service(DEFAULT_HANDEYE_NAMESPACE + '/compute_calibration')
+    rospy.wait_for_service(DEFAULT_HANDEYE_NAMESPACE + '/compute_calibration', timeout=2.5)
     compute_calibration_srv = rospy.ServiceProxy(DEFAULT_HANDEYE_NAMESPACE + '/compute_calibration', ComputeCalibration)
     print("Computing calibration")
     result = compute_calibration_srv()
     print("Finished calibration.")
     print(result)
     print("Saving calibration to: " + CALIBRATION_FILEPATH)
-    rospy.wait_for_service(DEFAULT_HANDEYE_NAMESPACE + '/save_calibration')
+    rospy.wait_for_service(DEFAULT_HANDEYE_NAMESPACE + '/save_calibration', timeout=2.5)
     save_calibration = rospy.ServiceProxy(DEFAULT_HANDEYE_NAMESPACE + '/save_calibration', Empty)
     save_calibration()
     
@@ -261,6 +319,9 @@ def main():
     position_names, positions = load_positions(CORK_IRIS_BASE_DIR + "/yaml/positions.yaml")
     rospy.Subscriber("/aruco_tracker/result", Image, aruco_callback)
     rospy.Subscriber("/cork_iris/cork_center", Point, robot2cork)
+    # # display_trajectory_publisher = rospy.Publisher('/move_group/display_planned_path',
+    # #                                            moveit_msgs.msg.DisplayTrajectory,
+    # #                                            queue_size=20)
     
     arm = ArmControl(rospy)
 
