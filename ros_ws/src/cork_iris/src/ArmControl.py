@@ -74,7 +74,7 @@ class ArmControl:
         self.move_group.clear_pose_targets()
 
 
-    def simpleMove(self, movement, direction):
+    def simpleMove(self, movement, direction=pi/4):
         waypoints = []
         wpose = self.move_group.get_current_pose().pose
         joint_values = self.move_group.get_current_joint_values()

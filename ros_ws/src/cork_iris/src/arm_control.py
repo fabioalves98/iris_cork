@@ -10,7 +10,7 @@ from ast import literal_eval
 from math import pi, cos, sin
 from std_msgs.msg import String
 from sensor_msgs.msg import Image
-from geometry_msgs.msg import Point, TransformStamped
+from geometry_msgs.msg import Point, TransformStamped, Pose
 from moveit_commander.conversions import pose_to_list
 from tf.transformations import euler_from_quaternion, quaternion_from_euler, quaternion_multiply
 from easy_handeye.srv import TakeSample, ComputeCalibration
@@ -33,7 +33,6 @@ def load_positions(path):
     '''Returns tuple with keys of all possible positions and the dict with the positions previously
        saved in a yaml file'''
 
-    print(CORK_IRIS_BASE_DIR)
     data = rosparam.load_file(CORK_IRIS_BASE_DIR + "/yaml/positions.yaml")
     k = data[0][0].keys()
 
@@ -229,8 +228,10 @@ def aruco_callback(data):
     pass
 
 def robot2cork(data):
-    print ("\nCork Center")
-    print ("X: " + str(data.x) + ", Y: " + str(data.y) + " Z: " + str(data.z))
+    print ("\nCork Pose")
+    print ("X: " + str(data.position.x) + ", Y: " + str(data.position.y) + " Z: " + str(data.position.z))
+    print ("X: " + str(data.orientation.x) + ", Y: " + str(data.orientation.y) + " Z: " + str(data.orientation.z) + " W: " + str(data.orientation.w))
+
     
     print ("\nRobot Pose")
     pos = arm.getPose().position
@@ -247,19 +248,16 @@ def robot2cork(data):
     while not rospy.is_shutdown():
         try:
             trans = tf_buffer.lookup_transform('base_link', 'camera_depth_optical_frame', rospy.Time(0))
-            #print (trans, rot)
+            # print (trans, rot)
             break
         except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException):
-            continue
+            print("Error looking up transform!")
+            return
     
     pose = geometry_msgs.msg.PoseStamped()
     pose.header.frame_id = "string"
     pose.header.stamp = rospy.Time.now()
-    pose.pose.position = data
-    pose.pose.orientation.x = 0
-    pose.pose.orientation.y = 0
-    pose.pose.orientation.z = 0
-    pose.pose.orientation.w = 1
+    pose.pose = data
     
     print (tf2_geometry_msgs.do_transform_pose(pose, trans))
     
@@ -299,14 +297,14 @@ def test():
     
     # arm.jointGoal(positions['out_of_camera_pos'])
 
-    arm.jointGoal(positions['vert_pick_pos'])
+    # arm.jointGoal(positions['vert_pick_pos'])
     
-    print(arm.getPose())
+    # print(arm.getPose())
 
     # arm.grip()
     # print(arm.jointValues())
 
-    # rospy.spin()
+    rospy.spin()
 
     # arm.jointGoal(positions['out_of_camera_pos'])
 
@@ -318,7 +316,7 @@ def main():
     global arm, positions
     position_names, positions = load_positions(CORK_IRIS_BASE_DIR + "/yaml/positions.yaml")
     rospy.Subscriber("/aruco_tracker/result", Image, aruco_callback)
-    rospy.Subscriber("/cork_iris/cork_center", Point, robot2cork)
+    rospy.Subscriber("/cork_iris/cork_center", Pose, robot2cork)
     # # display_trajectory_publisher = rospy.Publisher('/move_group/display_planned_path',
     # #                                            moveit_msgs.msg.DisplayTrajectory,
     # #                                            queue_size=20)

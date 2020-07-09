@@ -9,23 +9,16 @@
 #include <pcl/common/common.h>
 #include <pcl/io/pcd_io.h>
 #include <pcl_conversions/pcl_conversions.h>
-#include <pcl/point_cloud.h>
-#include <pcl/point_types.h>
 #include <pcl/visualization/pcl_visualizer.h>
 #include <pcl/features/normal_3d.h>
-//#include <pcl/features/intensity_gradient.h>
-//#include <pcl/features/normal_3d_omp.h>
 #include <pcl/kdtree/kdtree_flann.h>
 #include <pcl/ModelCoefficients.h>
 #include <pcl/filters/conditional_removal.h>
 #include <pcl/filters/statistical_outlier_removal.h>
 #include <pcl/segmentation/extract_clusters.h>
 #include <pcl/segmentation/conditional_euclidean_clustering.h>
-//#include <pcl/search/organized.h>
 #include <pcl/filters/voxel_grid.h>
-//#include <pcl/filters/extract_indices.h>
 #include <pcl/surface/mls.h>
-
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
 #include "pcl/common/centroid.h"
@@ -48,6 +41,8 @@
 #include <sensor_msgs/Image.h>
 #include <sensor_msgs/CameraInfo.h>
 #include <geometry_msgs/Point.h>
+#include <geometry_msgs/Quaternion.h>
+#include <geometry_msgs/Pose.h>
 #include <image_transport/image_transport.h>
 // OpenCV
 #include <cv_bridge/cv_bridge.h>
@@ -60,11 +55,6 @@
 #define DEBUG 0
 #define SAVE_CLOUDS 0 
 
-/* Useful stuff
-
- - Adding a cube -> http://docs.pointclouds.org/1.8.1/classpcl_1_1visualization_1_1_p_c_l_visualizer.html#aa55f97ba784826552c9584d407014c78
- 
-*/ 
 
 using namespace std;
 
@@ -90,6 +80,8 @@ double radius_search;
 
 int min_cluster_size;
 int max_cluster_size;
+
+int meanK;
 
 int num_enforce = 0;
 
@@ -267,9 +259,29 @@ void drawCloudBoundingBox(pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_in)
     const Eigen::Vector3f bboxTransform = eigenVectorsPCA * meanDiagonal + pcaCentroid.head<3>();
 
     // degub prints
-    cout << bboxTransform << endl << endl << bboxQuaternion.w() << endl << bboxQuaternion.vec() << endl;
-    auto euler = bboxQuaternion.toRotationMatrix().eulerAngles(0, 1, 2);
-    std::cout << "Euler from quaternion in roll, pitch, yaw"<< std::endl << euler << std::endl;
+    // cout << "bboxtransf: " << bboxTransform << endl << endl << "quat.w(): " << bboxQuaternion.w() << endl << "quat.vec(): " << bboxQuaternion.vec() << endl;
+    // auto euler = bboxQuaternion.toRotationMatrix().eulerAngles(0, 1, 2);
+    // std::cout << "Euler from quaternion in roll, pitch, yaw"<< std::endl << euler << std::endl;
+    
+    geometry_msgs::Point center;
+    center.x = bboxTransform.x();
+    center.y = bboxTransform.y();
+    center.z = bboxTransform.z();
+    geometry_msgs::Quaternion orientation;
+    orientation.x = bboxQuaternion.vec()[0];
+    orientation.y = bboxQuaternion.vec()[1];
+    orientation.z = bboxQuaternion.vec()[2];
+    orientation.w = bboxQuaternion.w();
+    geometry_msgs::Pose cork_piece_pose;
+    cork_piece_pose.position = center;
+    cork_piece_pose.orientation = orientation;
+    cout << cork_piece_pose << endl;
+
+    
+    // cloud_out->push_back(center);
+
+    point_pub.publish(cork_piece_pose);
+
 
     viewer->removeShape("bbox");
     viewer->addCube(bboxTransform, bboxQuaternion, maxPoint.x - minPoint.x, maxPoint.y - minPoint.y, maxPoint.z - minPoint.z, "bbox", 0);  
@@ -280,6 +292,8 @@ void drawCloudBoundingBox(pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_in)
 
 void cluster_extraction (pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_in, pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_out)
 {
+
+
     pcl::VoxelGrid<pcl::PointXYZRGB> vg;
     vg.setInputCloud (cloud_in);
     vg.setLeafSize (leaf_size, leaf_size, leaf_size);
@@ -320,6 +334,7 @@ void cluster_extraction (pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_in, pcl::
 
         }
     }
+    
 
     for (int i = 0; i < large_clusters->size (); ++i)
     {
@@ -336,7 +351,7 @@ void cluster_extraction (pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_in, pcl::
         int randR = rand() % 255;
         int randG = rand() % 255;
         int randB = rand() % 255;
-
+      
         bitset<8> binary = bitset<8>(i);
 
         for (int j = 0; j < (*clusters)[i].indices.size (); ++j)
@@ -356,39 +371,27 @@ void cluster_extraction (pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_in, pcl::
         }
     }
 
+ 
     // Transforming the cluster into a cloud
+
     pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_cluster (new pcl::PointCloud<pcl::PointXYZRGB>);
     for (int j = 0; j < (*clusters)[0].indices.size (); ++j)
     {
         cloud_cluster->push_back(cloud_out->points[(*clusters)[0].indices[j]]);
     }
-    
+
+
+    // TODO: Unroll this function. Too much stuff happening inside.
     drawCloudBoundingBox(cloud_cluster);
 
-    Eigen::Vector4f pcaCentroid;
-    pcl::compute3DCentroid(*cloud_cluster, pcaCentroid);
-
-    geometry_msgs::Point center;
-    center.x = pcaCentroid.x();
-    center.y = pcaCentroid.y();
-    center.z = pcaCentroid.z();
-
-    cout << pcaCentroid << endl;
-    
-    // center.r = 255;
-    // center.g = 0;
-    // center.b = 0;
-    
-    // cloud_out->push_back(center);
-
-    point_pub.publish(center);
 }
 
 void remove_outliers (pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_in, pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_out)
 {
+
     pcl::StatisticalOutlierRemoval<pcl::PointXYZRGB> sor;
     sor.setInputCloud (cloud_in);
-    sor.setMeanK (50);
+    sor.setMeanK(meanK);
     sor.setStddevMulThresh (1.0);
     sor.filter (*cloud_out);
 }
@@ -479,6 +482,9 @@ void parameterConfigure(cork_iris::PCLCorkConfig &config, uint32_t level)
     normal_diff = config.normal_diff;
     squared_dist = config.squared_dist;
     curv = config.curvature;
+
+    // Statistical outliers params
+    meanK = config.mean_k;
     
     displayed = false;
 }
@@ -561,15 +567,15 @@ void synced_callback(const sensor_msgs::ImageConstPtr& image,
 
             // Update the viewer and publish the processed pointcloud 
             viewer->updatePointCloud(cork_pieces, "kinectcloud");
-            
+
             sensor_msgs::PointCloud2 published_pcd;
             pcl::toROSMsg(*cork_pieces, published_pcd);
-            pub.publish(published_pcd);
+            pub.publish(published_pcd);            
         }
 
         auto end = chrono::steady_clock::now();
         auto diff = end - start;
-        cout << "PointCloud processed in " << chrono::duration <double, milli> (diff).count() << " ms" << endl;
+        cout << "PointCloud processed in " << chrono::duration <double, milli> (diff).count() << " ms" << endl << endl  ;
 
         displayed = true; 
     }
@@ -611,7 +617,7 @@ int main (int argc, char** argv)
 
     // Create a ROS publisher for the output point cloud
     pub = n.advertise<sensor_msgs::PointCloud2> ("/cork_iris/processed_pointcloud", 1);
-    point_pub = n.advertise<geometry_msgs::Point> ("/cork_iris/cork_center", 1);
+    point_pub = n.advertise<geometry_msgs::Pose> ("/cork_iris/cork_center", 1);
     ros::Rate loop_rate(10);
     // Spin
     ros::spin ();
