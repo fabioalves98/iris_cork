@@ -10,7 +10,7 @@ from ast import literal_eval
 from math import pi, cos, sin
 from std_msgs.msg import String
 from sensor_msgs.msg import Image
-from geometry_msgs.msg import Point, TransformStamped, Pose
+from geometry_msgs.msg import Point, TransformStamped, Pose, PoseStamped
 from moveit_commander.conversions import pose_to_list
 from tf.transformations import euler_from_quaternion, quaternion_from_euler, quaternion_multiply
 from easy_handeye.srv import TakeSample, ComputeCalibration
@@ -25,9 +25,12 @@ CORK_IRIS_BASE_DIR = rospkg.RosPack().get_path('cork_iris')
 DEFAULT_HANDEYE_NAMESPACE = '/easy_handeye_eye_on_base'
 CALIBRATION_FILEPATH = '~/.ros/easy_handeye' + DEFAULT_HANDEYE_NAMESPACE + ".yaml"
 ## Fast control variable just for debugging purposes
-SIM = True
+SIM = False
+
+test_publisher = None
 
 positions = {}
+position_names = []
 
 def load_positions(path):
     '''Returns tuple with keys of all possible positions and the dict with the positions previously
@@ -45,7 +48,7 @@ def parseRotationArgs(args):
     return args
 
 def parseParams(args):
-    global positions
+    global positions, position_names
     print("PARSING ARGS")
     try:
         print (args)
@@ -58,8 +61,9 @@ def parseParams(args):
         elif("rotate" in command):
             args = parseRotationArgs(args[1:4])
             arm.simpleRotate([args[0], args[1], args[2]])
-        elif("initial" in command):
-            arm.jointGoal(positions['init_live_pos'])
+        elif(command in position_names):
+            print("Moving to " + command)
+            arm.jointGoal(positions[command])
         elif("caljob" in command):
             caljob()
         elif("grip" in command):
@@ -143,7 +147,7 @@ def runActionlist(actions):
 
 def caljob():
     global positions
-    init_pos = positions['init_live_pos']
+    init_pos = positions['init_calibration_pos']
     # Saved Position
     arm.jointGoal(init_pos)
     take_sample()
@@ -175,14 +179,14 @@ def caljob():
     # Z Rotation
     for i in range(3):
         arm.simpleRotate([0, 0, pi/9])
-        take_sample()
+        # take_sample()
     
     arm.jointGoal(init_pos)
-    arm.simpleMove([-0.03, 0, -0.03], pi/4)
+    # arm.simpleMove([-0.03, 0, -0.03], pi/4)
 
     for i in range(3):
         arm.simpleRotate([0, 0, -pi/9])
-        take_sample()
+        # take_sample()
     
     arm.jointGoal(init_pos)
 
@@ -228,9 +232,11 @@ def aruco_callback(data):
     pass
 
 def robot2cork(data):
+    global test_publisher
+    corkpose = data.pose
     print ("\nCork Pose")
-    print ("X: " + str(data.position.x) + ", Y: " + str(data.position.y) + " Z: " + str(data.position.z))
-    print ("X: " + str(data.orientation.x) + ", Y: " + str(data.orientation.y) + " Z: " + str(data.orientation.z) + " W: " + str(data.orientation.w))
+    print ("X: " + str(corkpose.position.x) + ", Y: " + str(corkpose.position.y) + " Z: " + str(corkpose.position.z))
+    print ("X: " + str(corkpose.orientation.x) + ", Y: " + str(corkpose.orientation.y) + " Z: " + str(corkpose.orientation.z) + " W: " + str(corkpose.orientation.w))
 
     
     print ("\nRobot Pose")
@@ -247,84 +253,115 @@ def robot2cork(data):
     trans = None
     while not rospy.is_shutdown():
         try:
-            trans = tf_buffer.lookup_transform('base_link', 'camera_depth_optical_frame', rospy.Time(0))
+            trans = tf_buffer.lookup_transform('base_link', 'camera_depth_optical_frame', rospy.Time(), rospy.Duration(5))
             # print (trans, rot)
             break
-        except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException):
+        except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
             print("Error looking up transform!")
+            print(e)
             return
     
-    pose = geometry_msgs.msg.PoseStamped()
-    pose.header.frame_id = "string"
-    pose.header.stamp = rospy.Time.now()
-    pose.pose = data
-    
-    print (tf2_geometry_msgs.do_transform_pose(pose, trans))
+    # pose = geometry_msgs.msg.PoseStamped()
+    # pose.header.frame_id = "string"
+    # pose.header.stamp = rospy.Time.now()
+    # pose.pose = data
+    print("\nTransformed cork pose")
+    transformed_pose = tf2_geometry_msgs.do_transform_pose(data, trans)
+    print(transformed_pose.pose)
+
+    test = copy.deepcopy(transformed_pose.pose)
+    o = test.orientation
+
+
+    x = 1 - 2 * (o.y * o.y + o.z * o.z)
+    y = 2 * (o.x * o.y + o.w * o.z)
+    z = 2 * (o.x * o.z - o.w * o.y)
+
+    test.position.x -= x*0.25
+    test.position.y -= y*0.25
+    test.position.z -= z*0.25
+
+    to_pub = PoseStamped()
+    to_pub.header.stamp = rospy.Time.now()
+    to_pub.header.frame_id = "base_link"
+    to_pub.pose = test
+    test_publisher.publish(to_pub)
+
+    # print("GRABBING CORK")
+    grab_cork(test)
+
+
+
+
+def grab_cork(cork_pose):
+    '''Temporary function to grab a cork piece given its pose'''
+    global arm
+    arm.setSpeed(0.05)
+    arm.jointGoal(positions['vert_pick_pos'])
+    time.sleep(2)
+    ## Orient the arm
+    arm.poseGoal([cork_pose.position.x, cork_pose.position.y, cork_pose.position.z], [cork_pose.orientation.x,cork_pose.orientation.y,cork_pose.orientation.z,cork_pose.orientation.w ])
+    # euler = euler_from_quaternion((o.x, o.y, o.z, o.w))
+    # p_new = arm.getPose().position
+    # p_new.x += o.x
+    # p_new.y += o.y
+    # p_new.z += o.z
+    # x = cos(euler[2])*cos(euler[1])
+    # y = sin(euler[2])*cos(euler[1])
+    # z = sin(euler[1])
+    # arm.simpleMove([0.1*x, 0.1*y, 0.1*z], direction=0)
+    # arm.simpleMove([0.1, 0, 0], direction=0)
+    # x = 1 - 2 * (o.y * o.y + o.z * o.z)
+    # y = 2 * (o.x * o.y + o.w * o.z)
+    # z = 2 * (o.x * o.z - o.w * o.y)
+    # arm.simpleMove([0.1*x, 0.1*y, 0.1*z], direction=0)
+
+    rospy.signal_shutdown("grabbed cork debug stop")
+
+
     
     
 
 def test():
     global positions, arm
 
-    # We can get the name of the reference frame for this robot:
-    #print("============ Planning frame: ", move_group.get_planning_frame())
 
-    # We can also print the name of the end-effector link for this group:
-    #print("============ End effector link: ", move_group.get_end_effector_link())
-
-    # We can get a list of all the groups in the robot:
-    #print("============ Available Planning Groups:", robot.get_group_names())
-
-    # Sometimes for debugging it is useful to print the entire state of the robot:
-    #print("============ Printing robot state:", robot.get_current_state())
-
-    # To be tested
-    # poseGoal([0.4, 0.3, 0.4])
-
-    # Default joint goal for Calibraion with real robot
-    # jointGoal([0.391, -1.553, 2.165, -0.226, 1.232, -1.70])
-    # jointGoal([pi, None, None, None, None, None])
-
-    # Default joint goal for Simulation
-    # jointGoal([-3*pi/4, -pi/2, -pi/2, 0, pi/2, 0])
-    # poseGoal([0.5, 0.5, 0.1], [0, pi/2, 0])
-    # simpleMove([0.18, 0.22, -0.34], pi/4)
-    # simpleRotate([0, pi/4, 0])
     # arm.setSpeed(0.1)
+    # p = arm.getPose().position
+    # o = arm.getPose().orientation
+    # arm.poseGoal([p.x, p.y, p.z], [-0.471886915591, 0.0268562771098, 0.859489799629, -0.194624544454])
+
     # arm.jointGoal(positions['out_of_camera_pos'])
-    # arm.simpleMove([0, 0, -0.05], pi/4)
-    # arm.saveJointPosition(CORK_IRIS_BASE_DIR + "/yaml/positions.yaml", "test_position")
-    
-    # arm.jointGoal(positions['out_of_camera_pos'])
+    # arm.simpleRotate([pi/2, 0, 0])
+    # p = arm.getPose().position
+    # o = arm.getPose().orientation
+    # arm.poseGoal([0.450731189437, 0.590359096664 + 0.02, p.z], [o.x, o.y, o.z, o.w])
+    # p = arm.getPose().position
+    # o = arm.getPose().orientation
+    # arm.poseGoal([p.x, p.y, -0.0474082425519 + 0.05], [o.x, o.y, o.z, o.w])
 
-    # arm.jointGoal(positions['vert_pick_pos'])
-    
-    # print(arm.getPose())
-
-    # arm.grip()
-    # print(arm.jointValues())
-
+    # arm.saveJointPosition(CORK_IRIS_BASE_DIR + "/yaml/positions.yaml", "init_calibration_pos")
+    # grab_cork(None)
     rospy.spin()
-
-    # arm.jointGoal(positions['out_of_camera_pos'])
-
 
 def main():
     # moveit_commander.roscpp_initialize(sys.argv)
     rospy.init_node('arm_control', anonymous=True)
 
-    global arm, positions
+    global arm, positions, position_names, test_publisher
     position_names, positions = load_positions(CORK_IRIS_BASE_DIR + "/yaml/positions.yaml")
     rospy.Subscriber("/aruco_tracker/result", Image, aruco_callback)
-    rospy.Subscriber("/cork_iris/cork_center", Pose, robot2cork)
-    # # display_trajectory_publisher = rospy.Publisher('/move_group/display_planned_path',
-    # #                                            moveit_msgs.msg.DisplayTrajectory,
-    # #                                            queue_size=20)
+    rospy.Subscriber("/cork_iris/cork_piece", PoseStamped, robot2cork)
+
+    test_publisher = rospy.Publisher('cork_iris/grabbing_position', PoseStamped, queue_size=1)
+
+    
     
     arm = ArmControl(rospy)
+    arm.setSpeed(0.1)
 
     parseParams(sys.argv[1:])
 
 
 if __name__ == "__main__":
-   main() 
+    main()

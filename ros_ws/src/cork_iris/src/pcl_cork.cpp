@@ -42,7 +42,7 @@
 #include <sensor_msgs/CameraInfo.h>
 #include <geometry_msgs/Point.h>
 #include <geometry_msgs/Quaternion.h>
-#include <geometry_msgs/Pose.h>
+#include <geometry_msgs/PoseStamped.h>
 #include <image_transport/image_transport.h>
 // OpenCV
 #include <cv_bridge/cv_bridge.h>
@@ -264,6 +264,7 @@ void drawCloudBoundingBox(pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_in)
     // std::cout << "Euler from quaternion in roll, pitch, yaw"<< std::endl << euler << std::endl;
     
     geometry_msgs::Point center;
+    // TODO: Check bboxtransform xyz vs pcaCentroid xyz
     center.x = bboxTransform.x();
     center.y = bboxTransform.y();
     center.z = bboxTransform.z();
@@ -272,9 +273,12 @@ void drawCloudBoundingBox(pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_in)
     orientation.y = bboxQuaternion.vec()[1];
     orientation.z = bboxQuaternion.vec()[2];
     orientation.w = bboxQuaternion.w();
-    geometry_msgs::Pose cork_piece_pose;
-    cork_piece_pose.position = center;
-    cork_piece_pose.orientation = orientation;
+    geometry_msgs::PoseStamped cork_piece_pose;
+    cork_piece_pose.header.stamp = ros::Time::now();
+    // cork_piece_pose.header.frame_id = "camera_link";
+    cork_piece_pose.header.frame_id = "camera_depth_optical_frame";
+    cork_piece_pose.pose.position = center;
+    cork_piece_pose.pose.orientation = orientation;
     cout << cork_piece_pose << endl;
 
     
@@ -617,7 +621,7 @@ int main (int argc, char** argv)
 
     // Create a ROS publisher for the output point cloud
     pub = n.advertise<sensor_msgs::PointCloud2> ("/cork_iris/processed_pointcloud", 1);
-    point_pub = n.advertise<geometry_msgs::Pose> ("/cork_iris/cork_center", 1);
+    point_pub = n.advertise<geometry_msgs::PoseStamped> ("/cork_iris/cork_piece", 1);
     ros::Rate loop_rate(10);
     // Spin
     ros::spin ();

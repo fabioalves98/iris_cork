@@ -27,6 +27,20 @@ class ArmControl:
             print("Couldn't load robot arm or move_group")
             print(e)
             sys.exit(0)
+    
+    def printGeneralStatus(self):
+        # We can get the name of the reference frame for this robot:
+        print("============ Planning frame: ", self.move_group.get_planning_frame())
+
+        # We can also print the name of the end-effector link for this group:
+        print("============ End effector link: ", self.move_group.get_end_effector_link())
+
+        # We can get a list of all the groups in the robot:
+        print("============ Available Planning Groups:", self.robot.get_group_names())
+
+        # Sometimes for debugging it is useful to print the entire state of the robot:
+        print("============ Printing robot state:", self.robot.get_current_state())
+
 
 
     def cartesianGoal(self, waypoints):
@@ -57,15 +71,20 @@ class ArmControl:
 
     def poseGoal(self, coordinates, orientation):
         pose_goal = geometry_msgs.msg.Pose()
-        pose_goal.position.x = coordinates[0]
-        pose_goal.position.y = coordinates[1]
-        pose_goal.position.z = coordinates[2]
+        pose_goal.position.x = coordinates[0] if coordinates[0] != None else self.getPose().position.x
+        pose_goal.position.y = coordinates[1] if coordinates[1] != None else self.getPose().position.y
+        pose_goal.position.z = coordinates[2] if coordinates[2] != None else self.getPose().position.z
 
-        pose_goal.orientation = geometry_msgs.msg.Quaternion(*quaternion_from_euler(orientation[0], orientation[1], orientation[2]))
-
+        # pose_goal.orientation = geometry_msgs.msg.Quaternion(*quaternion_from_euler(orientation[0], orientation[1], orientation[2]))
+        pose_goal.orientation.x = orientation[0] if orientation[0] != None else self.getPose().orientation.x
+        pose_goal.orientation.y = orientation[1] if orientation[1] != None else self.getPose().orientation.y
+        pose_goal.orientation.z = orientation[2] if orientation[2] != None else self.getPose().orientation.z
+        pose_goal.orientation.w = orientation[3] if orientation[3] != None else self.getPose().orientation.w
+        
         self.move_group.set_pose_target(pose_goal)
 
         ## Now, we call the planner to compute the plan and execute it.
+        self.rospy.loginfo("Sending Pose goal - %s \n %s", coordinates, orientation)
         plan = self.move_group.go(wait=True)
         # Calling `stop()` ensures that there is no residual movement
         self.move_group.stop()
