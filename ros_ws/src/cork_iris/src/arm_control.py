@@ -277,9 +277,9 @@ def robot2cork(data):
     y = 2 * (o.x * o.y + o.w * o.z)
     z = 2 * (o.x * o.z - o.w * o.y)
 
-    test.position.x -= x*0.25
-    test.position.y -= y*0.25
-    test.position.z -= z*0.25
+    test.position.x -= x*0.15
+    test.position.y -= y*0.15
+    test.position.z -= z*0.15
 
     to_pub = PoseStamped()
     to_pub.header.stamp = rospy.Time.now()
@@ -288,6 +288,8 @@ def robot2cork(data):
     test_publisher.publish(to_pub)
 
     # print("GRABBING CORK")
+
+    
     grab_cork(test)
 
 
@@ -296,25 +298,20 @@ def robot2cork(data):
 def grab_cork(cork_pose):
     '''Temporary function to grab a cork piece given its pose'''
     global arm
-    arm.setSpeed(0.05)
-    arm.jointGoal(positions['vert_pick_pos'])
-    time.sleep(2)
+    # arm.jointGoal(positions['vert_pick_pos'])
+    # time.sleep(2)
     ## Orient the arm
     arm.poseGoal([cork_pose.position.x, cork_pose.position.y, cork_pose.position.z], [cork_pose.orientation.x,cork_pose.orientation.y,cork_pose.orientation.z,cork_pose.orientation.w ])
-    # euler = euler_from_quaternion((o.x, o.y, o.z, o.w))
-    # p_new = arm.getPose().position
-    # p_new.x += o.x
-    # p_new.y += o.y
-    # p_new.z += o.z
-    # x = cos(euler[2])*cos(euler[1])
-    # y = sin(euler[2])*cos(euler[1])
-    # z = sin(euler[1])
-    # arm.simpleMove([0.1*x, 0.1*y, 0.1*z], direction=0)
-    # arm.simpleMove([0.1, 0, 0], direction=0)
+    
+    
+    # o = arm.getPose().orientation
+
     # x = 1 - 2 * (o.y * o.y + o.z * o.z)
     # y = 2 * (o.x * o.y + o.w * o.z)
     # z = 2 * (o.x * o.z - o.w * o.y)
-    # arm.simpleMove([0.1*x, 0.1*y, 0.1*z], direction=0)
+    # desloc = 0.05
+
+    # arm.simpleMove([desloc*x, desloc*y, desloc*z], direction=0)
 
     rospy.signal_shutdown("grabbed cork debug stop")
 
@@ -324,7 +321,6 @@ def grab_cork(cork_pose):
 
 def test():
     global positions, arm
-
 
     # arm.setSpeed(0.1)
     # p = arm.getPose().position
@@ -341,7 +337,15 @@ def test():
     # arm.poseGoal([p.x, p.y, -0.0474082425519 + 0.05], [o.x, o.y, o.z, o.w])
 
     # arm.saveJointPosition(CORK_IRIS_BASE_DIR + "/yaml/positions.yaml", "init_calibration_pos")
-    # grab_cork(None)
+
+    # o = arm.getPose().orientation
+    # x = 1 - 2 * (o.y * o.y + o.z * o.z)
+    # y = 2 * (o.x * o.y + o.w * o.z)
+    # z = 2 * (o.x * o.z - o.w * o.y)
+    # desloc = 0.10
+
+    # arm.simpleMove([desloc*x, desloc*y, desloc*z], direction=0)
+
     rospy.spin()
 
 def main():

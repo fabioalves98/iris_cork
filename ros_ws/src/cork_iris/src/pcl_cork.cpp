@@ -265,9 +265,9 @@ void drawCloudBoundingBox(pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_in)
     
     geometry_msgs::Point center;
     // TODO: Check bboxtransform xyz vs pcaCentroid xyz
-    center.x = bboxTransform.x();
-    center.y = bboxTransform.y();
-    center.z = bboxTransform.z();
+    center.x = pcaCentroid.x();
+    center.y = pcaCentroid.y();
+    center.z = pcaCentroid.z();
     geometry_msgs::Quaternion orientation;
     orientation.x = bboxQuaternion.vec()[0];
     orientation.y = bboxQuaternion.vec()[1];
@@ -279,13 +279,12 @@ void drawCloudBoundingBox(pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_in)
     cork_piece_pose.header.frame_id = "camera_depth_optical_frame";
     cork_piece_pose.pose.position = center;
     cork_piece_pose.pose.orientation = orientation;
-    cout << cork_piece_pose << endl;
-
     
-    // cloud_out->push_back(center);
+    // cout << bboxTransform << endl;
+
+    cout << endl << pcaCentroid << endl;
 
     point_pub.publish(cork_piece_pose);
-
 
     viewer->removeShape("bbox");
     viewer->addCube(bboxTransform, bboxQuaternion, maxPoint.x - minPoint.x, maxPoint.y - minPoint.y, maxPoint.z - minPoint.z, "bbox", 0);  
@@ -388,6 +387,21 @@ void cluster_extraction (pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_in, pcl::
     // TODO: Unroll this function. Too much stuff happening inside.
     drawCloudBoundingBox(cloud_cluster);
 
+    Eigen::Vector4f pcaCentroid;
+    pcl::compute3DCentroid(*cloud_cluster, pcaCentroid);
+
+    cout << endl << pcaCentroid << endl;
+
+    pcl::PointXYZRGB painted;
+    painted.x = pcaCentroid.x();
+    painted.y = pcaCentroid.y();
+    painted.z = pcaCentroid.z(); 
+
+    painted.r = 0;
+    painted.g = 0;
+    painted.b = 255;
+
+    cloud_out->push_back(painted);
 }
 
 void remove_outliers (pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_in, pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_out)
