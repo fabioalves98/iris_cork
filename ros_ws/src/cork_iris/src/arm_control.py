@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-import sys, copy, time, yaml, csv, json
+import sys, copy, time, yaml, csv, json, shutil, os
 import rospy, rospkg, rosparam
 import tf2_ros, tf2_geometry_msgs
 import moveit_commander
@@ -23,6 +23,7 @@ arm = None
 
 CORK_IRIS_BASE_DIR = rospkg.RosPack().get_path('cork_iris')
 DEFAULT_HANDEYE_NAMESPACE = '/easy_handeye_eye_on_base'
+
 CALIBRATION_FILEPATH = '~/.ros/easy_handeye' + DEFAULT_HANDEYE_NAMESPACE + ".yaml"
 ## Fast control variable just for debugging purposes
 SIM = False
@@ -64,8 +65,6 @@ def parseParams(args):
         elif(command in position_names):
             print("Moving to " + command)
             arm.jointGoal(positions[command])
-        elif("caljob" in command):
-            caljob()
         elif("grip" in command):
             arm.grip()
         elif("release" in command):
@@ -86,7 +85,6 @@ def parseParams(args):
             print("\tgrip               -> Grip the gripper")
             print("\trelease            -> Release the gripper")
             print("\tinitial            -> Joint goal to the default initial position")
-            print("\tcaljob             -> Calibration job")
             print("\tsave   <pos_name>  -> Save the current joint values of the arm")
             print("\actionlist <file>   -> Run movements defined in action list <file>")
 
@@ -95,9 +93,9 @@ def parseParams(args):
         if len(args) == 0:
             test()
         else:
-            print("An error occured while parsing the arguments:")
-            print(e)
-            print("Check the help command for more information.")   
+            rospy.logerr("[CORK-IRIS] An error occured while parsing the arguments:")
+            rospy.logerr(e)
+            rospy.logerr("Check the help command for more information.")   
 
 
 
@@ -141,57 +139,32 @@ def runActionlist(actions):
                 arm.simpleMove(argums, pi/4)
             elif "compute" in cmd and not SIM:
                 compute_calibration()
+                continue
 
             if(sample and not SIM): take_sample()
-        
 
-def caljob():
-    global positions
-    init_pos = positions['init_calibration_pos']
-    # Saved Position
-    arm.jointGoal(init_pos)
-    take_sample()
 
-    # X Rotation
-    for i in range(3):
-        arm.simpleRotate([pi/9, 0, 0])
-        take_sample()
+def save_calibration_to_basedir():
+    ''' Copies the saved calibration file in the calibration filepath to the cork irirs base yaml directory'''
+    try:
+        src = os.path.expanduser("~") + CALIBRATION_FILEPATH[1:]
+        dest = CORK_IRIS_BASE_DIR+"/yaml/easy_handeye_eye_on_base.yaml"
+        shutil.copyfile(src, dest)
+    except Exception as e:
+        rospy.logerr("[CORK-IRIS] Error while saving file to '" + dest + "'")
+        rospy.logerr(e)
+
+def load_calibration_file(filename):
+    ''' Loads a file from the yaml cork iris base directory with name <filename> and adds it to the default calibration dir'''
+    try:
+        src = CORK_IRIS_BASE_DIR+"/yaml/"+filename
+        dest = os.path.expanduser("~") + CALIBRATION_FILEPATH[1:]
+        shutil.copyfile(src, dest)
+    except Exception as e:
+        rospy.logerr("[CORK-IRIS] Error while loading file from '" + src + "'")
+        rospy.logerr(e)
+    rospy.loginfo("Calibration file loaded correctly!")
     
-    arm.jointGoal(init_pos)
-
-    for i in range(3):
-        arm.simpleRotate([-pi/9, 0, 0])
-        take_sample()
-    
-    arm.jointGoal(init_pos)
-    
-    # Y Rotation
-    for i in range(3):
-        arm.simpleRotate([0, pi/9, 0])
-        #simpleMove([-0.02, 0, 0], pi/4)
-        take_sample()
-    
-    arm.jointGoal(init_pos)
-
-    arm.simpleMove([-0.03, 0, -0.03], pi/4)
-    take_sample()
-
-    # Z Rotation
-    for i in range(3):
-        arm.simpleRotate([0, 0, pi/9])
-        # take_sample()
-    
-    arm.jointGoal(init_pos)
-    # arm.simpleMove([-0.03, 0, -0.03], pi/4)
-
-    for i in range(3):
-        arm.simpleRotate([0, 0, -pi/9])
-        # take_sample()
-    
-    arm.jointGoal(init_pos)
-
-    compute_calibration()
-
 
 def print_samples(samples):
     print("Translation" + "\t" + "Rotation")
@@ -219,10 +192,12 @@ def compute_calibration():
     result = compute_calibration_srv()
     print("Finished calibration.")
     print(result)
-    print("Saving calibration to: " + CALIBRATION_FILEPATH)
+    print("Saving calibration to: " + CALIBRATION_FILEPATH + " and " + CORK_IRIS_BASE_DIR + "/yaml")
     rospy.wait_for_service(DEFAULT_HANDEYE_NAMESPACE + '/save_calibration', timeout=2.5)
     save_calibration = rospy.ServiceProxy(DEFAULT_HANDEYE_NAMESPACE + '/save_calibration', Empty)
     save_calibration()
+    
+    save_calibration_to_basedir()
     
 
 
@@ -261,10 +236,6 @@ def robot2cork(data):
             print(e)
             return
     
-    # pose = geometry_msgs.msg.PoseStamped()
-    # pose.header.frame_id = "string"
-    # pose.header.stamp = rospy.Time.now()
-    # pose.pose = data
     print("\nTransformed cork pose")
     transformed_pose = tf2_geometry_msgs.do_transform_pose(data, trans)
     print(transformed_pose.pose)
@@ -328,14 +299,6 @@ def test():
     # arm.poseGoal([p.x, p.y, p.z], [-0.471886915591, 0.0268562771098, 0.859489799629, -0.194624544454])
 
     # arm.jointGoal(positions['out_of_camera_pos'])
-    # arm.simpleRotate([pi/2, 0, 0])
-    # p = arm.getPose().position
-    # o = arm.getPose().orientation
-    # arm.poseGoal([0.450731189437, 0.590359096664 + 0.02, p.z], [o.x, o.y, o.z, o.w])
-    # p = arm.getPose().position
-    # o = arm.getPose().orientation
-    # arm.poseGoal([p.x, p.y, -0.0474082425519 + 0.05], [o.x, o.y, o.z, o.w])
-
     # arm.saveJointPosition(CORK_IRIS_BASE_DIR + "/yaml/positions.yaml", "init_calibration_pos")
 
     # o = arm.getPose().orientation
@@ -345,8 +308,7 @@ def test():
     # desloc = 0.10
 
     # arm.simpleMove([desloc*x, desloc*y, desloc*z], direction=0)
-
-    rospy.spin()
+    # rospy.spin()
 
 def main():
     # moveit_commander.roscpp_initialize(sys.argv)
@@ -361,9 +323,9 @@ def main():
 
     
     
-    arm = ArmControl(rospy)
-    arm.setSpeed(0.1)
-
+    # arm = ArmControl(rospy)
+    # arm.setSpeed(0.1)
+    print(CORK_IRIS_BASE_DIR)
     parseParams(sys.argv[1:])
 
 
