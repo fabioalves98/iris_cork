@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 import sys, copy, time, yaml, csv, json, shutil, os
-import rospy, rospkg, rosparam
+import rospy, rospkg, rosparam, tf
 import tf2_ros, tf2_geometry_msgs
 import moveit_commander
 import moveit_msgs.msg
@@ -201,6 +201,24 @@ def compute_calibration():
     
 
 
+
+def getTransform(src_tf, dest_tf):
+    ''' Uses tf2 buffer lookup transform to return the transform from src_tf to dest_tf'''
+    tf_buffer = tf2_ros.Buffer(rospy.Duration(1200))
+    listener = tf2_ros.TransformListener(tf_buffer)
+    rate = rospy.Rate(10.0)
+    trans = None
+    while not rospy.is_shutdown():
+        try:
+            trans = tf_buffer.lookup_transform(str(src_tf), str(dest_tf), rospy.Time(), rospy.Duration(5))
+            break
+        except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
+            rospy.logerr("[CORK-IRIS] Error looking up transform!")
+            rospy.logerr(e)
+            return
+    return trans
+
+
 ## Subscribing to the aruco result data is needed for him to publish the
 ## marker transform.
 def aruco_callback(data):
@@ -222,67 +240,66 @@ def robot2cork(data):
 
     print ("\nKinect Transform")
 
-    tf_buffer = tf2_ros.Buffer(rospy.Duration(1200))
-    listener = tf2_ros.TransformListener(tf_buffer)
-    rate = rospy.Rate(10.0)
-    trans = None
-    while not rospy.is_shutdown():
-        try:
-            trans = tf_buffer.lookup_transform('base_link', 'camera_depth_optical_frame', rospy.Time(), rospy.Duration(5))
-            # print (trans, rot)
-            break
-        except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
-            print("Error looking up transform!")
-            print(e)
-            return
+
+    base2camera = getTransform('base_link', 'camera_depth_optical_frame')
     
     print("\nTransformed cork pose")
-    transformed_pose = tf2_geometry_msgs.do_transform_pose(data, trans)
+    transformed_pose = tf2_geometry_msgs.do_transform_pose(data, base2camera)
     print(transformed_pose.pose)
+    cork_pose = transformed_pose.pose
 
-    test = copy.deepcopy(transformed_pose.pose)
-    o = test.orientation
-
-
-    x = 1 - 2 * (o.y * o.y + o.z * o.z)
-    y = 2 * (o.x * o.y + o.w * o.z)
-    z = 2 * (o.x * o.z - o.w * o.y)
-
-    test.position.x -= x*0.15
-    test.position.y -= y*0.15
-    test.position.z -= z*0.15
-
+    ## Gets a position -0.25 meters behind the original cork piece. this should be the 
+    ## grabbing position
     to_pub = PoseStamped()
     to_pub.header.stamp = rospy.Time.now()
     to_pub.header.frame_id = "base_link"
-    to_pub.pose = test
-    test_publisher.publish(to_pub)
-
-    # print("GRABBING CORK")
+    to_pub.pose.position.x = -0.25
+    to_pub.pose.position.y = 0
+    to_pub.pose.position.z = 0
+    to_pub.pose.orientation.x = 0
+    to_pub.pose.orientation.y = 0
+    to_pub.pose.orientation.z = 0
+    to_pub.pose.orientation.w = 1
 
     
-    grab_cork(test)
+    trans = getTransform('base_link', 'cork_piece')
+    transformed_pose_grab = tf2_geometry_msgs.do_transform_pose(to_pub, trans)
+    test_publisher.publish(transformed_pose_grab)
+    
+
+
+
+    print("GRABBING CORK")    
+    grab_cork(transformed_pose_grab.pose)
 
 
 
 
-def grab_cork(cork_pose):
+def grab_cork(cork_grab_pose):
     '''Temporary function to grab a cork piece given its pose'''
+    ## TODO: This function should make the live feed of pcl_cork stop
     global arm
     # arm.jointGoal(positions['vert_pick_pos'])
     # time.sleep(2)
     ## Orient the arm
-    arm.poseGoal([cork_pose.position.x, cork_pose.position.y, cork_pose.position.z], [cork_pose.orientation.x,cork_pose.orientation.y,cork_pose.orientation.z,cork_pose.orientation.w ])
+    arm.poseGoal([cork_grab_pose.position.x, cork_grab_pose.position.y, cork_grab_pose.position.z], 
+    [cork_grab_pose.orientation.x,cork_grab_pose.orientation.y,cork_grab_pose.orientation.z,cork_grab_pose.orientation.w ])
     
-    
-    # o = arm.getPose().orientation
-
-    # x = 1 - 2 * (o.y * o.y + o.z * o.z)
-    # y = 2 * (o.x * o.y + o.w * o.z)
-    # z = 2 * (o.x * o.z - o.w * o.y)
-    # desloc = 0.05
-
-    # arm.simpleMove([desloc*x, desloc*y, desloc*z], direction=0)
+    to_pub = PoseStamped()
+    to_pub.header.stamp = rospy.Time.now()
+    to_pub.header.frame_id = "base_link"
+    to_pub.pose.position.x = 0.05
+    to_pub.pose.position.y = 0
+    to_pub.pose.position.z = 0
+    to_pub.pose.orientation.x = 0
+    to_pub.pose.orientation.y = 0
+    to_pub.pose.orientation.z = 0
+    to_pub.pose.orientation.w = 1
+    trans = getTransform('base_link', 'ee_link')
+    transformed_pose_grab = tf2_geometry_msgs.do_transform_pose(to_pub, trans)
+    p = transformed_pose_grab.pose.position
+    o = arm.getPose().orientation
+    arm.poseGoal([p.x, p.y, p.z], [o.x, o.y, o.z, o.w])
 
     rospy.signal_shutdown("grabbed cork debug stop")
 
@@ -298,17 +315,11 @@ def test():
     # o = arm.getPose().orientation
     # arm.poseGoal([p.x, p.y, p.z], [-0.471886915591, 0.0268562771098, 0.859489799629, -0.194624544454])
 
-    # arm.jointGoal(positions['out_of_camera_pos'])
+    arm.jointGoal(positions['vert_pick_pos'])
     # arm.saveJointPosition(CORK_IRIS_BASE_DIR + "/yaml/positions.yaml", "init_calibration_pos")
 
-    # o = arm.getPose().orientation
-    # x = 1 - 2 * (o.y * o.y + o.z * o.z)
-    # y = 2 * (o.x * o.y + o.w * o.z)
-    # z = 2 * (o.x * o.z - o.w * o.y)
-    # desloc = 0.10
 
-    # arm.simpleMove([desloc*x, desloc*y, desloc*z], direction=0)
-    # rospy.spin()
+    rospy.spin()
 
 def main():
     # moveit_commander.roscpp_initialize(sys.argv)
@@ -322,10 +333,8 @@ def main():
     test_publisher = rospy.Publisher('cork_iris/grabbing_position', PoseStamped, queue_size=1)
 
     
-    
-    # arm = ArmControl(rospy)
-    # arm.setSpeed(0.1)
-    print(CORK_IRIS_BASE_DIR)
+    arm = ArmControl(rospy)
+    arm.setSpeed(0.1)
     parseParams(sys.argv[1:])
 
 

@@ -1,9 +1,10 @@
 #include <stdio.h>
 #include <chrono>
 #include <numeric>
-
+#include <math.h>
 // ROS Common
 #include <ros/ros.h>
+#include <tf/transform_broadcaster.h>
 
 // PCL specific includes
 #include <pcl/common/common.h>
@@ -12,7 +13,7 @@
 #include <pcl/visualization/pcl_visualizer.h>
 #include <pcl/features/normal_3d.h>
 #include <pcl/kdtree/kdtree_flann.h>
-#include <pcl/ModelCoefficients.h>
+// #include <pcl/ModelCoefficients.h>
 #include <pcl/filters/conditional_removal.h>
 #include <pcl/filters/statistical_outlier_removal.h>
 #include <pcl/segmentation/extract_clusters.h>
@@ -259,12 +260,14 @@ void drawCloudBoundingBox(pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_in)
     const Eigen::Vector3f bboxTransform = eigenVectorsPCA * meanDiagonal + pcaCentroid.head<3>();
 
     // degub prints
-    // cout << "bboxtransf: " << bboxTransform << endl << endl << "quat.w(): " << bboxQuaternion.w() << endl << "quat.vec(): " << bboxQuaternion.vec() << endl;
-    // auto euler = bboxQuaternion.toRotationMatrix().eulerAngles(0, 1, 2);
-    // std::cout << "Euler from quaternion in roll, pitch, yaw"<< std::endl << euler << std::endl;
-    
+    auto euler = bboxQuaternion.toRotationMatrix().eulerAngles(0, 1, 2);
+    euler[0] = (euler[0] * 180) / M_PI;
+    euler[1] = (euler[1] * 180) / M_PI;
+    euler[2] = (euler[2] * 180) / M_PI;
+    std::cout << "Euler from quaternion in roll, pitch, yaw"<< std::endl << euler << std::endl;
+
+
     geometry_msgs::Point center;
-    // TODO: Check bboxtransform xyz vs pcaCentroid xyz
     center.x = pcaCentroid.x();
     center.y = pcaCentroid.y();
     center.z = pcaCentroid.z();
@@ -279,10 +282,28 @@ void drawCloudBoundingBox(pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_in)
     cork_piece_pose.header.frame_id = "camera_depth_optical_frame";
     cork_piece_pose.pose.position = center;
     cork_piece_pose.pose.orientation = orientation;
+
+    static tf::TransformBroadcaster br;
+    tf::Transform transform;
+    transform.setOrigin(tf::Vector3(center.x, center.y, center.z));
+    tf::Quaternion q(orientation.x, orientation.y, orientation.z, orientation.w);
+    if(euler[1] > 0){
+        if(euler[1] > 180){
+            cout << "UPWARDS!!!" << endl;
+        }
+    }else if(euler[1] < 0){
+        if(euler[1] > -180){
+            cout << "UPWARDS!!!" << endl;
+        }
+    }
+    // TODO: Only do this rotation if its pointing upwards
+    // tf::Quaternion q_rot;
+    // q_rot.setRPY(0, 0, M_PI);
+    // q = q * q_rot;
+    transform.setRotation(q);
+    br.sendTransform(tf::StampedTransform(transform, ros::Time::now(), "camera_depth_optical_frame", "cork_piece"));
     
     // cout << bboxTransform << endl;
-
-    cout << endl << pcaCentroid << endl;
 
     point_pub.publish(cork_piece_pose);
 
@@ -389,8 +410,6 @@ void cluster_extraction (pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_in, pcl::
 
     Eigen::Vector4f pcaCentroid;
     pcl::compute3DCentroid(*cloud_cluster, pcaCentroid);
-
-    cout << endl << pcaCentroid << endl;
 
     pcl::PointXYZRGB painted;
     painted.x = pcaCentroid.x();
@@ -588,6 +607,7 @@ void synced_callback(const sensor_msgs::ImageConstPtr& image,
 
             sensor_msgs::PointCloud2 published_pcd;
             pcl::toROSMsg(*cork_pieces, published_pcd);
+            published_pcd.header.frame_id = "camera_depth_optical_frame";
             pub.publish(published_pcd);            
         }
 
