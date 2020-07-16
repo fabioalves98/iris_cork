@@ -1,0 +1,12 @@
+<launch>
+    
+    <include file="$(find iris_ur10e)/launch/live.launch">
+    </include>
+
+    <include file="$(find cork_iris)/launch/kinect_launch.launch">
+    </include>
+
+    <include file="$(find cork_iris)/launch/handeye_publish.launch">
+    </include>
+
+</launch>

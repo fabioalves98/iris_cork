@@ -16,7 +16,7 @@ from tf.transformations import euler_from_quaternion, quaternion_from_euler, qua
 from easy_handeye.srv import TakeSample, ComputeCalibration
 from std_srvs.srv import Empty, Trigger
 from ur_msgs.srv import SetSpeedSliderFraction
-from ur_dashboard_msgs.srv import Load
+from ur_dashboard_msgs.srv import Load, GetProgramState, GetLoadedProgram
 from ArmControl import ArmControl
 
 arm = None
@@ -84,7 +84,7 @@ def parseParams(args):
             print("\trotate <x> <y> <z> -> Simple rotation relative to last position")
             print("\tgrip               -> Grip the gripper")
             print("\trelease            -> Release the gripper")
-            print("\tinitial            -> Joint goal to the default initial position")
+            print("\t<position_name>    -> Joint goal to a <position_name>. Names are loaded at the start from positions.yaml")
             print("\tsave   <pos_name>  -> Save the current joint values of the arm")
             print("\actionlist <file>   -> Run movements defined in action list <file>")
 
@@ -128,8 +128,7 @@ def runActionlist(actions):
     global arm
     for action in actions:
         reps, cmd, argums, sample = action
-        print(action)
-        print(int(reps))
+
         for i in range(0, int(reps)):
             if "jointGoal" in cmd:
                 arm.jointGoal(positions[argums])
@@ -264,42 +263,56 @@ def robot2cork(data):
     
     trans = getTransform('base_link', 'cork_piece')
     transformed_pose_grab = tf2_geometry_msgs.do_transform_pose(to_pub, trans)
-    test_publisher.publish(transformed_pose_grab)
+    # test_publisher.publish(transformed_pose_grab)
+
+    to_pub.pose.position.x = -0.075
+    cork = tf2_geometry_msgs.do_transform_pose(to_pub, trans)
+    test_publisher.publish(cork)
+
     
 
 
 
     print("GRABBING CORK")    
-    grab_cork(transformed_pose_grab.pose)
+    grab_cork(cork.pose, transformed_pose_grab.pose)
 
 
 
 
-def grab_cork(cork_grab_pose):
+def grab_cork(cork, cork_grab_pose):
     '''Temporary function to grab a cork piece given its pose'''
     ## TODO: This function should make the live feed of pcl_cork stop
     global arm
     # arm.jointGoal(positions['vert_pick_pos'])
     # time.sleep(2)
     ## Orient the arm
+
+    goon = raw_input("grab cork?")
+    if('n' in goon):
+        rospy.signal_shutdown("emergency stop. dont grab")
+
     arm.poseGoal([cork_grab_pose.position.x, cork_grab_pose.position.y, cork_grab_pose.position.z], 
     [cork_grab_pose.orientation.x,cork_grab_pose.orientation.y,cork_grab_pose.orientation.z,cork_grab_pose.orientation.w ])
     
-    to_pub = PoseStamped()
-    to_pub.header.stamp = rospy.Time.now()
-    to_pub.header.frame_id = "base_link"
-    to_pub.pose.position.x = 0.05
-    to_pub.pose.position.y = 0
-    to_pub.pose.position.z = 0
-    to_pub.pose.orientation.x = 0
-    to_pub.pose.orientation.y = 0
-    to_pub.pose.orientation.z = 0
-    to_pub.pose.orientation.w = 1
-    trans = getTransform('base_link', 'ee_link')
-    transformed_pose_grab = tf2_geometry_msgs.do_transform_pose(to_pub, trans)
-    p = transformed_pose_grab.pose.position
-    o = arm.getPose().orientation
-    arm.poseGoal([p.x, p.y, p.z], [o.x, o.y, o.z, o.w])
+
+    time.sleep(2)
+
+    arm.poseGoal([cork.position.x, cork.position.y, cork.position.z], 
+    [cork.orientation.x, cork.orientation.y, cork.orientation.z, cork.orientation.w])
+    goon = raw_input("press enter to grip")
+    if('n' in goon):
+        rospy.signal_shutdown("emergency stop. dont grip")
+
+    arm.grip()
+
+    
+    goon = raw_input("pick up and go back?")
+    if('n' in goon):
+        rospy.signal_shutdown("emergency stop. dont go back")
+    
+    arm.poseGoal([cork_grab_pose.position.x, cork_grab_pose.position.y, cork_grab_pose.position.z], 
+    [cork_grab_pose.orientation.x,cork_grab_pose.orientation.y,cork_grab_pose.orientation.z,cork_grab_pose.orientation.w ])
+    
 
     rospy.signal_shutdown("grabbed cork debug stop")
 
@@ -315,11 +328,20 @@ def test():
     # o = arm.getPose().orientation
     # arm.poseGoal([p.x, p.y, p.z], [-0.471886915591, 0.0268562771098, 0.859489799629, -0.194624544454])
 
-    arm.jointGoal(positions['vert_pick_pos'])
+    # arm.jointGoal(positions['vert_pick_pos'])
     # arm.saveJointPosition(CORK_IRIS_BASE_DIR + "/yaml/positions.yaml", "init_calibration_pos")
+    
+ 
+    try:
+        rospy.wait_for_service('/ur_hardware_interface/dashboard/stop', timeout=10)
+    except Exception as e:
+        rospy.logwarn("[CORK-IRIS] Service for starting a program is not available. Can't start")
+        rospy.logwarn(e)
+        return
+    play_program = rospy.ServiceProxy('/ur_hardware_interface/dashboard/stop', Trigger)
+    print(play_program()) 
 
-
-    rospy.spin()
+    # rospy.spin()
 
 def main():
     # moveit_commander.roscpp_initialize(sys.argv)
@@ -327,6 +349,9 @@ def main():
 
     global arm, positions, position_names, test_publisher
     position_names, positions = load_positions(CORK_IRIS_BASE_DIR + "/yaml/positions.yaml")
+    # TODO: Only subscribe to the topics in the correct parseParams place
+    # Bugs happend when u are trying to send a position command and it starts listening to robot2cork
+    # and sending goals to grab cork and stuff
     rospy.Subscriber("/aruco_tracker/result", Image, aruco_callback)
     rospy.Subscriber("/cork_iris/cork_piece", PoseStamped, robot2cork)
 
