@@ -59,6 +59,13 @@
 
 using namespace std;
 
+struct BoundingBox{
+    Eigen::Quaternionf orientation;
+    Eigen::Vector3f position;
+    pcl::PointXYZRGB minPoint, maxPoint;
+    Eigen::Vector4f centroid;
+};
+
 pcl::visualization::PCLVisualizer::Ptr viewer;
 image_transport::Publisher parsed_pub;
 
@@ -229,9 +236,30 @@ bool enforceNormals (const pcl::PointXYZRGBNormal& point_a, const pcl::PointXYZR
     return (false);
 }
 
-void drawCloudBoundingBox(pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_in)
+bool isCorkPoseInverted(Eigen::Vector3f euler_angles)
 {
+    euler_angles[1] = (euler_angles[1] * 180) / M_PI;
 
+    // TODO: confirm this works in every case
+    bool upwards = false;
+    if(euler_angles[1] > 0){
+        if(euler_angles[1] > 180){
+            cout << "UPWARDS!!!" << endl;
+            upwards = true;
+        }
+    }else if(euler_angles[1] < 0){
+        if(euler_angles[1] > -180){
+            cout << "UPWARDS!!!" << endl;
+            upwards = true;
+        }
+    }
+    return upwards;
+ 
+}
+
+
+BoundingBox computeCloudBoundingBox(pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_in)
+{
     // Compute principal directions
     Eigen::Vector4f pcaCentroid;
     pcl::compute3DCentroid(*cloud_in, pcaCentroid);
@@ -259,58 +287,63 @@ void drawCloudBoundingBox(pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_in)
     const Eigen::Quaternionf bboxQuaternion(eigenVectorsPCA);
     const Eigen::Vector3f bboxTransform = eigenVectorsPCA * meanDiagonal + pcaCentroid.head<3>();
 
-    // degub prints
-    auto euler = bboxQuaternion.toRotationMatrix().eulerAngles(0, 1, 2);
-    euler[0] = (euler[0] * 180) / M_PI;
-    euler[1] = (euler[1] * 180) / M_PI;
-    euler[2] = (euler[2] * 180) / M_PI;
-    std::cout << "Euler from quaternion in roll, pitch, yaw"<< std::endl << euler << std::endl;
+    BoundingBox bb;
+    bb.orientation = bboxQuaternion;
+    bb.position = bboxTransform;
+    bb.minPoint = minPoint;
+    bb.maxPoint = maxPoint;
+    bb.centroid = pcaCentroid;
 
+    return bb;
+
+}
+
+void drawBoundingBox(BoundingBox *bb)
+{
+    viewer->removeShape("bbox");
+    viewer->addCube(bb->position, bb->orientation, bb->maxPoint.x - bb->minPoint.x, bb->maxPoint.y - bb->minPoint.y, bb->maxPoint.z - bb->minPoint.z, "bbox", 0);  
+    viewer->setShapeRenderingProperties(pcl::visualization::PCL_VISUALIZER_COLOR, 1, 0, 0, "bbox");             
+    viewer->setRepresentationToWireframeForAllActors(); 
+}
+
+void broadcastCorkTransform(BoundingBox *bb)
+{
+
+    auto euler = bb->orientation.toRotationMatrix().eulerAngles(0, 1, 2);
+    Eigen::Quaternionf corkOrientation = bb->orientation;
+    if(isCorkPoseInverted(euler)){
+            
+        Eigen::Quaternionf q_rot = Eigen::AngleAxisf(0, Eigen::Vector3f::UnitX()) * 
+                                   Eigen::AngleAxisf(0, Eigen::Vector3f::UnitY()) * 
+                                   Eigen::AngleAxisf(M_PI, Eigen::Vector3f::UnitZ());
+        
+        corkOrientation = bb->orientation * q_rot;    
+    }
+    
 
     geometry_msgs::Point center;
-    center.x = pcaCentroid.x();
-    center.y = pcaCentroid.y();
-    center.z = pcaCentroid.z();
+    center.x = bb->centroid.x();
+    center.y = bb->centroid.y();
+    center.z = bb->centroid.z();
     geometry_msgs::Quaternion orientation;
-    orientation.x = bboxQuaternion.vec()[0];
-    orientation.y = bboxQuaternion.vec()[1];
-    orientation.z = bboxQuaternion.vec()[2];
-    orientation.w = bboxQuaternion.w();
+    orientation.x = corkOrientation.vec()[0];
+    orientation.y = corkOrientation.vec()[1];
+    orientation.z = corkOrientation.vec()[2];
+    orientation.w = corkOrientation.w();
     geometry_msgs::PoseStamped cork_piece_pose;
     cork_piece_pose.header.stamp = ros::Time::now();
-    // cork_piece_pose.header.frame_id = "camera_link";
     cork_piece_pose.header.frame_id = "camera_depth_optical_frame";
     cork_piece_pose.pose.position = center;
     cork_piece_pose.pose.orientation = orientation;
 
+    point_pub.publish(cork_piece_pose);
+
     static tf::TransformBroadcaster br;
     tf::Transform transform;
     transform.setOrigin(tf::Vector3(center.x, center.y, center.z));
-    tf::Quaternion q(orientation.x, orientation.y, orientation.z, orientation.w);
-    if(euler[1] > 0){
-        if(euler[1] > 180){
-            cout << "UPWARDS!!!" << endl;
-        }
-    }else if(euler[1] < 0){
-        if(euler[1] > -180){
-            cout << "UPWARDS!!!" << endl;
-        }
-    }
-    // TODO: Only do this rotation if its pointing upwards
-    // tf::Quaternion q_rot;
-    // q_rot.setRPY(0, 0, M_PI);
-    // q = q * q_rot;
+    tf::Quaternion q(orientation.x, orientation.y, orientation.z, orientation.w);  
     transform.setRotation(q);
     br.sendTransform(tf::StampedTransform(transform, ros::Time::now(), "camera_depth_optical_frame", "cork_piece"));
-    
-    // cout << bboxTransform << endl;
-
-    point_pub.publish(cork_piece_pose);
-
-    viewer->removeShape("bbox");
-    viewer->addCube(bboxTransform, bboxQuaternion, maxPoint.x - minPoint.x, maxPoint.y - minPoint.y, maxPoint.z - minPoint.z, "bbox", 0);  
-    viewer->setShapeRenderingProperties(pcl::visualization::PCL_VISUALIZER_COLOR, 1, 0, 0, "bbox");             
-    viewer->setRepresentationToWireframeForAllActors();
 
 }
 
@@ -397,7 +430,6 @@ void cluster_extraction (pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_in, pcl::
 
  
     // Transforming the cluster into a cloud
-
     pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_cluster (new pcl::PointCloud<pcl::PointXYZRGB>);
     for (int j = 0; j < (*clusters)[0].indices.size (); ++j)
     {
@@ -405,8 +437,10 @@ void cluster_extraction (pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_in, pcl::
     }
 
 
-    // TODO: Unroll this function. Too much stuff happening inside.
-    drawCloudBoundingBox(cloud_cluster);
+    BoundingBox cork_piece = computeCloudBoundingBox(cloud_cluster);
+    broadcastCorkTransform(&cork_piece);
+    drawBoundingBox(&cork_piece);
+    // drawCloudBoundingBox(cloud_cluster);
 
     Eigen::Vector4f pcaCentroid;
     pcl::compute3DCentroid(*cloud_cluster, pcaCentroid);

@@ -1,10 +1,12 @@
 <launch>
     
+    <arg name="bag" default="big10.bag"  doc="Choose bag to use"/>
+
     <include file="$(find iris_ur10e)/launch/sim.launch">
     </include>
 
     <node pkg="rosbag" type="play" name="rosbag" 
-    args="-l  /home/fraga/Documents/Programming/Bolsa/big10.bag /tf:=/tf_nouse"/>
+    args="-l  /home/fraga/Documents/Programming/Bolsa/$(arg bag) /tf:=/tf_nouse"/>
 
     <!-- args="-l  /home/fraga/Documents/Programming/Bolsa/big5_mikado.bag /tf:=/tf_nouse"/> -->
 

@@ -224,59 +224,86 @@ def aruco_callback(data):
     pass
 
 def robot2cork(data):
-    global test_publisher
-    corkpose = data.pose
-    print ("\nCork Pose")
-    print ("X: " + str(corkpose.position.x) + ", Y: " + str(corkpose.position.y) + " Z: " + str(corkpose.position.z))
-    print ("X: " + str(corkpose.orientation.x) + ", Y: " + str(corkpose.orientation.y) + " Z: " + str(corkpose.orientation.z) + " W: " + str(corkpose.orientation.w))
+    # global test_publisher
+    # corkpose = data.pose
+    # print ("\nCork Pose")
+    # print ("X: " + str(corkpose.position.x) + ", Y: " + str(corkpose.position.y) + " Z: " + str(corkpose.position.z))
+    # print ("X: " + str(corkpose.orientation.x) + ", Y: " + str(corkpose.orientation.y) + " Z: " + str(corkpose.orientation.z) + " W: " + str(corkpose.orientation.w))
+    print("got data")
+    
+    # print ("\nRobot Pose")
+    # pos = arm.getPose().position
+    # ori = arm.getPose().orientation
+    # print ("X: " + str(pos.x) + ", Y: " + str(pos.y) + " Z: " + str(pos.z))
+    # print ("X: " + str(ori.x) + ", Y: " + str(ori.y) + " Z: " + str(ori.z) + " W: " + str(ori.w))
+
+    # print ("\nKinect Transform")
+
+
+    # base2camera = getTransform('base_link', 'camera_depth_optical_frame')
+    
+    # print("\nTransformed cork pose")
+    # transformed_pose = tf2_geometry_msgs.do_transform_pose(data, base2camera)
+    # print(transformed_pose.pose)
+    # cork_pose = transformed_pose.pose
+
+    # ## Gets a position -0.25 meters behind the original cork piece. this should be the 
+    # ## grabbing position
+    # trans = getTransform('base_link', 'cork_piece')
+
+    # ## Position 25 centimeters back from the main cork position
+    # aux = PoseStamped()
+    # aux.header.stamp = rospy.Time.now()
+    # aux.header.frame_id = "base_link"
+    # aux.pose.position.x = -0.25
+    # aux.pose.position.y = 0
+    # aux.pose.position.z = 0
+    # aux.pose.orientation.x = 0
+    # aux.pose.orientation.y = 0
+    # aux.pose.orientation.z = 0
+    # aux.pose.orientation.w = 1
+
+    # grab_pose_1 = tf2_geometry_msgs.do_transform_pose(aux, trans)
+
+    # aux.pose.position.x = -0.075
+    # grab_pose_2 = tf2_geometry_msgs.do_transform_pose(aux, trans)
+
+    # return (grab_pose_1, grab_pose_2)
+    # # test_publisher.publish(transformed_pose_grab)
+
+    # test_publisher.publish(grab_pose_1)
 
     
-    print ("\nRobot Pose")
-    pos = arm.getPose().position
-    ori = arm.getPose().orientation
-    print ("X: " + str(pos.x) + ", Y: " + str(pos.y) + " Z: " + str(pos.z))
-    print ("X: " + str(ori.x) + ", Y: " + str(ori.y) + " Z: " + str(ori.z) + " W: " + str(ori.w))
-
-    print ("\nKinect Transform")
 
 
-    base2camera = getTransform('base_link', 'camera_depth_optical_frame')
-    
-    print("\nTransformed cork pose")
-    transformed_pose = tf2_geometry_msgs.do_transform_pose(data, base2camera)
-    print(transformed_pose.pose)
-    cork_pose = transformed_pose.pose
 
+    # print("GRABBING CORK")    
+    # grab_cork(grab_pose_2, grab_pose_1)
+
+
+def computeCorkGrabPositions():
     ## Gets a position -0.25 meters behind the original cork piece. this should be the 
     ## grabbing position
-    to_pub = PoseStamped()
-    to_pub.header.stamp = rospy.Time.now()
-    to_pub.header.frame_id = "base_link"
-    to_pub.pose.position.x = -0.25
-    to_pub.pose.position.y = 0
-    to_pub.pose.position.z = 0
-    to_pub.pose.orientation.x = 0
-    to_pub.pose.orientation.y = 0
-    to_pub.pose.orientation.z = 0
-    to_pub.pose.orientation.w = 1
-
-    
     trans = getTransform('base_link', 'cork_piece')
-    transformed_pose_grab = tf2_geometry_msgs.do_transform_pose(to_pub, trans)
-    # test_publisher.publish(transformed_pose_grab)
 
-    to_pub.pose.position.x = -0.075
-    cork = tf2_geometry_msgs.do_transform_pose(to_pub, trans)
-    test_publisher.publish(cork)
+    ## Position 25 centimeters back from the main cork position
+    aux = PoseStamped()
+    aux.header.stamp = rospy.Time.now()
+    aux.header.frame_id = "base_link"
+    aux.pose.position.x = -0.25
+    aux.pose.position.y = 0
+    aux.pose.position.z = 0
+    aux.pose.orientation.x = 0
+    aux.pose.orientation.y = 0
+    aux.pose.orientation.z = 0
+    aux.pose.orientation.w = 1
 
-    
+    grab_pose_1 = tf2_geometry_msgs.do_transform_pose(aux, trans)
 
+    aux.pose.position.x = -0.075
+    grab_pose_2 = tf2_geometry_msgs.do_transform_pose(aux, trans)
 
-
-    print("GRABBING CORK")    
-    grab_cork(cork.pose, transformed_pose_grab.pose)
-
-
+    return (grab_pose_1, grab_pose_2)
 
 
 def grab_cork(cork, cork_grab_pose):
@@ -299,11 +326,11 @@ def grab_cork(cork, cork_grab_pose):
 
     arm.poseGoal([cork.position.x, cork.position.y, cork.position.z], 
     [cork.orientation.x, cork.orientation.y, cork.orientation.z, cork.orientation.w])
-    goon = raw_input("press enter to grip")
-    if('n' in goon):
-        rospy.signal_shutdown("emergency stop. dont grip")
+    # goon = raw_input("press enter to grip")
+    # if('n' in goon):
+    #     rospy.signal_shutdown("emergency stop. dont grip")
 
-    arm.grip()
+    # arm.grip()
 
     
     goon = raw_input("pick up and go back?")
@@ -321,7 +348,7 @@ def grab_cork(cork, cork_grab_pose):
     
 
 def test():
-    global positions, arm
+    global positions, arm, test_publisher
 
     # arm.setSpeed(0.1)
     # p = arm.getPose().position
@@ -331,17 +358,21 @@ def test():
     # arm.jointGoal(positions['vert_pick_pos'])
     # arm.saveJointPosition(CORK_IRIS_BASE_DIR + "/yaml/positions.yaml", "init_calibration_pos")
     
- 
-    try:
-        rospy.wait_for_service('/ur_hardware_interface/dashboard/stop', timeout=10)
-    except Exception as e:
-        rospy.logwarn("[CORK-IRIS] Service for starting a program is not available. Can't start")
-        rospy.logwarn(e)
-        return
-    play_program = rospy.ServiceProxy('/ur_hardware_interface/dashboard/stop', Trigger)
-    print(play_program()) 
+    listener = tf.TransformListener()
+    
+    while not rospy.is_shutdown():
+        # listener.waitForTransform("/cork_piece", "/base_link", rospy.Time.now(), rospy.Duration(4.0))
+        trans = None
+        while not trans:
+            trans = getTransform("camera_depth_optical_frame", "cork_piece")
+        
+        grab1, grab2 = computeCorkGrabPositions()
 
-    # rospy.spin()
+        grab_cork(grab2.pose, grab1.pose)
+        test_publisher.publish(grab1)
+
+    
+    rospy.spin()
 
 def main():
     # moveit_commander.roscpp_initialize(sys.argv)
@@ -353,7 +384,7 @@ def main():
     # Bugs happend when u are trying to send a position command and it starts listening to robot2cork
     # and sending goals to grab cork and stuff
     rospy.Subscriber("/aruco_tracker/result", Image, aruco_callback)
-    rospy.Subscriber("/cork_iris/cork_piece", PoseStamped, robot2cork)
+    # rospy.Subscriber("/cork_iris/cork_piece", PoseStamped, robot2cork)
 
     test_publisher = rospy.Publisher('cork_iris/grabbing_position', PoseStamped, queue_size=1)
 
