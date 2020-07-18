@@ -8,12 +8,10 @@
 
 // PCL specific includes
 #include <pcl/common/common.h>
-#include <pcl/io/pcd_io.h>
 #include <pcl_conversions/pcl_conversions.h>
 #include <pcl/visualization/pcl_visualizer.h>
 #include <pcl/features/normal_3d.h>
 #include <pcl/kdtree/kdtree_flann.h>
-// #include <pcl/ModelCoefficients.h>
 #include <pcl/filters/conditional_removal.h>
 #include <pcl/filters/statistical_outlier_removal.h>
 #include <pcl/segmentation/extract_clusters.h>
@@ -52,9 +50,6 @@
 #include "box.h"
 #include "DepthParser.h"
 #include "ImageParser.h"
-
-#define DEBUG 0
-#define SAVE_CLOUDS 0 
 
 
 using namespace std;
@@ -556,7 +551,6 @@ void parameterConfigure(cork_iris::PCLCorkConfig &config, uint32_t level)
 
     // Statistical outliers params
     meanK = config.mean_k;
-    
     displayed = false;
 }
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 import sys, copy, time, yaml, csv, json, shutil, os
-import rospy, rospkg, rosparam, tf
+import rospy, rospkg, rosparam, tf, dynamic_reconfigure.client
 import tf2_ros, tf2_geometry_msgs
 import moveit_commander
 import moveit_msgs.msg
@@ -26,7 +26,7 @@ DEFAULT_HANDEYE_NAMESPACE = '/easy_handeye_eye_on_base'
 
 CALIBRATION_FILEPATH = '~/.ros/easy_handeye' + DEFAULT_HANDEYE_NAMESPACE + ".yaml"
 ## Fast control variable just for debugging purposes
-SIM = False
+SIM = True
 
 test_publisher = None
 
@@ -223,63 +223,11 @@ def getTransform(src_tf, dest_tf):
 def aruco_callback(data):
     pass
 
-def robot2cork(data):
-    # global test_publisher
-    # corkpose = data.pose
-    # print ("\nCork Pose")
-    # print ("X: " + str(corkpose.position.x) + ", Y: " + str(corkpose.position.y) + " Z: " + str(corkpose.position.z))
-    # print ("X: " + str(corkpose.orientation.x) + ", Y: " + str(corkpose.orientation.y) + " Z: " + str(corkpose.orientation.z) + " W: " + str(corkpose.orientation.w))
-    print("got data")
-    
-    # print ("\nRobot Pose")
-    # pos = arm.getPose().position
-    # ori = arm.getPose().orientation
-    # print ("X: " + str(pos.x) + ", Y: " + str(pos.y) + " Z: " + str(pos.z))
-    # print ("X: " + str(ori.x) + ", Y: " + str(ori.y) + " Z: " + str(ori.z) + " W: " + str(ori.w))
 
-    # print ("\nKinect Transform")
-
-
-    # base2camera = getTransform('base_link', 'camera_depth_optical_frame')
-    
-    # print("\nTransformed cork pose")
-    # transformed_pose = tf2_geometry_msgs.do_transform_pose(data, base2camera)
-    # print(transformed_pose.pose)
-    # cork_pose = transformed_pose.pose
-
-    # ## Gets a position -0.25 meters behind the original cork piece. this should be the 
-    # ## grabbing position
-    # trans = getTransform('base_link', 'cork_piece')
-
-    # ## Position 25 centimeters back from the main cork position
-    # aux = PoseStamped()
-    # aux.header.stamp = rospy.Time.now()
-    # aux.header.frame_id = "base_link"
-    # aux.pose.position.x = -0.25
-    # aux.pose.position.y = 0
-    # aux.pose.position.z = 0
-    # aux.pose.orientation.x = 0
-    # aux.pose.orientation.y = 0
-    # aux.pose.orientation.z = 0
-    # aux.pose.orientation.w = 1
-
-    # grab_pose_1 = tf2_geometry_msgs.do_transform_pose(aux, trans)
-
-    # aux.pose.position.x = -0.075
-    # grab_pose_2 = tf2_geometry_msgs.do_transform_pose(aux, trans)
-
-    # return (grab_pose_1, grab_pose_2)
-    # # test_publisher.publish(transformed_pose_grab)
-
-    # test_publisher.publish(grab_pose_1)
-
-    
-
-
-
-    # print("GRABBING CORK")    
-    # grab_cork(grab_pose_2, grab_pose_1)
-
+def setPCLCorkParameter(params={"live" : "true", "type" : "4"}):
+    ''' Updates the pcl_cork parameters using "params" values'''
+    client = dynamic_reconfigure.client.Client("pcl_cork", timeout=30)
+    client.update_configuration(params)
 
 def computeCorkGrabPositions():
     ## Gets a position -0.25 meters behind the original cork piece. this should be the 
@@ -308,7 +256,6 @@ def computeCorkGrabPositions():
 
 def grab_cork(cork, cork_grab_pose):
     '''Temporary function to grab a cork piece given its pose'''
-    ## TODO: This function should make the live feed of pcl_cork stop
     global arm
     # arm.jointGoal(positions['vert_pick_pos'])
     # time.sleep(2)
@@ -358,8 +305,9 @@ def test():
     # arm.jointGoal(positions['vert_pick_pos'])
     # arm.saveJointPosition(CORK_IRIS_BASE_DIR + "/yaml/positions.yaml", "init_calibration_pos")
     
-    listener = tf.TransformListener()
-    
+    # listener = tf.TransformListener()
+    # Confirm pcl cork is live and with clustering activated
+    setPCLCorkParameter()
     while not rospy.is_shutdown():
         # listener.waitForTransform("/cork_piece", "/base_link", rospy.Time.now(), rospy.Duration(4.0))
         trans = None
@@ -367,11 +315,9 @@ def test():
             trans = getTransform("camera_depth_optical_frame", "cork_piece")
         
         grab1, grab2 = computeCorkGrabPositions()
-
+        setPCLCorkParameter({"live" : "false"})
         grab_cork(grab2.pose, grab1.pose)
         test_publisher.publish(grab1)
-
-    
     rospy.spin()
 
 def main():
@@ -380,18 +326,21 @@ def main():
 
     global arm, positions, position_names, test_publisher
     position_names, positions = load_positions(CORK_IRIS_BASE_DIR + "/yaml/positions.yaml")
-    # TODO: Only subscribe to the topics in the correct parseParams place
-    # Bugs happend when u are trying to send a position command and it starts listening to robot2cork
-    # and sending goals to grab cork and stuff
     rospy.Subscriber("/aruco_tracker/result", Image, aruco_callback)
     # rospy.Subscriber("/cork_iris/cork_piece", PoseStamped, robot2cork)
 
     test_publisher = rospy.Publisher('cork_iris/grabbing_position', PoseStamped, queue_size=1)
-
     
-    arm = ArmControl(rospy)
-    arm.setSpeed(0.1)
-    parseParams(sys.argv[1:])
+    if SIM:
+        arm = ArmControl('localhost')
+    else:
+        arm = ArmControl()
+
+    arm.release()
+    rospy.sleep(2)
+    arm.grip()
+    
+    # parseParams(sys.argv[1:])
 
 
 if __name__ == "__main__":

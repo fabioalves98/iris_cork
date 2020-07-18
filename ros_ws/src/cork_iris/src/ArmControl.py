@@ -1,25 +1,33 @@
+
+import sys, time, copy, socket, struct, fcntl, xmlrpclib
+import subprocess
+import rospy
 import moveit_commander
 import geometry_msgs.msg
+from math import pi, cos, sin
 from tf.transformations import euler_from_quaternion, quaternion_from_euler, quaternion_multiply
 from ur_dashboard_msgs.srv import Load
 from std_srvs.srv import Empty, Trigger
 from ur_msgs.srv import SetSpeedSliderFraction
 
 
-import sys, time, copy, socket, struct, fcntl
-
-from math import pi, cos, sin
-import subprocess
-
-
 
 class ArmControl:
     
-    def __init__(self, rospy):
-        self.rospy = rospy
-        print("Starting robot arm control!")
+    def __init__(self, robot_ip='10.1.0.2'):
+        
+        self.ip = robot_ip
+        self.gripper_connection_port = 44221
+        
         self.currentSpeed = None
-        moveit_commander.roscpp_initialize(sys.argv)
+
+        ## Connecting to gripper server proxy (should work for sim and live)
+        connstr = "http://{}:{}".format(self.ip, self.gripper_connection_port)
+        self.grpc = xmlrpclib.ServerProxy(connstr)
+        self.gid = self.grpc.GetGrippers()[0]
+
+        print("Starting robot arm control!")
+        # moveit_commander.roscpp_initialize(sys.argv)
         try:
             self.robot = moveit_commander.RobotCommander()
             self.move_group = moveit_commander.MoveGroupCommander("manipulator")
@@ -27,7 +35,7 @@ class ArmControl:
             print("Couldn't load robot arm or move_group")
             print(e)
             sys.exit(0)
-    
+        
     def printGeneralStatus(self):
         # We can get the name of the reference frame for this robot:
         print("============ Planning frame: ", self.move_group.get_planning_frame())
@@ -62,7 +70,7 @@ class ArmControl:
 
         # # The go command can be called with joint values, poses, or without any
         # # parameters if you have already set the pose or joint target for the group
-        self.rospy.loginfo("Sending Joint Action - %s", joints)
+        rospy.loginfo("Sending Joint Action - %s", joints)
         plan = self.move_group.go(joint_goal, wait=True)
 
         # # Calling ``stop()`` ensures that there is no residual movement
@@ -84,7 +92,7 @@ class ArmControl:
         self.move_group.set_pose_target(pose_goal)
 
         ## Now, we call the planner to compute the plan and execute it.
-        self.rospy.loginfo("Sending Pose goal - %s \n %s", coordinates, orientation)
+        rospy.loginfo("Sending Pose goal - %s \n %s", coordinates, orientation)
         plan = self.move_group.go(wait=True)
         # Calling `stop()` ensures that there is no residual movement
         self.move_group.stop()
@@ -138,37 +146,40 @@ class ArmControl:
 
     def load_and_play_program(self, program_filename):
         try:
-            self.rospy.wait_for_service('/ur_hardware_interface/dashboard/load_program', timeout=2.5)
+            rospy.wait_for_service('/ur_hardware_interface/dashboard/load_program', timeout=2.5)
         except Exception as e:
-            self.rospy.logwarn("[CORK-IRIS] Service for loading a program is not available. Can't load '%s'", program_filename)
+            rospy.logwarn("[CORK-IRIS] Service for loading a program is not available. Can't load '%s'", program_filename)
             return
-        load_program = self.rospy.ServiceProxy('/ur_hardware_interface/dashboard/load_program', Load)
+        load_program = rospy.ServiceProxy('/ur_hardware_interface/dashboard/load_program', Load)
         print(load_program(program_filename))
 
         try:
-            self.rospy.wait_for_service('/ur_hardware_interface/dashboard/play', timeout=2.5)
+            rospy.wait_for_service('/ur_hardware_interface/dashboard/play', timeout=2.5)
         except Exception as e:
-            self.rospy.logwarn("[CORK-IRIS] Service for starting a program is not available. Can't start '%s'", program_filename)
+            rospy.logwarn("[CORK-IRIS] Service for starting a program is not available. Can't start '%s'", program_filename)
             return
-        play_program = self.rospy.ServiceProxy('/ur_hardware_interface/dashboard/play', Trigger)
+        play_program = rospy.ServiceProxy('/ur_hardware_interface/dashboard/play', Trigger)
         print(play_program()) 
 
     def grip(self):
-        self.load_and_play_program('grip.urp')
+        self.grpc.Grip(self.gid, 1)
+        # self.load_and_play_program('grip.urp')
 
     def release(self):
-        self.load_and_play_program('release.urp')
-  
+        self.grpc.Release(self.gid, 1)
+        # self.load_and_play_program('release.urp')
+
     def setSpeed(self, speed):
         try:
-            self.rospy.wait_for_service('/ur_hardware_interface/set_speed_slider', timeout=2.5)
+            rospy.wait_for_service('/ur_hardware_interface/set_speed_slider', timeout=2.5)
         except Exception as e:
-            self.rospy.logwarn("[CORK-IRIS] Service for setting speed is not available!")
+            rospy.logwarn("[CORK-IRIS] Service for setting speed is not available!")
             return
-        set_speed = self.rospy.ServiceProxy('/ur_hardware_interface/set_speed_slider', SetSpeedSliderFraction)
-        print(set_speed(speed))
-        ## TODO: Check if the message returned success and only update the speed after that
-        self.currentSpeed = speed
+        set_speed = rospy.ServiceProxy('/ur_hardware_interface/set_speed_slider', SetSpeedSliderFraction)
+        ans = set_speed(speed)
+        print(ans)
+        if 'success' in ans: 
+            self.currentSpeed = speed
 
     def getSpeed(self):
         if(not self.currentSpeed):
