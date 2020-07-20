@@ -26,7 +26,7 @@ DEFAULT_HANDEYE_NAMESPACE = '/easy_handeye_eye_on_base'
 
 CALIBRATION_FILEPATH = '~/.ros/easy_handeye' + DEFAULT_HANDEYE_NAMESPACE + ".yaml"
 ## Fast control variable just for debugging purposes
-SIM = True
+SIM = False
 
 test_publisher = None
 
@@ -257,36 +257,44 @@ def computeCorkGrabPositions():
 def grab_cork(cork, cork_grab_pose):
     '''Temporary function to grab a cork piece given its pose'''
     global arm
-    # arm.jointGoal(positions['vert_pick_pos'])
-    # time.sleep(2)
-    ## Orient the arm
+
 
     goon = raw_input("grab cork?")
     if('n' in goon):
         rospy.signal_shutdown("emergency stop. dont grab")
+        return
 
     arm.poseGoal([cork_grab_pose.position.x, cork_grab_pose.position.y, cork_grab_pose.position.z], 
     [cork_grab_pose.orientation.x,cork_grab_pose.orientation.y,cork_grab_pose.orientation.z,cork_grab_pose.orientation.w ])
     
+    goon = raw_input("go towards cork?")
+    if('n' in goon):
+        rospy.signal_shutdown("emergency stop. dont grab")
+        return
 
     time.sleep(2)
 
     arm.poseGoal([cork.position.x, cork.position.y, cork.position.z], 
     [cork.orientation.x, cork.orientation.y, cork.orientation.z, cork.orientation.w])
-    # goon = raw_input("press enter to grip")
-    # if('n' in goon):
-    #     rospy.signal_shutdown("emergency stop. dont grip")
-
-    # arm.grip()
+    goon = raw_input("press enter to grip")
+    if('n' in goon):
+        rospy.signal_shutdown("emergency stop. dont grip")
+        return 
+    arm.grip()
 
     
     goon = raw_input("pick up and go back?")
     if('n' in goon):
         rospy.signal_shutdown("emergency stop. dont go back")
-    
+        return 
     arm.poseGoal([cork_grab_pose.position.x, cork_grab_pose.position.y, cork_grab_pose.position.z], 
     [cork_grab_pose.orientation.x,cork_grab_pose.orientation.y,cork_grab_pose.orientation.z,cork_grab_pose.orientation.w ])
     
+    goon = raw_input("go to out of camera?")
+    if('n' in goon):
+        rospy.signal_shutdown("emergency stop. dont go back")
+        return 
+    arm.jointGoal(positions['out_of_camera_pos'])
 
     rospy.signal_shutdown("grabbed cork debug stop")
 
@@ -336,11 +344,9 @@ def main():
     else:
         arm = ArmControl()
 
-    arm.release()
-    rospy.sleep(2)
-    arm.grip()
-    
-    # parseParams(sys.argv[1:])
+    arm.setSpeed(0.1)
+
+    parseParams(sys.argv[1:])
 
 
 if __name__ == "__main__":

@@ -22,7 +22,7 @@ class ArmControl:
         self.currentSpeed = None
 
         ## Connecting to gripper server proxy (should work for sim and live)
-        connstr = "http://{}:{}".format(self.ip, self.gripper_connection_port)
+        connstr = "http://{}:{}/RPC2".format(self.ip, self.gripper_connection_port)
         self.grpc = xmlrpclib.ServerProxy(connstr)
         self.gid = self.grpc.GetGrippers()[0]
 
@@ -169,6 +169,14 @@ class ArmControl:
         self.grpc.Release(self.gid, 1)
         # self.load_and_play_program('release.urp')
 
+    def config_gripper(self, new_limit):
+        ''' Configs. the release limit so that the gripper opens up to "new_limit" on release '''
+        print('Current state: ', self.grpc.GetState(self.gid))
+        print('Current release limit: ', self.grpc.GetReleaseLimit(self.gid, 1))
+        print(self.grpc.SetReleaseLimit(self.gid, 1, new_limit))
+        print('New release limit: ', self.grpc.GetReleaseLimit(self.gid, 1))
+
+
     def setSpeed(self, speed):
         try:
             rospy.wait_for_service('/ur_hardware_interface/set_speed_slider', timeout=2.5)
@@ -177,8 +185,7 @@ class ArmControl:
             return
         set_speed = rospy.ServiceProxy('/ur_hardware_interface/set_speed_slider', SetSpeedSliderFraction)
         ans = set_speed(speed)
-        print(ans)
-        if 'success' in ans: 
+        if ans.success:
             self.currentSpeed = speed
 
     def getSpeed(self):
