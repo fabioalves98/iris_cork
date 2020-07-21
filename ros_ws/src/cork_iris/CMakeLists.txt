@@ -11,6 +11,7 @@ find_package(catkin REQUIRED COMPONENTS
   pcl_ros
   sensor_msgs
   dynamic_reconfigure
+  message_generation
 )
 
 generate_dynamic_reconfigure_options(
@@ -32,6 +33,15 @@ include_directories(${PCL_INCLUDE_DIRS})
 link_directories(${PCL_LIBRARY_DIRS})
 add_definitions(${PCL_DEFINITIONS})
 
+add_message_files(
+  FILES
+  ArmCommand.msg
+)
+
+generate_messages(
+  DEPENDENCIES
+  std_msgs
+)
 
 add_executable(capture src/capture.cpp src/ImageParser.cpp src/box.cpp src/DepthParser.cpp)
 target_link_libraries(capture ${OpenCV_LIBS} ${catkin_LIBRARIES})

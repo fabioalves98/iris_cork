@@ -23,8 +23,13 @@ class ArmControl:
 
         ## Connecting to gripper server proxy (should work for sim and live)
         connstr = "http://{}:{}/RPC2".format(self.ip, self.gripper_connection_port)
-        self.grpc = xmlrpclib.ServerProxy(connstr)
-        self.gid = self.grpc.GetGrippers()[0]
+        try:
+            self.grpc = xmlrpclib.ServerProxy(connstr)
+            self.gid = self.grpc.GetGrippers()[0]
+        except Exception as e:
+            rospy.logerr("[CORK-IRIS] Couldn't connect to gripper xmlrpc proxy")
+            rospy.logerr(e)
+            sys.exit(0)
 
         print("Starting robot arm control!")
         # moveit_commander.roscpp_initialize(sys.argv)

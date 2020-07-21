@@ -8,6 +8,7 @@ import moveit_msgs.msg
 import geometry_msgs.msg
 from ast import literal_eval
 from math import pi, cos, sin
+from cork_iris.msg import ArmCommand
 from std_msgs.msg import String
 from sensor_msgs.msg import Image
 from geometry_msgs.msg import Point, TransformStamped, Pose, PoseStamped
@@ -88,7 +89,7 @@ def parseParams(args):
             print("\trelease            -> Release the gripper")
             print("\t<position_name>    -> Joint goal to a <position_name>. Names are loaded at the start from positions.yaml")
             print("\tsave   <pos_name>  -> Save the current joint values of the arm")
-            print("\actionlist <file>   -> Run movements defined in action list <file>")
+            print("\tactionlist <file>   -> Run movements defined in action list <file>")
 
 
     except Exception as e:
@@ -301,8 +302,11 @@ def grab_cork(cork, cork_grab_pose):
     rospy.signal_shutdown("grabbed cork debug stop")
 
 
-    
-    
+
+
+def takeCommand(data):
+    parseParams(data.command)
+
 
 def test():
     global positions, arm, test_publisher
@@ -338,19 +342,19 @@ def main():
     position_names, positions = load_positions(CORK_IRIS_BASE_DIR + "/yaml/positions.yaml")
     # rospy.Subscriber("/aruco_tracker/result", Image, aruco_callback)
     # rospy.Subscriber("/cork_iris/cork_piece", PoseStamped, robot2cork)
+    rospy.Subscriber("/cork_iris/control", ArmCommand, takeCommand)
 
     test_publisher = rospy.Publisher('cork_iris/grabbing_position', PoseStamped, queue_size=1)
     
-    if SIM:
-        arm = ArmControl('localhost')
-    else:
-        arm = ArmControl()
-        calibration = Calibration(CORK_IRIS_BASE_DIR)
-    
+    # if SIM:
+    #     arm = ArmControl('localhost')
+    # else:
+    #     arm = ArmControl()
+    #     calibration = Calibration(CORK_IRIS_BASE_DIR)
+    #     arm.setSpeed(0.1)
 
-    arm.setSpeed(0.1)
-
-    parseParams(sys.argv[1:])
+    rospy.spin()
+    # parseParams(sys.argv[1:])
 
 
 if __name__ == "__main__":
