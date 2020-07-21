@@ -18,8 +18,10 @@ from std_srvs.srv import Empty, Trigger
 from ur_msgs.srv import SetSpeedSliderFraction
 from ur_dashboard_msgs.srv import Load, GetProgramState, GetLoadedProgram
 from ArmControl import ArmControl
+from Calibration import Calibration
 
 arm = None
+calibration = None
 
 CORK_IRIS_BASE_DIR = rospkg.RosPack().get_path('cork_iris')
 DEFAULT_HANDEYE_NAMESPACE = '/easy_handeye_eye_on_base'
@@ -125,7 +127,7 @@ def parseActionlist(filename):
 
 
 def runActionlist(actions):
-    global arm
+    global arm, calibration
     for action in actions:
         reps, cmd, argums, sample = action
 
@@ -137,66 +139,66 @@ def runActionlist(actions):
             elif "move" in cmd:
                 arm.simpleMove(argums, pi/4)
             elif "compute" in cmd and not SIM:
-                compute_calibration()
+                calibration.compute_calibration()
                 continue
 
-            if(sample and not SIM): take_sample()
+            if(sample and not SIM): calibration.take_sample()
 
 
-def save_calibration_to_basedir():
-    ''' Copies the saved calibration file in the calibration filepath to the cork irirs base yaml directory'''
-    try:
-        src = os.path.expanduser("~") + CALIBRATION_FILEPATH[1:]
-        dest = CORK_IRIS_BASE_DIR+"/yaml/easy_handeye_eye_on_base.yaml"
-        shutil.copyfile(src, dest)
-    except Exception as e:
-        rospy.logerr("[CORK-IRIS] Error while saving file to '" + dest + "'")
-        rospy.logerr(e)
+# def save_calibration_to_basedir():
+#     ''' Copies the saved calibration file in the calibration filepath to the cork irirs base yaml directory'''
+#     try:
+#         src = os.path.expanduser("~") + CALIBRATION_FILEPATH[1:]
+#         dest = CORK_IRIS_BASE_DIR+"/yaml/easy_handeye_eye_on_base.yaml"
+#         shutil.copyfile(src, dest)
+#     except Exception as e:
+#         rospy.logerr("[CORK-IRIS] Error while saving file to '" + dest + "'")
+#         rospy.logerr(e)
 
-def load_calibration_file(filename):
-    ''' Loads a file from the yaml cork iris base directory with name <filename> and adds it to the default calibration dir'''
-    try:
-        src = CORK_IRIS_BASE_DIR+"/yaml/"+filename
-        dest = os.path.expanduser("~") + CALIBRATION_FILEPATH[1:]
-        shutil.copyfile(src, dest)
-    except Exception as e:
-        rospy.logerr("[CORK-IRIS] Error while loading file from '" + src + "'")
-        rospy.logerr(e)
-    rospy.loginfo("Calibration file loaded correctly!")
+# def load_calibration_file(filename):
+#     ''' Loads a file from the yaml cork iris base directory with name <filename> and adds it to the default calibration dir'''
+#     try:
+#         src = CORK_IRIS_BASE_DIR+"/yaml/"+filename
+#         dest = os.path.expanduser("~") + CALIBRATION_FILEPATH[1:]
+#         shutil.copyfile(src, dest)
+#     except Exception as e:
+#         rospy.logerr("[CORK-IRIS] Error while loading file from '" + src + "'")
+#         rospy.logerr(e)
+#     rospy.loginfo("Calibration file loaded correctly!")
     
 
-def print_samples(samples):
-    print("Translation" + "\t" + "Rotation")
-    for sample in samples:
-        print("x: " + str(sample.translation.x)[:8] + "\t" + str(sample.rotation.x)[:8])
-        print("y: " + str(sample.translation.y)[:8] + "\t" + str(sample.rotation.y)[:8])
-        print("z: " + str(sample.translation.z)[:8] + "\t" + str(sample.rotation.z)[:8])
-        print("=========================================")
+# def print_samples(samples):
+#     print("Translation" + "\t" + "Rotation")
+#     for sample in samples:
+#         print("x: " + str(sample.translation.x)[:8] + "\t" + str(sample.rotation.x)[:8])
+#         print("y: " + str(sample.translation.y)[:8] + "\t" + str(sample.rotation.y)[:8])
+#         print("z: " + str(sample.translation.z)[:8] + "\t" + str(sample.rotation.z)[:8])
+#         print("=========================================")
 
-def take_sample():
-    rospy.wait_for_service(DEFAULT_HANDEYE_NAMESPACE + '/take_sample', timeout=2.5)
-    take_sample_srv = rospy.ServiceProxy(DEFAULT_HANDEYE_NAMESPACE + '/take_sample', TakeSample)
-    vals = take_sample_srv()
-    print("New sample taken: ")
-    transforms = vals.samples.camera_marker_samples.transforms
-    print_samples([transforms[len(transforms)-1]])
+# def take_sample():
+#     rospy.wait_for_service(DEFAULT_HANDEYE_NAMESPACE + '/take_sample', timeout=2.5)
+#     take_sample_srv = rospy.ServiceProxy(DEFAULT_HANDEYE_NAMESPACE + '/take_sample', TakeSample)
+#     vals = take_sample_srv()
+#     print("New sample taken: ")
+#     transforms = vals.samples.camera_marker_samples.transforms
+#     print_samples([transforms[len(transforms)-1]])
 
-def compute_calibration():
+# def compute_calibration():
     
-    # get sample list - /easy_handeye_eye_on_base/get_sample_list
-    # chamar servico compute - /easy_handeye_eye_on_base/compute_calibration
-    rospy.wait_for_service(DEFAULT_HANDEYE_NAMESPACE + '/compute_calibration', timeout=2.5)
-    compute_calibration_srv = rospy.ServiceProxy(DEFAULT_HANDEYE_NAMESPACE + '/compute_calibration', ComputeCalibration)
-    print("Computing calibration")
-    result = compute_calibration_srv()
-    print("Finished calibration.")
-    print(result)
-    print("Saving calibration to: " + CALIBRATION_FILEPATH + " and " + CORK_IRIS_BASE_DIR + "/yaml")
-    rospy.wait_for_service(DEFAULT_HANDEYE_NAMESPACE + '/save_calibration', timeout=2.5)
-    save_calibration = rospy.ServiceProxy(DEFAULT_HANDEYE_NAMESPACE + '/save_calibration', Empty)
-    save_calibration()
+#     # get sample list - /easy_handeye_eye_on_base/get_sample_list
+#     # chamar servico compute - /easy_handeye_eye_on_base/compute_calibration
+#     rospy.wait_for_service(DEFAULT_HANDEYE_NAMESPACE + '/compute_calibration', timeout=2.5)
+#     compute_calibration_srv = rospy.ServiceProxy(DEFAULT_HANDEYE_NAMESPACE + '/compute_calibration', ComputeCalibration)
+#     print("Computing calibration")
+#     result = compute_calibration_srv()
+#     print("Finished calibration.")
+#     print(result)
+#     print("Saving calibration to: " + CALIBRATION_FILEPATH + " and " + CORK_IRIS_BASE_DIR + "/yaml")
+#     rospy.wait_for_service(DEFAULT_HANDEYE_NAMESPACE + '/save_calibration', timeout=2.5)
+#     save_calibration = rospy.ServiceProxy(DEFAULT_HANDEYE_NAMESPACE + '/save_calibration', Empty)
+#     save_calibration()
     
-    save_calibration_to_basedir()
+#     save_calibration_to_basedir()
     
 
 
@@ -220,8 +222,8 @@ def getTransform(src_tf, dest_tf):
 
 ## Subscribing to the aruco result data is needed for him to publish the
 ## marker transform.
-def aruco_callback(data):
-    pass
+# def aruco_callback(data):
+#     pass
 
 
 def setPCLCorkParameter(params={"live" : "true", "type" : "4"}):
@@ -332,9 +334,9 @@ def main():
     # moveit_commander.roscpp_initialize(sys.argv)
     rospy.init_node('arm_control', anonymous=True)
 
-    global arm, positions, position_names, test_publisher
+    global arm, positions, position_names, test_publisher, calibration
     position_names, positions = load_positions(CORK_IRIS_BASE_DIR + "/yaml/positions.yaml")
-    rospy.Subscriber("/aruco_tracker/result", Image, aruco_callback)
+    # rospy.Subscriber("/aruco_tracker/result", Image, aruco_callback)
     # rospy.Subscriber("/cork_iris/cork_piece", PoseStamped, robot2cork)
 
     test_publisher = rospy.Publisher('cork_iris/grabbing_position', PoseStamped, queue_size=1)
@@ -343,6 +345,8 @@ def main():
         arm = ArmControl('localhost')
     else:
         arm = ArmControl()
+        calibration = Calibration(CORK_IRIS_BASE_DIR)
+    
 
     arm.setSpeed(0.1)
 
