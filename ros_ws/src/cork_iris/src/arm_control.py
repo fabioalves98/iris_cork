@@ -11,7 +11,7 @@ from math import pi, cos, sin
 from cork_iris.msg import ArmCommand
 from std_msgs.msg import String
 from sensor_msgs.msg import Image
-from geometry_msgs.msg import Point, TransformStamped, Pose, PoseStamped
+from geometry_msgs.msg import Point, TransformStamped, Pose, PoseStamped, Quaternion
 from moveit_commander.conversions import pose_to_list
 from tf.transformations import euler_from_quaternion, quaternion_from_euler, quaternion_multiply
 from easy_handeye.srv import TakeSample, ComputeCalibration
@@ -29,7 +29,7 @@ DEFAULT_HANDEYE_NAMESPACE = '/easy_handeye_eye_on_base'
 
 CALIBRATION_FILEPATH = '~/.ros/easy_handeye' + DEFAULT_HANDEYE_NAMESPACE + ".yaml"
 ## Fast control variable just for debugging purposes
-SIM = True
+SIM = False
 
 test_publisher = None
 
@@ -253,6 +253,19 @@ def computeCorkGrabPositions():
 
     aux.pose.position.x = -0.075
     grab_pose_2 = tf2_geometry_msgs.do_transform_pose(aux, trans)
+    
+    if grab_pose_1.pose.position.z < trans.transform.translation.z:
+        inv_quaternion = tf.transformations.quaternion_multiply(
+            (trans.transform.rotation.x, trans.transform.rotation.y, trans.transform.rotation.z, trans.transform.rotation.w),
+            quaternion_from_euler(0, 0, pi))
+
+        trans.transform.rotation = Quaternion(*inv_quaternion)
+        aux.pose.position.x = -0.25
+
+        grab_pose_1 = tf2_geometry_msgs.do_transform_pose(aux, trans)
+
+        aux.pose.position.x = -0.075
+        grab_pose_2 = tf2_geometry_msgs.do_transform_pose(aux, trans)
 
     return (grab_pose_1, grab_pose_2)
 
@@ -302,8 +315,6 @@ def grab_cork(cork, cork_grab_pose):
     rospy.signal_shutdown("grabbed cork debug stop")
 
 
-
-
 def takeCommand(data):
     parseParams(data.command)
 
@@ -330,8 +341,11 @@ def test():
         
         grab1, grab2 = computeCorkGrabPositions()
         setPCLCorkParameter({"live" : "false"})
+        
         grab_cork(grab2.pose, grab1.pose)
+        
         test_publisher.publish(grab1)
+    
     rospy.spin()
 
 def main():

@@ -231,27 +231,6 @@ bool enforceNormals (const pcl::PointXYZRGBNormal& point_a, const pcl::PointXYZR
     return (false);
 }
 
-bool isCorkPoseInverted(Eigen::Vector3f euler_angles)
-{
-    euler_angles[1] = (euler_angles[1] * 180) / M_PI;
-
-    // TODO: confirm this works in every case
-    bool upwards = false;
-    if(euler_angles[1] > 0){
-        if(euler_angles[1] > 180){
-            cout << "UPWARDS!!!" << endl;
-            upwards = true;
-        }
-    }else if(euler_angles[1] < 0){
-        if(euler_angles[1] > -180){
-            cout << "UPWARDS!!!" << endl;
-            upwards = true;
-        }
-    }
-    return upwards;
- 
-}
-
 
 BoundingBox computeCloudBoundingBox(pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_in)
 {
@@ -303,18 +282,7 @@ void drawBoundingBox(BoundingBox *bb)
 
 void broadcastCorkTransform(BoundingBox *bb)
 {
-
-    auto euler = bb->orientation.toRotationMatrix().eulerAngles(0, 1, 2);
     Eigen::Quaternionf corkOrientation = bb->orientation;
-    if(isCorkPoseInverted(euler)){
-            
-        Eigen::Quaternionf q_rot = Eigen::AngleAxisf(0, Eigen::Vector3f::UnitX()) * 
-                                   Eigen::AngleAxisf(0, Eigen::Vector3f::UnitY()) * 
-                                   Eigen::AngleAxisf(M_PI, Eigen::Vector3f::UnitZ());
-        
-        corkOrientation = bb->orientation * q_rot;    
-    }
-    
 
     geometry_msgs::Point center;
     center.x = bb->centroid.x();
