@@ -53,8 +53,8 @@ class Calibration:
             print("=========================================")
 
     def take_sample(self):
-        rospy.wait_for_service(DEFAULT_HANDEYE_NAMESPACE + '/take_sample', timeout=2.5)
-        take_sample_srv = rospy.ServiceProxy(DEFAULT_HANDEYE_NAMESPACE + '/take_sample', TakeSample)
+        rospy.wait_for_service(self.DEFAULT_HANDEYE_NAMESPACE + '/take_sample', timeout=2.5)
+        take_sample_srv = rospy.ServiceProxy(self.DEFAULT_HANDEYE_NAMESPACE + '/take_sample', TakeSample)
         vals = take_sample_srv()
         print("New sample taken: ")
         transforms = vals.samples.camera_marker_samples.transforms
@@ -64,8 +64,8 @@ class Calibration:
         
         # get sample list - /easy_handeye_eye_on_base/get_sample_list
         # chamar servico compute - /easy_handeye_eye_on_base/compute_calibration
-        rospy.wait_for_service(DEFAULT_HANDEYE_NAMESPACE + '/compute_calibration', timeout=2.5)
-        compute_calibration_srv = rospy.ServiceProxy(DEFAULT_HANDEYE_NAMESPACE + '/compute_calibration', ComputeCalibration)
+        rospy.wait_for_service(self.DEFAULT_HANDEYE_NAMESPACE + '/compute_calibration', timeout=2.5)
+        compute_calibration_srv = rospy.ServiceProxy(self.DEFAULT_HANDEYE_NAMESPACE + '/compute_calibration', ComputeCalibration)
         print("Computing calibration")
         result = compute_calibration_srv()
         print("Finished calibration.")

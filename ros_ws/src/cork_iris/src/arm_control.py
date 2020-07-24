@@ -241,7 +241,7 @@ def computeCorkGrabPositions():
     aux = PoseStamped()
     aux.header.stamp = rospy.Time.now()
     aux.header.frame_id = "base_link"
-    aux.pose.position.x = -0.25
+    aux.pose.position.x = -0.15
     aux.pose.position.y = 0
     aux.pose.position.z = 0
     aux.pose.orientation.x = 0
@@ -260,7 +260,7 @@ def computeCorkGrabPositions():
             quaternion_from_euler(0, 0, pi))
 
         trans.transform.rotation = Quaternion(*inv_quaternion)
-        aux.pose.position.x = -0.25
+        aux.pose.position.x = -0.15
 
         grab_pose_1 = tf2_geometry_msgs.do_transform_pose(aux, trans)
 
