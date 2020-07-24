@@ -366,6 +366,11 @@ void cluster_extraction (pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_in, pcl::
         }
     }
 
+    if(clusters->size() == 0){
+        cout << "No clusters found. Returning!" << endl;
+        return;
+    }
+
     for (int i = 0; i < clusters->size (); ++i)
     {
         int randR = rand() % 255;
