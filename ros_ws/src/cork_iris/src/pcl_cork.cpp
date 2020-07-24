@@ -53,6 +53,9 @@
 
 
 using namespace std;
+typedef pcl::PointCloud<pcl::PointXYZRGB> Cloud;
+typedef Cloud::Ptr CloudPtr;
+
 
 struct BoundingBox{
     Eigen::Quaternionf orientation;
@@ -72,6 +75,7 @@ int display_type;
 bool live;
 bool remove_stat_outliers;
 bool smooth_cloud;
+bool choose_best_cork;
 
 double normal_diff;
 double squared_dist;
@@ -231,6 +235,21 @@ bool enforceNormals (const pcl::PointXYZRGBNormal& point_a, const pcl::PointXYZR
     return (false);
 }
 
+std::vector<CloudPtr> clusterIndicesToCloud(pcl::IndicesClustersPtr clusters, CloudPtr original_cloud)
+{
+    std::vector<CloudPtr> cloud_clusters;
+    for(int i = 0; i < clusters->size(); i++)
+    {
+        CloudPtr cloud_cluster (new Cloud);
+        for (int j = 0; j < (*clusters)[i].indices.size (); ++j)
+        {
+            cloud_cluster->push_back(original_cloud->points[(*clusters)[i].indices[j]]);
+        }
+        cloud_clusters.push_back(cloud_cluster);  
+    }
+    return cloud_clusters;
+}
+
 
 BoundingBox computeCloudBoundingBox(pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_in)
 {
@@ -309,6 +328,76 @@ void broadcastCorkTransform(BoundingBox *bb)
     br.sendTransform(tf::StampedTransform(transform, ros::Time::now(), "camera_depth_optical_frame", "cork_piece"));
 
 }
+
+
+CloudPtr chooseBestCluster(pcl::IndicesClustersPtr clusters, CloudPtr fullPointCloud)
+{
+    // cout << clusters << endl;
+    // cout << fullPointCloud << endl;
+    auto start = chrono::steady_clock::now();
+
+   
+
+    float min_dist = 100;
+    int idx;
+    std::vector<CloudPtr> cluster_clouds = clusterIndicesToCloud(clusters, fullPointCloud);
+    if(!choose_best_cork){
+        return cluster_clouds[0];    
+    }
+
+    Eigen::Vector4f cloud_centroid;
+    // For simplicity hardcodedthreshold is the first cloud z for now
+    pcl::compute3DCentroid(*(cluster_clouds[0]), cloud_centroid);
+    float hardcoded_threshold_z = cloud_centroid.z() + 0.05;
+
+    std::vector<int> to_remove;
+    for(int i = 0; i < cluster_clouds.size(); i++){
+        pcl::compute3DCentroid(*(cluster_clouds[i]), cloud_centroid);
+        if(cloud_centroid.z() <= hardcoded_threshold_z)
+        {
+            cout << i << " centroid: " << cloud_centroid << endl;
+            // to_remove.push_back(i);
+            Eigen::Vector2f cloud_centroid_xyplane(cloud_centroid.x(), cloud_centroid.y());
+            float dist = cloud_centroid_xyplane.squaredNorm();
+            cout << " distance to center: " <<  dist << endl;
+            if(dist < min_dist) 
+            {
+                idx = i;
+                min_dist = dist;
+            } 
+        }
+       
+
+        cout << "-------" << endl;    
+
+    }
+    
+    // Remove all unwanted point clouds
+    cout << " size: " << cluster_clouds.size() << endl;
+    for(int i = to_remove.size()-1; i >= 0; i--)
+    {
+        cout << "Removing: " << to_remove[i] << endl;
+        cluster_clouds.erase(cluster_clouds.begin() + to_remove[i]);
+    }
+    cout << " size: " << cluster_clouds.size() << endl;
+
+    CloudPtr final(new Cloud);
+    for(int i = 0; i < cluster_clouds.size(); i++){
+        *final += *(cluster_clouds[i]);
+    }
+
+
+
+
+    // viewer->updatePointCloud(final, "kinectcloud");
+    
+    auto end = chrono::steady_clock::now();
+    auto diff = end - start;
+    cout << "Picked best cork in " << chrono::duration <double, milli> (diff).count() << " ms" << endl << endl  ;
+
+    return cluster_clouds[idx];
+}
+
 
 void cluster_extraction (pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_in, pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_out)
 {
@@ -398,11 +487,13 @@ void cluster_extraction (pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_in, pcl::
 
  
     // Transforming the cluster into a cloud
-    pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_cluster (new pcl::PointCloud<pcl::PointXYZRGB>);
-    for (int j = 0; j < (*clusters)[0].indices.size (); ++j)
-    {
-        cloud_cluster->push_back(cloud_out->points[(*clusters)[0].indices[j]]);
-    }
+    // pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_cluster (new pcl::PointCloud<pcl::PointXYZRGB>);
+    // for (int j = 0; j < (*clusters)[0].indices.size (); ++j)
+    // {
+    //     cloud_cluster->push_back(cloud_out->points[(*clusters)[0].indices[j]]);
+    // }
+
+    CloudPtr cloud_cluster = chooseBestCluster(clusters, cloud_out);
 
 
     BoundingBox cork_piece = computeCloudBoundingBox(cloud_cluster);
@@ -510,6 +601,7 @@ void parameterConfigure(cork_iris::PCLCorkConfig &config, uint32_t level)
     live = config.live;
     remove_stat_outliers = config.remove_outliers;
     smooth_cloud = config.smooth_cloud;
+    choose_best_cork = config.choose_best_cork;
 
     radius_search = config.radius_search;
 

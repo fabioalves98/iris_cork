@@ -16,7 +16,6 @@ class Calibration:
         self.basedir = basedir
         self.aruco_sub = rospy.Subscriber("/aruco_tracker/result", Image, self._on_aruco_result, queue_size=1)
 
-
     def _on_aruco_result(self, data):
         ''' Aruco tracker result needs to be subscriber for the calibration module to work '''
         pass
@@ -26,7 +25,7 @@ class Calibration:
         ''' Copies the saved calibration file in the calibration filepath to the specified basedir.
             This function should only be called if the calibration is already saved in the .ros dir'''
         try:
-            src = os.path.expanduser("~") + CALIBRATION_FILEPATH[1:]
+            src = os.path.expanduser("~") + self.CALIBRATION_FILEPATH[1:]
             dest = self.basedir+"/yaml/easy_handeye_eye_on_base.yaml"
             shutil.copyfile(src, dest)
         except Exception as e:
@@ -37,11 +36,12 @@ class Calibration:
         ''' Loads a file from the yaml specified base directory with name <filename> and adds it to the default calibration dir'''
         try:
             src = self.basedir+"/yaml/"+filename
-            dest = os.path.expanduser("~") + CALIBRATION_FILEPATH[1:]
+            dest = os.path.expanduser("~") + self.CALIBRATION_FILEPATH[1:]
             shutil.copyfile(src, dest)
         except Exception as e:
             rospy.logerr("[CORK-IRIS] Error while loading file from '" + src + "'")
             rospy.logerr(e)
+            return
         rospy.loginfo("Calibration file loaded correctly!")
     
     def print_samples(self, samples):
@@ -70,9 +70,9 @@ class Calibration:
         result = compute_calibration_srv()
         print("Finished calibration.")
         print(result)
-        print("Saving calibration to: " + CALIBRATION_FILEPATH + " and " + self.basedir + "/yaml")
-        rospy.wait_for_service(DEFAULT_HANDEYE_NAMESPACE + '/save_calibration', timeout=2.5)
-        save_calibration = rospy.ServiceProxy(DEFAULT_HANDEYE_NAMESPACE + '/save_calibration', Empty)
+        print("Saving calibration to: " + self.CALIBRATION_FILEPATH + " and " + self.basedir + "/yaml")
+        rospy.wait_for_service(self.DEFAULT_HANDEYE_NAMESPACE + '/save_calibration', timeout=2.5)
+        save_calibration = rospy.ServiceProxy(self.DEFAULT_HANDEYE_NAMESPACE + '/save_calibration', Empty)
         save_calibration()
         
         self.save_calibration_to_basedir()

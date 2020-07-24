@@ -341,10 +341,10 @@ def test():
         
         grab1, grab2 = computeCorkGrabPositions()
         setPCLCorkParameter({"live" : "false"})
+        test_publisher.publish(grab1)
         
         grab_cork(grab2.pose, grab1.pose)
         
-        test_publisher.publish(grab1)
     
     rospy.spin()
 
