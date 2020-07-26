@@ -1,6 +1,6 @@
 <launch>
     
-    <arg name="bag" default="big10.bag"  doc="Choose bag to use"/>
+    <arg name="bag" default="big5_mikado.bag"  doc="Choose bag to use"/>
 
     <include file="$(find iris_ur10e)/launch/sim.launch">
     </include>

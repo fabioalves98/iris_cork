@@ -55,12 +55,18 @@
 using namespace std;
 typedef pcl::PointCloud<pcl::PointXYZRGB> Cloud;
 typedef Cloud::Ptr CloudPtr;
+typedef int Index;
 
 
 struct BoundingBox{
     Eigen::Quaternionf orientation;
     Eigen::Vector3f position;
     pcl::PointXYZRGB minPoint, maxPoint;
+    Eigen::Vector4f centroid;
+};
+
+struct CloudInfo{
+    CloudPtr cloud;
     Eigen::Vector4f centroid;
 };
 
@@ -82,6 +88,8 @@ double squared_dist;
 double curv;
 double leaf_size;
 double cluster_tolerance;
+
+double z_threshold, center_threshold;
 
 double radius_search;
 
@@ -180,37 +188,6 @@ void removeBox(pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_in,
     }
 }
 
-int getHighestPoint()
-{
-    pcl::KdTreeFLANN<pcl::PointXYZRGB> kdtree;
-
-    kdtree.setInputCloud (cloud);
-
-    pcl::PointXYZRGB searchPoint;
-
-    searchPoint.x = 0;
-    searchPoint.y = 0;
-    searchPoint.z = 0;
-
-    // Changed here to one since we only need one point
-    int K = 1;
-    std::vector<int> pointIdxNKNSearch(K);
-    std::vector<float> pointNKNSquaredDistance(K);
-
-    if (kdtree.nearestKSearch (searchPoint, K, pointIdxNKNSearch, pointNKNSquaredDistance) > 0)
-    {  
-        for (std::size_t i = 0; i < pointIdxNKNSearch.size (); ++i){
-            cloud->points[pointIdxNKNSearch[i]].r = 0;
-            cloud->points[pointIdxNKNSearch[i]].g = 255;
-            cloud->points[pointIdxNKNSearch[i]].b = 0;
-        }
-    }
-
-    // Indice 0 since it's just a point
-    return pointIdxNKNSearch[0];
-
-}
-
 
 bool enforceNormals (const pcl::PointXYZRGBNormal& point_a, const pcl::PointXYZRGBNormal& point_b, float squared_distance)
 {
@@ -235,9 +212,9 @@ bool enforceNormals (const pcl::PointXYZRGBNormal& point_a, const pcl::PointXYZR
     return (false);
 }
 
-std::vector<CloudPtr> clusterIndicesToCloud(pcl::IndicesClustersPtr clusters, CloudPtr original_cloud)
+std::vector<CloudInfo> clusterIndicesToCloud(pcl::IndicesClustersPtr clusters, CloudPtr original_cloud)
 {
-    std::vector<CloudPtr> cloud_clusters;
+    std::vector<CloudInfo> cloud_clusters;
     for(int i = 0; i < clusters->size(); i++)
     {
         CloudPtr cloud_cluster (new Cloud);
@@ -245,7 +222,12 @@ std::vector<CloudPtr> clusterIndicesToCloud(pcl::IndicesClustersPtr clusters, Cl
         {
             cloud_cluster->push_back(original_cloud->points[(*clusters)[i].indices[j]]);
         }
-        cloud_clusters.push_back(cloud_cluster);  
+        CloudInfo cloud_info;
+        Eigen::Vector4f centroid;
+        pcl::compute3DCentroid(*(cloud_cluster), centroid);
+        cloud_info.cloud = cloud_cluster;
+        cloud_info.centroid = centroid;
+        cloud_clusters.push_back(cloud_info);  
     }
     return cloud_clusters;
 }
@@ -330,72 +312,89 @@ void broadcastCorkTransform(BoundingBox *bb)
 }
 
 
+Index getHighestCluster(std::vector<CloudInfo> clusters)
+{
+    if(clusters.size() == 0) return -1;
+
+    Index idx = 0;
+    float highest = clusters[0].centroid.z();
+    for(int i = 1; i < clusters.size(); i++)
+    {
+        if(clusters[i].centroid.z() <= highest)
+        {
+            highest = clusters[i].centroid.z();
+            idx = i;
+        }
+    }
+    return idx;
+}
+
+Index getMostCentralCluster(std::vector<CloudInfo> clusters)
+{
+    if(clusters.size() == 0) return -1;
+
+    Index idx = 0;
+    float min_dist = sqrt((clusters[0].centroid.x() * clusters[0].centroid.x()) + (clusters[0].centroid.y() * clusters[0].centroid.y()));
+    for(int i = 1; i < clusters.size(); i++)
+    {
+        float dist = sqrt((clusters[i].centroid.x() * clusters[i].centroid.x()) + (clusters[i].centroid.y() * clusters[i].centroid.y()));
+        if(dist < min_dist)
+        {
+            min_dist = dist;
+            idx = i;
+        }
+    }
+    return idx;
+}
+
+
+
 CloudPtr chooseBestCluster(pcl::IndicesClustersPtr clusters, CloudPtr fullPointCloud)
 {
     // cout << clusters << endl;
     // cout << fullPointCloud << endl;
     auto start = chrono::steady_clock::now();
 
-   
 
-    float min_dist = 100;
-    int idx;
-    std::vector<CloudPtr> cluster_clouds = clusterIndicesToCloud(clusters, fullPointCloud);
+    Index idx;
+    std::vector<CloudInfo> cluster_clouds = clusterIndicesToCloud(clusters, fullPointCloud);
+    cout << "Got cloudinfo" << cluster_clouds.size() << endl;
     if(!choose_best_cork){
-        return cluster_clouds[0];    
+        return cluster_clouds[0].cloud;    
     }
 
-    Eigen::Vector4f cloud_centroid;
-    // For simplicity hardcodedthreshold is the first cloud z for now
-    pcl::compute3DCentroid(*(cluster_clouds[0]), cloud_centroid);
-    float hardcoded_threshold_z = cloud_centroid.z() + 0.05;
+    Index highest_cloud_idx = getHighestCluster(cluster_clouds);
+    Index closest_cloud_idx = getMostCentralCluster(cluster_clouds);
 
-    std::vector<int> to_remove;
+    if(highest_cloud_idx < 0) {cout << "FAILED HIGHEST" << endl;}
+    if(closest_cloud_idx < 0) {cout << "FAILED CLOSEST" << endl;}
+
+    CloudInfo highest_cloud = cluster_clouds[highest_cloud_idx];
+    double THRESHOLD_Z = highest_cloud.centroid.z() + z_threshold;
+    CloudInfo closest_center = cluster_clouds[closest_cloud_idx];
+    double THRESHOLD_CENTER = center_threshold;//sqrt((closest_center.centroid.x() * closest_center.centroid.x()) + (closest_center.centroid.y() * closest_center.centroid.y())) + 0.05;
+
     for(int i = 0; i < cluster_clouds.size(); i++){
-        pcl::compute3DCentroid(*(cluster_clouds[i]), cloud_centroid);
-        if(cloud_centroid.z() <= hardcoded_threshold_z)
+        if(cluster_clouds[i].centroid.z() <= THRESHOLD_Z)
         {
-            cout << i << " centroid: " << cloud_centroid << endl;
-            // to_remove.push_back(i);
-            Eigen::Vector2f cloud_centroid_xyplane(cloud_centroid.x(), cloud_centroid.y());
-            float dist = cloud_centroid_xyplane.squaredNorm();
-            cout << " distance to center: " <<  dist << endl;
-            if(dist < min_dist) 
+            cout << "Cluster " << i << " passed z thresh" << endl;
+            float dist2center = sqrt((cluster_clouds[i].centroid.x() * cluster_clouds[i].centroid.x()) + (cluster_clouds[i].centroid.y() * cluster_clouds[i].centroid.y())); 
+            cout << "THRESHOLD CENTER: " << THRESHOLD_CENTER << endl << "Dist2Center: " << dist2center << endl;
+            if(dist2center <= THRESHOLD_CENTER)
             {
+                cout << "Cluster " << i << " might be the chosen one!" << endl;
                 idx = i;
-                min_dist = dist;
-            } 
+            }
+            cout << "----" << endl;
         }
-       
-
-        cout << "-------" << endl;    
-
-    }
-    
-    // Remove all unwanted point clouds
-    cout << " size: " << cluster_clouds.size() << endl;
-    for(int i = to_remove.size()-1; i >= 0; i--)
-    {
-        cout << "Removing: " << to_remove[i] << endl;
-        cluster_clouds.erase(cluster_clouds.begin() + to_remove[i]);
-    }
-    cout << " size: " << cluster_clouds.size() << endl;
-
-    CloudPtr final(new Cloud);
-    for(int i = 0; i < cluster_clouds.size(); i++){
-        *final += *(cluster_clouds[i]);
+        
     }
 
-
-
-
-    // viewer->updatePointCloud(final, "kinectcloud");
-    
     auto end = chrono::steady_clock::now();
     auto diff = end - start;
     cout << "Picked best cork in " << chrono::duration <double, milli> (diff).count() << " ms" << endl << endl  ;
 
-    return cluster_clouds[idx];
+    return cluster_clouds[idx].cloud;
 }
 
 
@@ -602,6 +601,10 @@ void parameterConfigure(cork_iris::PCLCorkConfig &config, uint32_t level)
     remove_stat_outliers = config.remove_outliers;
     smooth_cloud = config.smooth_cloud;
     choose_best_cork = config.choose_best_cork;
+
+    // Best cork algorithm params
+    z_threshold = config.z_threshold;
+    center_threshold = config.center_threshold;
 
     radius_search = config.radius_search;
 
