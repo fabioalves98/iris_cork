@@ -258,9 +258,9 @@ def grab_cork(cork, cork_grab_pose):
     if(not keep_going("stand back")):
         return 
 
-    arm.poseGoal([cork_grab_pose.position.x, cork_grab_pose.position.y, cork_grab_pose.position.z], 
-    [cork_grab_pose.orientation.x,cork_grab_pose.orientation.y,cork_grab_pose.orientation.z,cork_grab_pose.orientation.w ])
-    
+    # arm.poseGoal([cork_grab_pose.position.x, cork_grab_pose.position.y, cork_grab_pose.position.z], 
+    # [cork_grab_pose.orientation.x,cork_grab_pose.orientation.y,cork_grab_pose.orientation.z,cork_grab_pose.orientation.w ])
+    arm.simpleMove([0, 0, 0.15])
     if(not keep_going("out of camera")):
         return 
     arm.jointGoal(positions['out_of_camera_pos'])
@@ -334,7 +334,8 @@ def main():
     else:
         arm = ArmControl()
         calibration = Calibration(CORK_IRIS_BASE_DIR)
-        arm.setSpeed(0.2)
+        arm.setSpeed(0.1)
+    arm.config_gripper(100.0)
     rospy.spin()
     # parseParams(sys.argv[1:])
 
