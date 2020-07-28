@@ -36,6 +36,16 @@ test_publisher = None
 positions = {}
 position_names = []
 
+
+def keep_going(text):
+
+    goon = raw_input("[ACTION] -> " + text + "['n' to stop]")
+    if('n' in goon):
+        return False
+    return True
+
+
+
 def load_positions(path):
     '''Returns tuple with keys of all possible positions and the dict with the positions previously
        saved in a yaml file'''
@@ -75,6 +85,7 @@ def parseParams(args):
         elif("save" in command):
             pos_name = args[1]
             arm.saveJointPosition(CORK_IRIS_BASE_DIR + "/yaml/positions.yaml", pos_name)
+            position_names, positions = load_positions(CORK_IRIS_BASE_DIR + "/yaml/positions.yaml")
         elif("actionlist" in args[0]):
             actionlist_file = args[1]
             actions = parseActionlist(actionlist_file)
@@ -141,66 +152,9 @@ def runActionlist(actions):
                 arm.simpleMove(argums, pi/4)
             elif "compute" in cmd and not SIM:
                 calibration.compute_calibration()
-                continue
+                break
 
             if(sample and not SIM): calibration.take_sample()
-
-
-# def save_calibration_to_basedir():
-#     ''' Copies the saved calibration file in the calibration filepath to the cork irirs base yaml directory'''
-#     try:
-#         src = os.path.expanduser("~") + CALIBRATION_FILEPATH[1:]
-#         dest = CORK_IRIS_BASE_DIR+"/yaml/easy_handeye_eye_on_base.yaml"
-#         shutil.copyfile(src, dest)
-#     except Exception as e:
-#         rospy.logerr("[CORK-IRIS] Error while saving file to '" + dest + "'")
-#         rospy.logerr(e)
-
-# def load_calibration_file(filename):
-#     ''' Loads a file from the yaml cork iris base directory with name <filename> and adds it to the default calibration dir'''
-#     try:
-#         src = CORK_IRIS_BASE_DIR+"/yaml/"+filename
-#         dest = os.path.expanduser("~") + CALIBRATION_FILEPATH[1:]
-#         shutil.copyfile(src, dest)
-#     except Exception as e:
-#         rospy.logerr("[CORK-IRIS] Error while loading file from '" + src + "'")
-#         rospy.logerr(e)
-#     rospy.loginfo("Calibration file loaded correctly!")
-    
-
-# def print_samples(samples):
-#     print("Translation" + "\t" + "Rotation")
-#     for sample in samples:
-#         print("x: " + str(sample.translation.x)[:8] + "\t" + str(sample.rotation.x)[:8])
-#         print("y: " + str(sample.translation.y)[:8] + "\t" + str(sample.rotation.y)[:8])
-#         print("z: " + str(sample.translation.z)[:8] + "\t" + str(sample.rotation.z)[:8])
-#         print("=========================================")
-
-# def take_sample():
-#     rospy.wait_for_service(DEFAULT_HANDEYE_NAMESPACE + '/take_sample', timeout=2.5)
-#     take_sample_srv = rospy.ServiceProxy(DEFAULT_HANDEYE_NAMESPACE + '/take_sample', TakeSample)
-#     vals = take_sample_srv()
-#     print("New sample taken: ")
-#     transforms = vals.samples.camera_marker_samples.transforms
-#     print_samples([transforms[len(transforms)-1]])
-
-# def compute_calibration():
-    
-#     # get sample list - /easy_handeye_eye_on_base/get_sample_list
-#     # chamar servico compute - /easy_handeye_eye_on_base/compute_calibration
-#     rospy.wait_for_service(DEFAULT_HANDEYE_NAMESPACE + '/compute_calibration', timeout=2.5)
-#     compute_calibration_srv = rospy.ServiceProxy(DEFAULT_HANDEYE_NAMESPACE + '/compute_calibration', ComputeCalibration)
-#     print("Computing calibration")
-#     result = compute_calibration_srv()
-#     print("Finished calibration.")
-#     print(result)
-#     print("Saving calibration to: " + CALIBRATION_FILEPATH + " and " + CORK_IRIS_BASE_DIR + "/yaml")
-#     rospy.wait_for_service(DEFAULT_HANDEYE_NAMESPACE + '/save_calibration', timeout=2.5)
-#     save_calibration = rospy.ServiceProxy(DEFAULT_HANDEYE_NAMESPACE + '/save_calibration', Empty)
-#     save_calibration()
-    
-#     save_calibration_to_basedir()
-    
 
 
 
@@ -249,24 +203,30 @@ def computeCorkGrabPositions():
     aux.pose.orientation.z = 0
     aux.pose.orientation.w = 1
 
+    # grab_pose_1 = aux
     grab_pose_1 = tf2_geometry_msgs.do_transform_pose(aux, trans)
-
     aux.pose.position.x = -0.075
     grab_pose_2 = tf2_geometry_msgs.do_transform_pose(aux, trans)
     
     if grab_pose_1.pose.position.z < trans.transform.translation.z:
+
+        rospy.loginfo("Inverting cork piece orientation!")
         inv_quaternion = tf.transformations.quaternion_multiply(
             (trans.transform.rotation.x, trans.transform.rotation.y, trans.transform.rotation.z, trans.transform.rotation.w),
-            quaternion_from_euler(0, 0, pi))
+            quaternion_from_euler(0, pi, 0))
 
         trans.transform.rotation = Quaternion(*inv_quaternion)
         aux.pose.position.x = -0.15
 
         grab_pose_1 = tf2_geometry_msgs.do_transform_pose(aux, trans)
 
-        aux.pose.position.x = -0.075
+        aux.pose.position.x = -0.070
         grab_pose_2 = tf2_geometry_msgs.do_transform_pose(aux, trans)
-
+    # grab_pose_2 = None
+    ## TODO: fix this bug
+    grab_pose_1.pose.position.x = grab_pose_1.pose.position.x - 0.02
+    grab_pose_2.pose.position.x = grab_pose_2.pose.position.x - 0.02
+    
     return (grab_pose_1, grab_pose_2)
 
 
@@ -275,44 +235,50 @@ def grab_cork(cork, cork_grab_pose):
     global arm
 
 
-    goon = raw_input("grab cork?")
-    if('n' in goon):
-        rospy.signal_shutdown("emergency stop. dont grab")
+    if(not keep_going("grab_cork")):
         return
 
     arm.poseGoal([cork_grab_pose.position.x, cork_grab_pose.position.y, cork_grab_pose.position.z], 
     [cork_grab_pose.orientation.x,cork_grab_pose.orientation.y,cork_grab_pose.orientation.z,cork_grab_pose.orientation.w ])
     
-    goon = raw_input("go towards cork?")
-    if('n' in goon):
-        rospy.signal_shutdown("emergency stop. dont grab")
-        return
+    if(not keep_going("go towards cork")):
+        return 
 
     time.sleep(2)
 
     arm.poseGoal([cork.position.x, cork.position.y, cork.position.z], 
     [cork.orientation.x, cork.orientation.y, cork.orientation.z, cork.orientation.w])
-    goon = raw_input("press enter to grip")
-    if('n' in goon):
-        rospy.signal_shutdown("emergency stop. dont grip")
+    
+    if(not keep_going("grip")):
         return 
+  
     arm.grip()
 
     
-    goon = raw_input("pick up and go back?")
-    if('n' in goon):
-        rospy.signal_shutdown("emergency stop. dont go back")
+    if(not keep_going("stand back")):
         return 
+
     arm.poseGoal([cork_grab_pose.position.x, cork_grab_pose.position.y, cork_grab_pose.position.z], 
     [cork_grab_pose.orientation.x,cork_grab_pose.orientation.y,cork_grab_pose.orientation.z,cork_grab_pose.orientation.w ])
     
-    goon = raw_input("go to out of camera?")
-    if('n' in goon):
-        rospy.signal_shutdown("emergency stop. dont go back")
+    if(not keep_going("out of camera")):
         return 
     arm.jointGoal(positions['out_of_camera_pos'])
 
-    rospy.signal_shutdown("grabbed cork debug stop")
+    if(not keep_going("place pos")):
+        return 
+    arm.jointGoal(positions['place_pos'])
+
+    if(not keep_going("release")):
+        return
+    arm.release()
+
+    if(not keep_going("out of camera")):
+        return 
+    arm.jointGoal(positions['out_of_camera_pos'])
+
+
+    # rospy.signal_shutdown("grabbed cork debug stop")
 
 
 def takeCommand(data):
@@ -321,7 +287,7 @@ def takeCommand(data):
 
 def test():
     global positions, arm, test_publisher
-    print("test called")
+    rospy.loginfo("[TEST] Grabbing routine started")
     # arm.setSpeed(0.1)
     # p = arm.getPose().position
     # o = arm.getPose().orientation
@@ -344,9 +310,11 @@ def test():
         test_publisher.publish(grab1)
         
         grab_cork(grab2.pose, grab1.pose)
+        rospy.loginfo("Ended grabbing routine")
+        break
         
     
-    rospy.spin()
+    # rospy.spin()
 
 def main():
     # moveit_commander.roscpp_initialize(sys.argv)
@@ -366,8 +334,7 @@ def main():
     else:
         arm = ArmControl()
         calibration = Calibration(CORK_IRIS_BASE_DIR)
-        arm.setSpeed(0.1)
-
+        arm.setSpeed(0.2)
     rospy.spin()
     # parseParams(sys.argv[1:])
 

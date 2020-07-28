@@ -31,6 +31,12 @@ class ArmControl:
             rospy.logerr(e)
             sys.exit(0)
 
+        
+        release_limit = self.grpc.GetReleaseLimit(self.gid, 1)
+        if(release_limit < 65.0):
+            rospy.logwarn("[CORK-IRIS] Gripper release limit might be too low!!")
+
+
         print("Starting robot arm control!")
         # moveit_commander.roscpp_initialize(sys.argv)
         try:
@@ -201,5 +207,6 @@ class ArmControl:
 
     def saveJointPosition(self, path, position_name):
         hs = open(path,"a")
-        hs.write(position_name + " : " + str(self.getJointValues()))
+        hs.write("\n" + position_name + " : " + str(self.getJointValues()))
         hs.close()
+        rospy.loginfo("Successfully saved position '" + position_name + "' to '" + path + "'")

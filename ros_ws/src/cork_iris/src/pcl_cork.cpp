@@ -356,11 +356,11 @@ CloudPtr chooseBestCluster(pcl::IndicesClustersPtr clusters, CloudPtr fullPointC
     auto start = chrono::steady_clock::now();
 
 
-    Index idx;
+    Index idx = 0;
     std::vector<CloudInfo> cluster_clouds = clusterIndicesToCloud(clusters, fullPointCloud);
     cout << "Got cloudinfo" << cluster_clouds.size() << endl;
-    if(!choose_best_cork){
-        return cluster_clouds[0].cloud;    
+    if(!choose_best_cork && cluster_clouds.size() > 0){
+        return cluster_clouds[idx].cloud;    
     }
 
     Index highest_cloud_idx = getHighestCluster(cluster_clouds);
@@ -375,7 +375,7 @@ CloudPtr chooseBestCluster(pcl::IndicesClustersPtr clusters, CloudPtr fullPointC
     double THRESHOLD_CENTER = center_threshold;//sqrt((closest_center.centroid.x() * closest_center.centroid.x()) + (closest_center.centroid.y() * closest_center.centroid.y())) + 0.05;
 
     for(int i = 0; i < cluster_clouds.size(); i++){
-        if(cluster_clouds[i].centroid.z() <= THRESHOLD_Z)
+        if(cluster_clouds[i].centroid.z() <= THRESHOLD_Z) // or > threshold_z - 2*z_threshold
         {
             cout << "Cluster " << i << " passed z thresh" << endl;
             float dist2center = sqrt((cluster_clouds[i].centroid.x() * cluster_clouds[i].centroid.x()) + (cluster_clouds[i].centroid.y() * cluster_clouds[i].centroid.y())); 

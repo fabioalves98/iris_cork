@@ -10,11 +10,11 @@
     </include>
 
     <group if="$(arg calibrate)">
-        <include file="$(find cork_iris)/launch/handeye_publish.launch">
+        <include file="$(find cork_iris)/launch/handeye_calibrate.launch">
         </include>        
     </group>
     <group unless="$(arg calibrate)">
-        <include file="$(find cork_iris)/launch/handeye_calibrate.launch">
+        <include file="$(find cork_iris)/launch/handeye_publish.launch">
         </include>       
     </group>
 
