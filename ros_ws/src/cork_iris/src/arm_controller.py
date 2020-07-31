@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-import sys, copy, time, yaml, csv, json, shutil, os
+import sys, time, csv #os #yaml
 import rospy, rospkg, rosparam, tf #dynamic_reconfigure.client
 # import tf2_ros, tf2_geometry_msgs
 import moveit_commander
@@ -8,16 +8,18 @@ import moveit_msgs.msg
 import geometry_msgs.msg
 from ast import literal_eval
 from math import pi, cos, sin
+
 from cork_iris.msg import ArmCommand
-from std_msgs.msg import String
-from sensor_msgs.msg import Image
+from cork_iris.srv import ControlArm
+# from std_msgs.msg import String
+# from sensor_msgs.msg import Image
 from geometry_msgs.msg import Point, TransformStamped, Pose, PoseStamped, Quaternion
-from moveit_commander.conversions import pose_to_list
+# from moveit_commander.conversions import pose_to_list
 from tf.transformations import euler_from_quaternion, quaternion_from_euler, quaternion_multiply
-from easy_handeye.srv import TakeSample, ComputeCalibration
-from std_srvs.srv import Empty, Trigger
-from ur_msgs.srv import SetSpeedSliderFraction
-from ur_dashboard_msgs.srv import Load, GetProgramState, GetLoadedProgram
+# from easy_handeye.srv import TakeSample, ComputeCalibration
+# from std_srvs.srv import Empty, Trigger
+# from ur_msgs.srv import SetSpeedSliderFraction
+# from ur_dashboard_msgs.srv import Load, GetProgramState, GetLoadedProgram
 from ArmControl import ArmControl
 from Calibration import Calibration
 from HelperFunctions import *
@@ -53,6 +55,30 @@ def parseRotationArgs(args):
         args[i] = eval(args[i].replace('pi', str(pi)))
     return args
 
+def helpString():
+    help = "Usage: rosrun cork_iris arm_controller.py <command> <command_params>\n \
+    Available commands:\n \
+    \tmove   <x> <y> <z> -> Simple cartesian movement relative to last position\n \
+    \trotate <x> <y> <z> -> Simple rotation relative to last position\n \
+    \tgrip               -> Close the gripper fingers\n \
+    \trelease            -> Release the gripper\n \
+    \t<position_name>    -> Joint goal to a <position_name>. Names are loaded at the start from positions.yaml\n \
+    \tsave   <pos_name>  -> Save the current joint values of the arm\n \
+    \tactionlist <file>  -> Run movements defined in action list <file>\n \
+    \tgrab_cork          -> If everything is setup correctly, the controller should send signal to grab a cork piece\n"
+    # print(help)
+    return help
+
+# def takeCommand(data):
+#     parseParams(data.command)
+
+def takeCommandService(req):
+    output = parseParams(req.command)
+    if output == -1:
+        return [False, 'An error occured!']
+    return [True, output]
+
+
 def parseParams(args):
     global positions, position_names
     print("PARSING ARGS")
@@ -68,8 +94,8 @@ def parseParams(args):
             args = parseRotationArgs(args[1:4])
             arm.simpleRotate([args[0], args[1], args[2]])
         elif(command in position_names):
-            print("Moving to " + command)
             arm.jointGoal(positions[command])
+            return 'Moving to' + command
         elif("grip" in command):
             arm.grip()
         elif("release" in command):
@@ -84,16 +110,7 @@ def parseParams(args):
             runActionlist(actions)
 
         else:
-            print("Usage: rosrun cork_iris arm_control.py <command> <command_params>")
-            print("Available commands:")
-            print("\tmove   <x> <y> <z> -> Simple cartesian movement relative to last position")
-            print("\trotate <x> <y> <z> -> Simple rotation relative to last position")
-            print("\tgrip               -> Grip the gripper")
-            print("\trelease            -> Release the gripper")
-            print("\t<position_name>    -> Joint goal to a <position_name>. Names are loaded at the start from positions.yaml")
-            print("\tsave   <pos_name>  -> Save the current joint values of the arm")
-            print("\tactionlist <file>   -> Run movements defined in action list <file>")
-
+            return helpString()
 
     except Exception as e:
         if len(args) == 0:
@@ -102,7 +119,7 @@ def parseParams(args):
             rospy.logerr("[CORK-IRIS] An error occured while parsing the arguments:")
             rospy.logerr(e)
             rospy.logerr("Check the help command for more information.")   
-
+            return -1
 
 
 def parseActionlist(filename):
@@ -235,23 +252,9 @@ def grab_cork(cork, cork_grab_pose):
     # rospy.signal_shutdown("grabbed cork debug stop")
 
 
-def takeCommand(data):
-    parseParams(data.command)
+def grab_cork_routine():
+    rospy.loginfo("Grabbing routine started")
 
-
-def test():
-    global positions, arm, test_publisher
-    rospy.loginfo("[TEST] Grabbing routine started")
-    # arm.setSpeed(0.1)
-    # p = arm.getPose().position
-    # o = arm.getPose().orientation
-    # arm.poseGoal([p.x, p.y, p.z], [-0.471886915591, 0.0268562771098, 0.859489799629, -0.194624544454])
-
-    # arm.jointGoal(positions['vert_pick_pos'])
-    # arm.saveJointPosition(CORK_IRIS_BASE_DIR + "/yaml/positions.yaml", "init_calibration_pos")
-    
-    # listener = tf.TransformListener()
-    # TODO: Insert this into a grabbing routine etc.
     # Confirm pcl cork is live and with clustering activated
     setPCLCorkParameter()
     while not rospy.is_shutdown():
@@ -268,6 +271,21 @@ def test():
         rospy.loginfo("Ended grabbing routine")
         break
         
+
+
+
+def test():
+    global positions, arm, test_publisher
+    rospy.logwarn("arm_controller.py was called without parameters")
+    # arm.setSpeed(0.1)
+    # p = arm.getPose().position
+    # o = arm.getPose().orientation
+    # arm.poseGoal([p.x, p.y, p.z], [-0.471886915591, 0.0268562771098, 0.859489799629, -0.194624544454])
+
+    # arm.jointGoal(positions['vert_pick_pos'])
+    # arm.saveJointPosition(CORK_IRIS_BASE_DIR + "/yaml/positions.yaml", "init_calibration_pos")
+    
+  
     
     # rospy.spin()
 
@@ -280,7 +298,8 @@ def main():
     position_names, positions = load_positions(CORK_IRIS_BASE_DIR + "/yaml/positions.yaml")
     # rospy.Subscriber("/aruco_tracker/result", Image, aruco_callback)
     # rospy.Subscriber("/cork_iris/cork_piece", PoseStamped, robot2cork)
-    rospy.Subscriber("/cork_iris/control", ArmCommand, takeCommand)
+    # rospy.Subscriber("/cork_iris/control", ArmCommand, takeCommand)
+    cmd_receiver = rospy.Service('/cork_iris/control_arm', ControlArm, takeCommandService)
 
     test_publisher = rospy.Publisher('cork_iris/grabbing_position', PoseStamped, queue_size=1)
     

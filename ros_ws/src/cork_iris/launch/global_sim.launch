@@ -11,24 +11,14 @@
         </include>
     </group>
     <group unless="$(arg camera)">
+
         <node pkg="rosbag" type="play" name="rosbag" 
         args="-l /home/fraga/Documents/Programming/Bolsa/$(arg bag) tf:=/tf_nouse camera/rgb/image_raw:=/rgb/image_raw_nouse 
         camera/depth_registered/image_raw:=/depth_registered/image_raw_nouse camera/depth_registered/points:=/depth_registered/points_nouse
         camera/depth_registered/camera_info:=/depth_registered/camera_info_nouse"/>
 
-
         <node pkg="cork_iris" name="bag_time_sync" type="bag_time_sync.py" output="screen"/>
 
-
-        <!-- args="-l  /home/fraga/Documents/Programming/Bolsa/big5_mikado.bag /tf:=/tf_nouse"/> -->
-
-        <!-- <node pkg="tf" name="tf_static_publisher" type="static_transform_publisher" 
-        args="0 -0.02 0 -1.571 -0 -1.571 camera_link camera_depth_optical_frame 1" /> -->
-        
-        <!--     
-        <node pkg="tf" name="tf_static_publisher2" type="static_transform_publisher" 
-        args="0.668718 0.620995 0.551920 0.5734 0.22946 -0.7217 0.3122 base_link camera_link 1" /> -->
-     
     </group>
 
 

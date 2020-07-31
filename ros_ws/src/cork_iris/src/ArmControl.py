@@ -29,7 +29,7 @@ class ArmControl:
         except Exception as e:
             rospy.logerr("[CORK-IRIS] Couldn't connect to gripper xmlrpc proxy")
             rospy.logerr(e)
-            sys.exit(0)
+            # sys.exit(0)
 
         try:        
             release_limit = self.grpc.GetReleaseLimit(self.gid, 1)
@@ -40,15 +40,17 @@ class ArmControl:
             # rospy.logerr(e)
             # sys.exit(0)
 
-        print("Starting robot arm control!")
         # moveit_commander.roscpp_initialize(sys.argv)
         try:
             self.robot = moveit_commander.RobotCommander()
             self.move_group = moveit_commander.MoveGroupCommander("manipulator")
         except Exception as e:
-            print("Couldn't load robot arm or move_group")
-            print(e)
-            sys.exit(0)
+            rospy.logerr("[CORK-IRIS] Couldn't load robot arm or move_group")
+            rospy.logerr(e)
+            # sys.exit(0)
+            return
+        rospy.loginfo("[CORK-IRIS] Starting robot arm control!")
+
         
     def printGeneralStatus(self):
         # We can get the name of the reference frame for this robot:
