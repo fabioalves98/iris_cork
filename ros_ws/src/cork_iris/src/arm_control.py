@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 
 import sys, copy, time, yaml, csv, json, shutil, os
-import rospy, rospkg, rosparam, tf, dynamic_reconfigure.client
-import tf2_ros, tf2_geometry_msgs
+import rospy, rospkg, rosparam, tf #dynamic_reconfigure.client
+# import tf2_ros, tf2_geometry_msgs
 import moveit_commander
 import moveit_msgs.msg
 import geometry_msgs.msg
@@ -20,31 +20,23 @@ from ur_msgs.srv import SetSpeedSliderFraction
 from ur_dashboard_msgs.srv import Load, GetProgramState, GetLoadedProgram
 from ArmControl import ArmControl
 from Calibration import Calibration
+from HelperFunctions import *
 
 arm = None
 calibration = None
+scene = None
 
 CORK_IRIS_BASE_DIR = rospkg.RosPack().get_path('cork_iris')
 DEFAULT_HANDEYE_NAMESPACE = '/easy_handeye_eye_on_base'
 
 CALIBRATION_FILEPATH = '~/.ros/easy_handeye' + DEFAULT_HANDEYE_NAMESPACE + ".yaml"
 ## Fast control variable just for debugging purposes
-SIM = False
+SIM = True
 
 test_publisher = None
 
 positions = {}
 position_names = []
-
-
-def keep_going(text):
-
-    goon = raw_input("[ACTION] -> " + text + "['n' to stop]")
-    if('n' in goon):
-        return False
-    return True
-
-
 
 def load_positions(path):
     '''Returns tuple with keys of all possible positions and the dict with the positions previously
@@ -158,56 +150,14 @@ def runActionlist(actions):
 
 
 
-def getTransform(src_tf, dest_tf):
-    ''' Uses tf2 buffer lookup transform to return the transform from src_tf to dest_tf'''
-    tf_buffer = tf2_ros.Buffer(rospy.Duration(1200))
-    listener = tf2_ros.TransformListener(tf_buffer)
-    rate = rospy.Rate(10.0)
-    trans = None
-    while not rospy.is_shutdown():
-        try:
-            trans = tf_buffer.lookup_transform(str(src_tf), str(dest_tf), rospy.Time(), rospy.Duration(5))
-            break
-        except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
-            rospy.logerr("[CORK-IRIS] Error looking up transform!")
-            rospy.logerr(e)
-            return
-    return trans
-
-
-## Subscribing to the aruco result data is needed for him to publish the
-## marker transform.
-# def aruco_callback(data):
-#     pass
-
-
-def setPCLCorkParameter(params={"live" : "true", "type" : "4"}):
-    ''' Updates the pcl_cork parameters using "params" values'''
-    client = dynamic_reconfigure.client.Client("pcl_cork", timeout=30)
-    client.update_configuration(params)
-
 def computeCorkGrabPositions():
-    ## Gets a position -0.25 meters behind the original cork piece. this should be the 
+    ## Gets a position -0.15 meters behind the original cork piece. this should be the 
     ## grabbing position
     trans = getTransform('base_link', 'cork_piece')
 
-    ## Position 25 centimeters back from the main cork position
-    aux = PoseStamped()
-    aux.header.stamp = rospy.Time.now()
-    aux.header.frame_id = "base_link"
-    aux.pose.position.x = -0.15
-    aux.pose.position.y = 0
-    aux.pose.position.z = 0
-    aux.pose.orientation.x = 0
-    aux.pose.orientation.y = 0
-    aux.pose.orientation.z = 0
-    aux.pose.orientation.w = 1
-
-    # grab_pose_1 = aux
+    aux = newPoseStamped([-0.15, 0, 0], frame_id="base_link")
     grab_pose_1 = tf2_geometry_msgs.do_transform_pose(aux, trans)
-    aux.pose.position.x = -0.075
-    grab_pose_2 = tf2_geometry_msgs.do_transform_pose(aux, trans)
-    
+
     if grab_pose_1.pose.position.z < trans.transform.translation.z:
 
         rospy.loginfo("Inverting cork piece orientation!")
@@ -220,46 +170,50 @@ def computeCorkGrabPositions():
 
         grab_pose_1 = tf2_geometry_msgs.do_transform_pose(aux, trans)
 
-        aux.pose.position.x = -0.070
-        grab_pose_2 = tf2_geometry_msgs.do_transform_pose(aux, trans)
-    # grab_pose_2 = None
+    aux.pose.position.x = -0.070
+    grab_pose_2 = tf2_geometry_msgs.do_transform_pose(aux, trans)
+
     ## TODO: fix this bug
-    grab_pose_1.pose.position.x = grab_pose_1.pose.position.x - 0.02
-    grab_pose_2.pose.position.x = grab_pose_2.pose.position.x - 0.02
+    if not SIM:
+        grab_pose_1.pose.position.x = grab_pose_1.pose.position.x - 0.02
+        grab_pose_2.pose.position.x = grab_pose_2.pose.position.x - 0.02
     
     return (grab_pose_1, grab_pose_2)
 
 
 def grab_cork(cork, cork_grab_pose):
     '''Temporary function to grab a cork piece given its pose'''
-    global arm
+    global arm, scene
 
 
     if(not keep_going("grab_cork")):
         return
 
-    arm.poseGoal([cork_grab_pose.position.x, cork_grab_pose.position.y, cork_grab_pose.position.z], 
-    [cork_grab_pose.orientation.x,cork_grab_pose.orientation.y,cork_grab_pose.orientation.z,cork_grab_pose.orientation.w ])
-    
+    arm.poseGoal(posePositionToArray(cork_grab_pose.position), poseOrientationToArray(cork_grab_pose.orientation))
+   
     if(not keep_going("go towards cork")):
         return 
 
     time.sleep(2)
-
-    arm.poseGoal([cork.position.x, cork.position.y, cork.position.z], 
-    [cork.orientation.x, cork.orientation.y, cork.orientation.z, cork.orientation.w])
     
+    arm.poseGoal(posePositionToArray(cork.position), poseOrientationToArray(cork.orientation))
+
     if(not keep_going("grip")):
         return 
-  
+    
+    # TODO: Change the gripper function to take care of attaching stuff or not (and release function to detach)
+    # TODO: More testing in live
+    # scene.attach_box("ee_link", "cork_piece", touch_links=arm.getLinks())
+    # time.sleep(2)
+    # print(scene.get_attached_objects())
     arm.grip()
 
     
     if(not keep_going("stand back")):
         return 
 
-    # arm.poseGoal([cork_grab_pose.position.x, cork_grab_pose.position.y, cork_grab_pose.position.z], 
-    # [cork_grab_pose.orientation.x,cork_grab_pose.orientation.y,cork_grab_pose.orientation.z,cork_grab_pose.orientation.w ])
+
+    # TODO: Move towards the center of the box in an upwards direction, not always upwards like this here
     arm.simpleMove([0, 0, 0.15])
     if(not keep_going("out of camera")):
         return 
@@ -297,6 +251,7 @@ def test():
     # arm.saveJointPosition(CORK_IRIS_BASE_DIR + "/yaml/positions.yaml", "init_calibration_pos")
     
     # listener = tf.TransformListener()
+    # TODO: Insert this into a grabbing routine etc.
     # Confirm pcl cork is live and with clustering activated
     setPCLCorkParameter()
     while not rospy.is_shutdown():
@@ -318,9 +273,10 @@ def test():
 
 def main():
     # moveit_commander.roscpp_initialize(sys.argv)
-    rospy.init_node('arm_control', anonymous=True)
+    rospy.init_node('arm_control', anonymous=False)
 
-    global arm, positions, position_names, test_publisher, calibration
+    global arm, positions, position_names, test_publisher, calibration, scene
+
     position_names, positions = load_positions(CORK_IRIS_BASE_DIR + "/yaml/positions.yaml")
     # rospy.Subscriber("/aruco_tracker/result", Image, aruco_callback)
     # rospy.Subscriber("/cork_iris/cork_piece", PoseStamped, robot2cork)
@@ -335,7 +291,12 @@ def main():
         arm = ArmControl()
         calibration = Calibration(CORK_IRIS_BASE_DIR)
         arm.setSpeed(0.1)
-    arm.config_gripper(100.0)
+        arm.config_gripper(100.0)
+    
+    # scene = moveit_commander.PlanningSceneInterface()
+    
+    # time.sleep(2)
+    # print(scene.get_attached_objects())
     rospy.spin()
     # parseParams(sys.argv[1:])
 

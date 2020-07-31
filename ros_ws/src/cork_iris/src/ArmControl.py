@@ -31,11 +31,14 @@ class ArmControl:
             rospy.logerr(e)
             sys.exit(0)
 
-        
-        release_limit = self.grpc.GetReleaseLimit(self.gid, 1)
-        if(release_limit < 65.0):
-            rospy.logwarn("[CORK-IRIS] Gripper release limit might be too low!!")
-
+        try:        
+            release_limit = self.grpc.GetReleaseLimit(self.gid, 1)
+            if(release_limit < 65.0):
+                rospy.logwarn("[CORK-IRIS] Gripper release limit might be too low!!")
+        except Exception as e:
+            rospy.logwarn("[CORK-IRIS] Couldn't get gripper release limit")
+            # rospy.logerr(e)
+            # sys.exit(0)
 
         print("Starting robot arm control!")
         # moveit_commander.roscpp_initialize(sys.argv)
@@ -155,30 +158,11 @@ class ArmControl:
     def getPose(self):
         return self.move_group.get_current_pose().pose
 
-    def load_and_play_program(self, program_filename):
-        try:
-            rospy.wait_for_service('/ur_hardware_interface/dashboard/load_program', timeout=2.5)
-        except Exception as e:
-            rospy.logwarn("[CORK-IRIS] Service for loading a program is not available. Can't load '%s'", program_filename)
-            return
-        load_program = rospy.ServiceProxy('/ur_hardware_interface/dashboard/load_program', Load)
-        print(load_program(program_filename))
-
-        try:
-            rospy.wait_for_service('/ur_hardware_interface/dashboard/play', timeout=2.5)
-        except Exception as e:
-            rospy.logwarn("[CORK-IRIS] Service for starting a program is not available. Can't start '%s'", program_filename)
-            return
-        play_program = rospy.ServiceProxy('/ur_hardware_interface/dashboard/play', Trigger)
-        print(play_program()) 
-
     def grip(self):
         self.grpc.Grip(self.gid, 1)
-        # self.load_and_play_program('grip.urp')
 
     def release(self):
         self.grpc.Release(self.gid, 1)
-        # self.load_and_play_program('release.urp')
 
     def config_gripper(self, new_limit):
         ''' Configs. the release limit so that the gripper opens up to "new_limit" on release '''
@@ -210,3 +194,6 @@ class ArmControl:
         hs.write("\n" + position_name + " : " + str(self.getJointValues()))
         hs.close()
         rospy.loginfo("Successfully saved position '" + position_name + "' to '" + path + "'")
+
+    def getLinks(self, group="endeffector"):
+        return self.robot.get_link_names(group=group)
