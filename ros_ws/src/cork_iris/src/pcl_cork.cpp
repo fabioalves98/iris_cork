@@ -15,6 +15,7 @@
 #include <pcl/filters/conditional_removal.h>
 #include <pcl/filters/statistical_outlier_removal.h>
 #include <pcl/segmentation/extract_clusters.h>
+#include <pcl/filters/extract_indices.h>
 #include <pcl/segmentation/conditional_euclidean_clustering.h>
 #include <pcl/filters/voxel_grid.h>
 #include <pcl/surface/mls.h>
@@ -25,10 +26,18 @@
 #include <Eigen/Geometry>
 #include <pcl/common/transforms.h>
 
+// moveit
+#include <moveit_msgs/PlanningScene.h>
+#include <moveit_msgs/AttachedCollisionObject.h>
+#include <moveit_msgs/GetStateValidity.h>
+#include <moveit_msgs/DisplayRobotState.h>
+#include <moveit_msgs/ApplyPlanningScene.h>
+
 
 //Dynamic Parameters Configure
 #include <dynamic_reconfigure/server.h>
 #include <cork_iris/PCLCorkConfig.h>
+#include <cork_iris/BestCorkConfig.h>
 
 // ROS Sync
 #include <message_filters/time_synchronizer.h>
@@ -67,7 +76,9 @@ struct BoundingBox{
 
 struct CloudInfo{
     CloudPtr cloud;
-    Eigen::Vector4f centroid;
+    pcl::PointIndices::Ptr indices;
+    BoundingBox bb;
+    // Eigen::Vector4f centroid;
 };
 
 pcl::visualization::PCLVisualizer::Ptr viewer;
@@ -82,26 +93,30 @@ bool live;
 bool remove_stat_outliers;
 bool smooth_cloud;
 bool choose_best_cork;
+bool add_planning_scene_cork;
 
 double normal_diff;
 double squared_dist;
 double curv;
 double leaf_size;
 double cluster_tolerance;
-
-double z_threshold, center_threshold;
-
 double radius_search;
 
-int min_cluster_size;
-int max_cluster_size;
+int min_cluster_size, max_cluster_size;
 
 int meanK;
+
+double z_threshold, center_threshold;
+double space_distance_threshold, space_count_points_threshold, space_k_neighbors;
+
+
+// End global parameter values
 
 int num_enforce = 0;
 
 ros::Publisher pub;
 ros::Publisher point_pub;
+ros::Publisher planning_scene_diff_publisher;
 
 // PointXYZRGB cloud
 pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud (new pcl::PointCloud<pcl::PointXYZRGB>);
@@ -111,6 +126,10 @@ pcl::PointCloud<pcl::PointXYZRGBNormal>::Ptr cloud_with_normals (new pcl::PointC
 pcl::IndicesClustersPtr clusters (new pcl::IndicesClusters), 
 small_clusters (new pcl::IndicesClusters), large_clusters (new pcl::IndicesClusters);
 
+
+/*****************************
+ *      Helper Functions     *
+******************************/
 void drawImageContours(cv::Mat drawing, std::vector<std::vector<cv::Point>> contours)
 {
     for( int i = 0; i < contours.size(); i++ )
@@ -169,6 +188,135 @@ bool isPointInside(cv::Point point, std::vector<cv::Point>* contour)
     return cv::pointPolygonTest(*contour, point, false) == 1;
 }
 
+
+void getNearestNeighbors(int K, Eigen::Vector4f searchPoint, CloudPtr cloud, vector<int>& points, vector<float>& dists)
+{
+    pcl::KdTreeFLANN<pcl::PointXYZRGB> kdtree;
+    kdtree.setInputCloud (cloud);
+    
+    // vector<int> nearestPointIndices(K);
+    // vector<float> nearestPointDistances(K);
+
+    cout << searchPoint.x() << " " << searchPoint.y() << " " << searchPoint.z() << endl;
+
+    // pcl::PointXYZRGB startingPoint(searchPoint.x(), searchPoint.y(), searchPoint.z());
+    pcl::PointXYZRGB startingPoint;
+    startingPoint.x = searchPoint.x();
+    startingPoint.y = searchPoint.y();
+    startingPoint.z = searchPoint.z(); 
+
+    kdtree.nearestKSearch (startingPoint, K, points, dists);
+    
+
+        // for (int i = 0; i < nearestPointIndices.size (); ++i)
+        // {
+        // // cout << "    "  <<   (*cloud)[ nearestPointIndices[i] ].x 
+        // //             << " " << (*cloud)[ nearestPointIndices[i] ].y 
+        // //             << " " << (*cloud)[ nearestPointIndices[i] ].z 
+        // //             << " " << nearestPointIndices[i]
+        // //             << " (squared distance: " << nearestPointDistances[i] << ")" << endl;
+
+        // //             (*cloud)[nearestPointIndices[i]].r = 255;
+        // //             (*cloud)[nearestPointIndices[i]].g = 255;
+        // //             (*cloud)[nearestPointIndices[i]].b = 255;
+        // }
+    
+
+
+}
+
+
+BoundingBox computeCloudBoundingBox(CloudPtr cloud_in)
+{
+    // Compute principal directions
+    Eigen::Vector4f pcaCentroid;
+    pcl::compute3DCentroid(*cloud_in, pcaCentroid);
+
+    Eigen::Matrix3f covariance;
+    computeCovarianceMatrixNormalized(*cloud_in, pcaCentroid, covariance);
+    Eigen::SelfAdjointEigenSolver<Eigen::Matrix3f> eigen_solver(covariance, Eigen::ComputeEigenvectors);
+    Eigen::Matrix3f eigenVectorsPCA = eigen_solver.eigenvectors();
+    /// This line is necessary for proper orientation in some cases. The numbers come out the same without it, but
+    ///    the signs are different and the box doesn't get correctly oriented in some cases.
+    eigenVectorsPCA.col(2) = eigenVectorsPCA.col(0).cross(eigenVectorsPCA.col(1));  
+                                                                               
+    // Transform the original cloud to the origin where the principal components correspond to the axes.
+    Eigen::Matrix4f projectionTransform(Eigen::Matrix4f::Identity());
+    projectionTransform.block<3,3>(0,0) = eigenVectorsPCA.transpose();
+    projectionTransform.block<3,1>(0,3) = -1.f * (projectionTransform.block<3,3>(0,0) * pcaCentroid.head<3>());
+    pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloudPointsProjected (new pcl::PointCloud<pcl::PointXYZRGB>);
+    pcl::transformPointCloud(*cloud_in, *cloudPointsProjected, projectionTransform);
+    // Get the minimum and maximum points of the transformed cloud.
+    pcl::PointXYZRGB minPoint, maxPoint;
+    pcl::getMinMax3D(*cloudPointsProjected, minPoint, maxPoint);
+    const Eigen::Vector3f meanDiagonal = 0.5f*(maxPoint.getVector3fMap() + minPoint.getVector3fMap());
+
+    // Final transform
+    const Eigen::Quaternionf bboxQuaternion(eigenVectorsPCA);
+    const Eigen::Vector3f bboxTransform = eigenVectorsPCA * meanDiagonal + pcaCentroid.head<3>();
+
+    BoundingBox bb;
+    bb.orientation = bboxQuaternion;
+    bb.position = bboxTransform;
+    bb.minPoint = minPoint;
+    bb.maxPoint = maxPoint;
+    // MaxPoint - MinPoint
+    // x -> altura da caixa
+    // y -> largura da caixa
+    // z -> comprimento da caixa
+    bb.centroid = pcaCentroid;
+
+    return bb;
+
+}
+
+/*
+
+    Returns an array of CloudInfo objects containing the cloud representing each individual cluster and
+    the respective BoundingBox (Including centroid, min and max point etc...). It also saves the PointIndices
+    related to the cluster
+
+*/
+std::vector<CloudInfo> clusterIndicesToCloud(pcl::IndicesClustersPtr clusters, CloudPtr original_cloud)
+{
+    std::vector<CloudInfo> cloud_clusters;
+    for(int i = 0; i < clusters->size(); i++)
+    {
+        CloudPtr cloud_cluster (new Cloud);
+        pcl::PointIndices::Ptr cloud_indices (new pcl::PointIndices);
+        cloud_indices->indices = (*clusters)[i].indices;
+        for (int j = 0; j < (*clusters)[i].indices.size (); ++j)
+        {
+            cloud_cluster->push_back(original_cloud->points[(*clusters)[i].indices[j]]);
+        }
+        CloudInfo cloud_info;
+        // Eigen::Vector4f centroid;
+        // pcl::compute3DCentroid(*(cloud_cluster), centroid);
+        cloud_info.cloud = cloud_cluster;
+        cloud_info.bb = computeCloudBoundingBox(cloud_cluster);
+        cloud_info.indices = cloud_indices;
+        cloud_clusters.push_back(cloud_info);  
+    }
+    return cloud_clusters;
+}
+
+
+CloudPtr subtractCloud(CloudPtr cloud, pcl::PointIndices::Ptr indices)
+{
+    CloudPtr cloud_subtracted (new Cloud);
+
+    pcl::ExtractIndices<pcl::PointXYZRGB> extract;
+    extract.setInputCloud (cloud);
+    extract.setIndices (indices);
+    extract.setNegative (true);
+    extract.filter (*cloud_subtracted);
+
+    return cloud_subtracted;
+
+}
+
+
+
 void removeBox(pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_in, 
                pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_out,
                vector<cv::Point>* contours)
@@ -212,66 +360,6 @@ bool enforceNormals (const pcl::PointXYZRGBNormal& point_a, const pcl::PointXYZR
     return (false);
 }
 
-std::vector<CloudInfo> clusterIndicesToCloud(pcl::IndicesClustersPtr clusters, CloudPtr original_cloud)
-{
-    std::vector<CloudInfo> cloud_clusters;
-    for(int i = 0; i < clusters->size(); i++)
-    {
-        CloudPtr cloud_cluster (new Cloud);
-        for (int j = 0; j < (*clusters)[i].indices.size (); ++j)
-        {
-            cloud_cluster->push_back(original_cloud->points[(*clusters)[i].indices[j]]);
-        }
-        CloudInfo cloud_info;
-        Eigen::Vector4f centroid;
-        pcl::compute3DCentroid(*(cloud_cluster), centroid);
-        cloud_info.cloud = cloud_cluster;
-        cloud_info.centroid = centroid;
-        cloud_clusters.push_back(cloud_info);  
-    }
-    return cloud_clusters;
-}
-
-
-BoundingBox computeCloudBoundingBox(pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_in)
-{
-    // Compute principal directions
-    Eigen::Vector4f pcaCentroid;
-    pcl::compute3DCentroid(*cloud_in, pcaCentroid);
-
-    Eigen::Matrix3f covariance;
-    computeCovarianceMatrixNormalized(*cloud_in, pcaCentroid, covariance);
-    Eigen::SelfAdjointEigenSolver<Eigen::Matrix3f> eigen_solver(covariance, Eigen::ComputeEigenvectors);
-    Eigen::Matrix3f eigenVectorsPCA = eigen_solver.eigenvectors();
-    /// This line is necessary for proper orientation in some cases. The numbers come out the same without it, but
-    ///    the signs are different and the box doesn't get correctly oriented in some cases.
-    eigenVectorsPCA.col(2) = eigenVectorsPCA.col(0).cross(eigenVectorsPCA.col(1));  
-                                                                               
-    // Transform the original cloud to the origin where the principal components correspond to the axes.
-    Eigen::Matrix4f projectionTransform(Eigen::Matrix4f::Identity());
-    projectionTransform.block<3,3>(0,0) = eigenVectorsPCA.transpose();
-    projectionTransform.block<3,1>(0,3) = -1.f * (projectionTransform.block<3,3>(0,0) * pcaCentroid.head<3>());
-    pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloudPointsProjected (new pcl::PointCloud<pcl::PointXYZRGB>);
-    pcl::transformPointCloud(*cloud_in, *cloudPointsProjected, projectionTransform);
-    // Get the minimum and maximum points of the transformed cloud.
-    pcl::PointXYZRGB minPoint, maxPoint;
-    pcl::getMinMax3D(*cloudPointsProjected, minPoint, maxPoint);
-    const Eigen::Vector3f meanDiagonal = 0.5f*(maxPoint.getVector3fMap() + minPoint.getVector3fMap());
-
-    // Final transform
-    const Eigen::Quaternionf bboxQuaternion(eigenVectorsPCA);
-    const Eigen::Vector3f bboxTransform = eigenVectorsPCA * meanDiagonal + pcaCentroid.head<3>();
-
-    BoundingBox bb;
-    bb.orientation = bboxQuaternion;
-    bb.position = bboxTransform;
-    bb.minPoint = minPoint;
-    bb.maxPoint = maxPoint;
-    bb.centroid = pcaCentroid;
-
-    return bb;
-
-}
 
 void drawBoundingBox(BoundingBox *bb)
 {
@@ -301,6 +389,33 @@ void broadcastCorkTransform(BoundingBox *bb)
     cork_piece_pose.pose.orientation = orientation;
 
     point_pub.publish(cork_piece_pose);
+    
+    // Adding cork piece object to move it planning scene
+    if(add_planning_scene_cork){
+
+        moveit_msgs::AttachedCollisionObject attached_object;
+        attached_object.link_name = "left_finger_link";
+        attached_object.object.header.frame_id = "camera_depth_optical_frame";
+        attached_object.object.id = "cork_piece";
+        
+        shape_msgs::SolidPrimitive primitive;
+        primitive.type = primitive.BOX;
+        primitive.dimensions.resize(3);
+        primitive.dimensions[0] = bb->maxPoint.x - bb->minPoint.x;
+        primitive.dimensions[1] = (bb->maxPoint.y - bb->minPoint.y) * 0.9;
+        primitive.dimensions[2] = bb->maxPoint.z - bb->minPoint.z;
+
+        attached_object.object.primitives.push_back(primitive);
+        attached_object.object.primitive_poses.push_back(cork_piece_pose.pose);
+        attached_object.object.operation = attached_object.object.ADD;
+        attached_object.touch_links = std::vector<std::string>{ "ee_link", "left_finger_link", "right_finger_link" };
+
+        moveit_msgs::PlanningScene planning_scene;
+        planning_scene.world.collision_objects.push_back(attached_object.object);
+        planning_scene.is_diff = true;
+        planning_scene_diff_publisher.publish(planning_scene);
+
+    }
 
     static tf::TransformBroadcaster br;
     tf::Transform transform;
@@ -312,87 +427,156 @@ void broadcastCorkTransform(BoundingBox *bb)
 }
 
 
+
+
+/*
+    Determines if the shape of the cluster is "cork" like
+*/
+bool isClusterBadShaped(BoundingBox cluster)
+{
+    float THRESHOLD_PERCENTAGE = 50.0; // TODO: Add to params
+    float largura = cluster.maxPoint.y - cluster.minPoint.y;
+    float comprimento = cluster.maxPoint.z - cluster.minPoint.z;
+    return ((largura/comprimento) * 100) > THRESHOLD_PERCENTAGE;
+}
+
+/*
+    Determines if the cluster bounding box is too big to be a "cork_piece"
+*/
+bool isClusterTooBig(BoundingBox cluster)
+{
+    float THRESHOLD_VOLUME = 0.001; // TODO: Add to params
+    float largura = cluster.maxPoint.y - cluster.minPoint.y;
+    float comprimento = cluster.maxPoint.z - cluster.minPoint.z;
+    float altura = cluster.maxPoint.x - cluster.minPoint.x;
+    return (largura * comprimento * altura) > THRESHOLD_VOLUME;
+}
+
+
 Index getHighestCluster(std::vector<CloudInfo> clusters)
 {
     if(clusters.size() == 0) return -1;
 
     Index idx = 0;
-    float highest = clusters[0].centroid.z();
+    float highest = clusters[0].bb.centroid.z();
     for(int i = 1; i < clusters.size(); i++)
     {
-        if(clusters[i].centroid.z() <= highest)
+        if(clusters[i].bb.centroid.z() <= highest)
         {
-            highest = clusters[i].centroid.z();
+            highest = clusters[i].bb.centroid.z();
             idx = i;
         }
     }
     return idx;
 }
 
-Index getMostCentralCluster(std::vector<CloudInfo> clusters)
+
+bool isThereSpace(CloudInfo cluster, CloudPtr fullCloud)
 {
-    if(clusters.size() == 0) return -1;
 
-    Index idx = 0;
-    float min_dist = sqrt((clusters[0].centroid.x() * clusters[0].centroid.x()) + (clusters[0].centroid.y() * clusters[0].centroid.y()));
-    for(int i = 1; i < clusters.size(); i++)
+    CloudPtr fullCloudNoCluster = subtractCloud(fullCloud, cluster.indices);
+    
+    int K = space_k_neighbors;
+    float DISTANCE_THRESHOLD_COUNT = space_distance_threshold;
+    int COUNT_THRESHOLD = space_count_points_threshold;
+
+    vector<int> points(K);
+    vector<float> distances(K);
+    getNearestNeighbors(K, cluster.bb.centroid, fullCloudNoCluster, points, distances);
+    int counter = 0;
+    for(int i = 0; i < points.size(); i++)
     {
-        float dist = sqrt((clusters[i].centroid.x() * clusters[i].centroid.x()) + (clusters[i].centroid.y() * clusters[i].centroid.y()));
-        if(dist < min_dist)
+        if(i < 30) cout << distances[i] << endl;
+        if(distances[i] < DISTANCE_THRESHOLD_COUNT)
         {
-            min_dist = dist;
-            idx = i;
+            counter++;
         }
     }
-    return idx;
+    cout << counter << " POINTS NEARBY CLUSTER" << endl;
+
+    // Debug drawing the points 
+    // for (int i = 0; i < points.size (); ++i)
+    // {
+    // cout << "    "  <<   (*fullCloudNoCluster)[ points[i] ].x 
+    //             << " " << (*fullCloudNoCluster)[ points[i] ].y 
+    //             << " " << (*fullCloudNoCluster)[ points[i] ].z 
+    //             << " " << points[i]
+    //             << " (squared distance: " << distances[i] << ")" << endl;
+
+    //             (*fullCloudNoCluster)[points[i]].r = 255;
+    //             (*fullCloudNoCluster)[points[i]].g = 255;
+    //             (*fullCloudNoCluster)[points[i]].b = 255;
+    // }
+
+    // viewer->updatePointCloud(fullCloudNoCluster, "kinectcloud");
+
+    return counter < COUNT_THRESHOLD;
+
 }
+
 
 
 
 CloudPtr chooseBestCluster(pcl::IndicesClustersPtr clusters, CloudPtr fullPointCloud)
 {
-    // cout << clusters << endl;
-    // cout << fullPointCloud << endl;
-    auto start = chrono::steady_clock::now();
 
 
     Index idx = 0;
     std::vector<CloudInfo> cluster_clouds = clusterIndicesToCloud(clusters, fullPointCloud);
     cout << "Got cloudinfo" << cluster_clouds.size() << endl;
+    
+    // Debug print
+
+    for(int i = 0; i < cluster_clouds.size(); i++){
+        float x = cluster_clouds[i].bb.maxPoint.x - cluster_clouds[i].bb.minPoint.x;
+        float y = cluster_clouds[i].bb.maxPoint.y - cluster_clouds[i].bb.minPoint.y;
+        float z = cluster_clouds[i].bb.maxPoint.z - cluster_clouds[i].bb.minPoint.z;
+        cout << "X MAX POINT -- " << x << endl;
+        cout << "Y MAX POINT -- " << y << endl;
+        cout << "Z MAX POINT -- " << z << endl;
+        cout << "% y/z -- " << (y/z) * 100 << "(" << (((y/z) * 100) > 50.0) << ")" << endl;
+        cout << "Total volume -- " << (x * y * z) << "(" <<  ((x*y*z) > 0.001) << ")" << endl;
+        cout << "-----" << endl;
+    }
+
+    
     if(!choose_best_cork && cluster_clouds.size() > 0){
         return cluster_clouds[idx].cloud;    
     }
 
+
     Index highest_cloud_idx = getHighestCluster(cluster_clouds);
-    Index closest_cloud_idx = getMostCentralCluster(cluster_clouds);
-
-    if(highest_cloud_idx < 0) {cout << "FAILED HIGHEST" << endl;}
-    if(closest_cloud_idx < 0) {cout << "FAILED CLOSEST" << endl;}
-
     CloudInfo highest_cloud = cluster_clouds[highest_cloud_idx];
-    double THRESHOLD_Z = highest_cloud.centroid.z() + z_threshold;
-    CloudInfo closest_center = cluster_clouds[closest_cloud_idx];
-    double THRESHOLD_CENTER = center_threshold;//sqrt((closest_center.centroid.x() * closest_center.centroid.x()) + (closest_center.centroid.y() * closest_center.centroid.y())) + 0.05;
+
+    double THRESHOLD_Z_DOWN = highest_cloud.bb.centroid.z() + z_threshold;
+    double THRESHOLD_Z_UP = (THRESHOLD_Z_DOWN - (2*z_threshold));
+    double THRESHOLD_CENTER = center_threshold;
+    // TODO: Distance to center should increase as cork pieces get removed?
+    // TODO: Add pre-processing step where bad shaped clusters and too big clusters are segmented again
 
     for(int i = 0; i < cluster_clouds.size(); i++){
-        if(cluster_clouds[i].centroid.z() <= THRESHOLD_Z) // or > threshold_z - 2*z_threshold
+
+        isThereSpace(cluster_clouds[i], fullPointCloud);
+
+        if(!isClusterBadShaped(cluster_clouds[i].bb) && !isClusterTooBig(cluster_clouds[i].bb))
         {
-            cout << "Cluster " << i << " passed z thresh" << endl;
-            float dist2center = sqrt((cluster_clouds[i].centroid.x() * cluster_clouds[i].centroid.x()) + (cluster_clouds[i].centroid.y() * cluster_clouds[i].centroid.y())); 
-            cout << "THRESHOLD CENTER: " << THRESHOLD_CENTER << endl << "Dist2Center: " << dist2center << endl;
-            if(dist2center <= THRESHOLD_CENTER)
-            {
-                cout << "Cluster " << i << " might be the chosen one!" << endl;
-                idx = i;
+            cout << "Cluster " << i << " is well shaped" << endl;
+            if((cluster_clouds[i].bb.centroid.z() <= THRESHOLD_Z_DOWN) && (cluster_clouds[i].bb.centroid.z() > THRESHOLD_Z_UP))
+                {
+                cout << "Cluster " << i << " passed z thresh" << endl;
+                float dist2center = sqrt((cluster_clouds[i].bb.centroid.x() * cluster_clouds[i].bb.centroid.x()) + (cluster_clouds[i].bb.centroid.y() * cluster_clouds[i].bb.centroid.y())); 
+                cout << "Dist2Center: " << dist2center << endl;
+                if(dist2center <= THRESHOLD_CENTER)
+                {
+                    cout << "Cluster " << i << " might be the chosen one!" << endl;
+                    // TODO: Finally check if there is enough space to grab
+                    idx = i;
+                }
             }
             cout << "----" << endl;
         }
         
     }
-
-    auto end = chrono::steady_clock::now();
-    auto diff = end - start;
-    cout << "Picked best cork in " << chrono::duration <double, milli> (diff).count() << " ms" << endl << endl  ;
 
     return cluster_clouds[idx].cloud;
 }
@@ -485,20 +669,11 @@ void cluster_extraction (pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_in, pcl::
     }
 
  
-    // Transforming the cluster into a cloud
-    // pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_cluster (new pcl::PointCloud<pcl::PointXYZRGB>);
-    // for (int j = 0; j < (*clusters)[0].indices.size (); ++j)
-    // {
-    //     cloud_cluster->push_back(cloud_out->points[(*clusters)[0].indices[j]]);
-    // }
-
     CloudPtr cloud_cluster = chooseBestCluster(clusters, cloud_out);
-
 
     BoundingBox cork_piece = computeCloudBoundingBox(cloud_cluster);
     broadcastCorkTransform(&cork_piece);
     drawBoundingBox(&cork_piece);
-    // drawCloudBoundingBox(cloud_cluster);
 
     Eigen::Vector4f pcaCentroid;
     pcl::compute3DCentroid(*cloud_cluster, pcaCentroid);
@@ -601,10 +776,8 @@ void parameterConfigure(cork_iris::PCLCorkConfig &config, uint32_t level)
     remove_stat_outliers = config.remove_outliers;
     smooth_cloud = config.smooth_cloud;
     choose_best_cork = config.choose_best_cork;
+    add_planning_scene_cork = config.add_planning_scene_cork;
 
-    // Best cork algorithm params
-    z_threshold = config.z_threshold;
-    center_threshold = config.center_threshold;
 
     radius_search = config.radius_search;
 
@@ -619,8 +792,22 @@ void parameterConfigure(cork_iris::PCLCorkConfig &config, uint32_t level)
 
     // Statistical outliers params
     meanK = config.mean_k;
+
+
+    // Best cork algorithm params
+    z_threshold = config.z_threshold;
+    center_threshold = config.center_threshold;
+    space_distance_threshold = config.space_distance_threshold;
+    space_count_points_threshold = config.space_count_points_threshold;
+    space_k_neighbors = config.space_k_neighbors;
+
+
     displayed = false;
+
+
 }
+
+
 
 void synced_callback(const sensor_msgs::ImageConstPtr& image, 
                     const sensor_msgs::ImageConstPtr& depth, 
@@ -741,6 +928,7 @@ int main (int argc, char** argv)
     dynamic_reconfigure::Server<cork_iris::PCLCorkConfig>::CallbackType pclConfigCallback;
     pclConfigCallback = boost::bind(&parameterConfigure, _1, _2);
     server.setCallback(pclConfigCallback);
+    
 
 	message_filters::Synchronizer<AproxSync> sync{static_cast<const AproxSync &>(mypolicy), image_sub, depth_sub, pointcloud_sub, camera_info};
     sync.registerCallback(boost::bind(&synced_callback, _1, _2, _3, _4));
@@ -752,7 +940,16 @@ int main (int argc, char** argv)
     // Create a ROS publisher for the output point cloud
     pub = n.advertise<sensor_msgs::PointCloud2> ("/cork_iris/processed_pointcloud", 1);
     point_pub = n.advertise<geometry_msgs::PoseStamped> ("/cork_iris/cork_piece", 1);
+
+
+    planning_scene_diff_publisher = n.advertise<moveit_msgs::PlanningScene>("planning_scene", 1);
+//   ros::WallDuration sleep_t(0.5);
+//   while (planning_scene_diff_publisher.getNumSubscribers() < 1)
+//   {
+//     sleep_t.sleep();
+//   }
     ros::Rate loop_rate(10);
+
     // Spin
     ros::spin ();
 }
