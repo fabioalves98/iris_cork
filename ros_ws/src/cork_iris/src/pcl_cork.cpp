@@ -2,6 +2,8 @@
 #include <chrono>
 #include <numeric>
 #include <math.h>
+#include <thread>
+
 // ROS Common
 #include <ros/ros.h>
 #include <tf/transform_broadcaster.h>
@@ -25,6 +27,7 @@
 #include <Eigen/Core>
 #include <Eigen/Geometry>
 #include <pcl/common/transforms.h>
+#include <pcl/filters/passthrough.h>
 
 // moveit
 #include <moveit_msgs/PlanningScene.h>
@@ -64,6 +67,9 @@
 using namespace std;
 typedef pcl::PointCloud<pcl::PointXYZRGB> Cloud;
 typedef Cloud::Ptr CloudPtr;
+typedef pcl::PointCloud<pcl::PointXYZRGBNormal> CloudNormal;
+typedef CloudNormal::Ptr CloudNormalPtr;
+typedef pcl::RGB Color;
 typedef int Index;
 
 
@@ -76,13 +82,26 @@ struct BoundingBox{
 
 struct CloudInfo{
     CloudPtr cloud;
+    CloudNormalPtr cloudNormal;
     pcl::PointIndices::Ptr indices;
     BoundingBox bb;
-    // Eigen::Vector4f centroid;
+};
+
+struct CECExtractionParams{
+    double normal_diff;
+    double squared_dist;
+    double curv;
+    double leaf_size;
+    double cluster_tolerance;
+    double radius_search;
+    int min_cluster_size, max_cluster_size;
 };
 
 pcl::visualization::PCLVisualizer::Ptr viewer;
-image_transport::Publisher parsed_pub;
+
+
+// Debug variable to get color from array index, since cluster colors are based on indices
+std::vector<std::string> colors = {"orange", "red", "green", "yellow", "blue", "pink", "cyan"};
 
 bool displayed = false;
 
@@ -95,24 +114,23 @@ bool smooth_cloud;
 bool choose_best_cork;
 bool add_planning_scene_cork;
 
-double normal_diff;
-double squared_dist;
-double curv;
-double leaf_size;
-double cluster_tolerance;
-double radius_search;
+bool filter_height;
+double filter_height_value;
 
-int min_cluster_size, max_cluster_size;
+double test_param, test_param2;
+CECExtractionParams cecparams;
+
+// int min_cluster_size, max_cluster_size;
 
 int meanK;
 
 double z_threshold, center_threshold;
 double space_distance_threshold, space_count_points_threshold, space_k_neighbors;
+double bad_shape_percentage_threshold, volume_threshold;
+double splitted_cork_distance_threshold, splitted_cork_normal_threshold;
 
 
 // End global parameter values
-
-int num_enforce = 0;
 
 ros::Publisher pub;
 ros::Publisher point_pub;
@@ -120,16 +138,8 @@ ros::Publisher planning_scene_diff_publisher;
 
 // PointXYZRGB cloud
 pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud (new pcl::PointCloud<pcl::PointXYZRGB>);
-// Cloud normals
-pcl::PointCloud<pcl::PointXYZRGBNormal>::Ptr cloud_with_normals (new pcl::PointCloud<pcl::PointXYZRGBNormal>);
-
-pcl::IndicesClustersPtr clusters (new pcl::IndicesClusters), 
-small_clusters (new pcl::IndicesClusters), large_clusters (new pcl::IndicesClusters);
 
 
-/*****************************
- *      Helper Functions     *
-******************************/
 void drawImageContours(cv::Mat drawing, std::vector<std::vector<cv::Point>> contours)
 {
     for( int i = 0; i < contours.size(); i++ )
@@ -138,9 +148,9 @@ void drawImageContours(cv::Mat drawing, std::vector<std::vector<cv::Point>> cont
     }
 }
 
-pcl::visualization::PCLVisualizer::Ptr normalsVis()
+pcl::visualization::PCLVisualizer::Ptr normalVis(string name)
 {   
-    pcl::visualization::PCLVisualizer::Ptr viewer (new pcl::visualization::PCLVisualizer ("3D Viewer"));
+    pcl::visualization::PCLVisualizer::Ptr viewer (new pcl::visualization::PCLVisualizer (name));
     viewer->setBackgroundColor (0, 0, 0);
     viewer->addCoordinateSystem (0.2);
     viewer->initCameraParameters ();
@@ -206,23 +216,6 @@ void getNearestNeighbors(int K, Eigen::Vector4f searchPoint, CloudPtr cloud, vec
     startingPoint.z = searchPoint.z(); 
 
     kdtree.nearestKSearch (startingPoint, K, points, dists);
-    
-
-        // for (int i = 0; i < nearestPointIndices.size (); ++i)
-        // {
-        // // cout << "    "  <<   (*cloud)[ nearestPointIndices[i] ].x 
-        // //             << " " << (*cloud)[ nearestPointIndices[i] ].y 
-        // //             << " " << (*cloud)[ nearestPointIndices[i] ].z 
-        // //             << " " << nearestPointIndices[i]
-        // //             << " (squared distance: " << nearestPointDistances[i] << ")" << endl;
-
-        // //             (*cloud)[nearestPointIndices[i]].r = 255;
-        // //             (*cloud)[nearestPointIndices[i]].g = 255;
-        // //             (*cloud)[nearestPointIndices[i]].b = 255;
-        // }
-    
-
-
 }
 
 
@@ -277,28 +270,31 @@ BoundingBox computeCloudBoundingBox(CloudPtr cloud_in)
     related to the cluster
 
 */
-std::vector<CloudInfo> clusterIndicesToCloud(pcl::IndicesClustersPtr clusters, CloudPtr original_cloud)
+std::vector<CloudInfo> clusterIndicesToCloud(pcl::IndicesClustersPtr clusters, CloudPtr original_cloud, CloudNormalPtr original_cloud_normal)
 {
     std::vector<CloudInfo> cloud_clusters;
     for(int i = 0; i < clusters->size(); i++)
     {
         CloudPtr cloud_cluster (new Cloud);
+        CloudNormalPtr cloud_normal_cluster (new CloudNormal);
         pcl::PointIndices::Ptr cloud_indices (new pcl::PointIndices);
         cloud_indices->indices = (*clusters)[i].indices;
         for (int j = 0; j < (*clusters)[i].indices.size (); ++j)
         {
             cloud_cluster->push_back(original_cloud->points[(*clusters)[i].indices[j]]);
+            cloud_normal_cluster->push_back(original_cloud_normal->points[(*clusters)[i].indices[j]]);
         }
         CloudInfo cloud_info;
-        // Eigen::Vector4f centroid;
-        // pcl::compute3DCentroid(*(cloud_cluster), centroid);
         cloud_info.cloud = cloud_cluster;
+        cloud_info.cloudNormal = cloud_normal_cluster;
         cloud_info.bb = computeCloudBoundingBox(cloud_cluster);
         cloud_info.indices = cloud_indices;
         cloud_clusters.push_back(cloud_info);  
     }
     return cloud_clusters;
 }
+
+
 
 
 CloudPtr subtractCloud(CloudPtr cloud, pcl::PointIndices::Ptr indices)
@@ -315,6 +311,36 @@ CloudPtr subtractCloud(CloudPtr cloud, pcl::PointIndices::Ptr indices)
 
 }
 
+
+/*
+    Computes an average normal associated with a cluster.
+*/
+Eigen::Vector3f getClusterAverageNormal(CloudNormalPtr cluster)
+{
+    Eigen::Vector3f currentNormal = cluster->points[0].getNormalVector3fMap();
+    for(int i = 1; i < cluster->points.size(); i++)
+    {
+        currentNormal += cluster->points[i].getNormalVector3fMap();
+    }
+
+    return currentNormal / cluster->points.size();
+
+}
+
+CloudInfo joinClusters(CloudInfo cluster0, CloudInfo cluster1)
+{
+    cout << "Cloud b4:" << cluster0.cloud->size() << endl;
+    *(cluster0.cloud) += *(cluster1.cloud);
+    *(cluster0.cloudNormal) += *(cluster1.cloudNormal);
+    (cluster0.indices->indices).insert(cluster0.indices->indices.end(), cluster1.indices->indices.begin(), cluster1.indices->indices.end());
+    if(cluster1.bb.centroid.z() > cluster0.bb.centroid.z())
+        cluster0.bb = cluster1.bb;
+    cout << "Centrofd BB0: " << cluster0.bb.centroid << endl << "Centroid BB1: " << cluster1.bb.centroid << endl;
+    cout << "Cloud after:" << cluster0.cloud->size() << endl;
+
+
+    return cluster0;
+}
 
 
 void removeBox(pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_in, 
@@ -337,23 +363,100 @@ void removeBox(pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_in,
 }
 
 
+void filterPointCloudHeight(CloudPtr cloud_in, CloudPtr cloud_out, float heigth_value)
+{
+    pcl::PassThrough<pcl::PointXYZRGB> pass;
+    pass.setInputCloud (cloud_in);
+    pass.setFilterFieldName ("z");
+    pass.setFilterLimits (0.0, heigth_value);
+    //pass.setFilterLimitsNegative (true);
+    pass.filter (*cloud_out);
+}
+
+
+void paintClusters(CloudPtr cloud_out, std::vector<CloudInfo> clusters)
+{
+    for (int i = 0; i < clusters.size(); ++i)
+    {      
+        bitset<8> binary = bitset<8>(i);
+
+        for (int j = 0; j < clusters[i].indices->indices.size (); ++j)
+        {
+            if (i % 8 == 0) 
+            {
+                cloud_out->points[clusters[i].indices->indices[j]].r = 255;
+                cloud_out->points[clusters[i].indices->indices[j]].g = 150;
+                cloud_out->points[clusters[i].indices->indices[j]].b = 0;
+            }
+            else
+            {
+                cloud_out->points[clusters[i].indices->indices[j]].r = 255 * binary[0];
+                cloud_out->points[clusters[i].indices->indices[j]].g = 255 * binary[1];
+                cloud_out->points[clusters[i].indices->indices[j]].b = 255 * binary[2];
+            }   
+        }
+    }  
+}
+
+
+void paintClustersFull(CloudPtr cloud_out, std::vector<CloudInfo> clusters, pcl::IndicesClustersPtr small_clusters, pcl::IndicesClustersPtr large_clusters)
+{
+    for (int i = 0; i < small_clusters->size (); ++i)
+    {
+        for (int j = 0; j < (*small_clusters)[i].indices.size (); ++j)
+        {
+            cloud_out->points[(*small_clusters)[i].indices[j]].r = 100;
+            cloud_out->points[(*small_clusters)[i].indices[j]].g = 100;
+            cloud_out->points[(*small_clusters)[i].indices[j]].b = 100;
+
+        }
+    }
+    
+
+    for (int i = 0; i < large_clusters->size (); ++i)
+    {
+        for (int j = 0; j < (*large_clusters)[i].indices.size (); ++j)
+        {
+            cloud_out->points[(*large_clusters)[i].indices[j]].r = 100;
+            cloud_out->points[(*large_clusters)[i].indices[j]].g = 50;
+            cloud_out->points[(*large_clusters)[i].indices[j]].b = 0;
+        }
+    }
+
+
+    paintClusters(cloud_out, clusters);
+
+}
+
+void paintPoints(CloudPtr cloud_out, vector<int> points, Color color)
+{
+    for (int i = 0; i < points.size (); ++i)
+    {
+        (*cloud_out)[points[i]].r = color.r;
+        (*cloud_out)[points[i]].g = color.g;
+        (*cloud_out)[points[i]].b = color.b;
+    }
+}
+
+
+
+
 bool enforceNormals (const pcl::PointXYZRGBNormal& point_a, const pcl::PointXYZRGBNormal& point_b, float squared_distance)
 {
     Eigen::Map<const Eigen::Vector3f> point_a_normal = point_a.getNormalVector3fMap (), 
     point_b_normal = point_b.getNormalVector3fMap ();
 
-    num_enforce++;
 
     double enf_normal_diff = point_a_normal.dot(point_b_normal);
-    
-    if (squared_distance < squared_dist)
+    if (squared_distance < cecparams.squared_dist)
     {
-        if (enf_normal_diff >= normal_diff)
+        if (enf_normal_diff >= cecparams.normal_diff)
         {
-            if (point_b.curvature < curv)
-            {
-                return (true);
-            }   
+            return (true);
+            // if (point_b.curvature < cecparams.curv)
+            // {
+            //     return (true);
+            // }   
         }
     }
 
@@ -361,11 +464,47 @@ bool enforceNormals (const pcl::PointXYZRGBNormal& point_a, const pcl::PointXYZR
 }
 
 
-void drawBoundingBox(BoundingBox *bb)
+/*
+    Segments the cloud_in using CEC and ultimately returns a new processed cloud, indices for clusters, small clusters and big clusters.
+    Also returns the cloud with normals estimated during the process
+*/
+
+void CECExtraction(CloudPtr cloud_in, CloudPtr cloud_out, 
+                   pcl::IndicesClustersPtr clusters, pcl::IndicesClustersPtr& sclusters, pcl::IndicesClustersPtr& lclusters,
+                   CloudNormalPtr cloud_with_normals)
 {
-    viewer->removeShape("bbox");
-    viewer->addCube(bb->position, bb->orientation, bb->maxPoint.x - bb->minPoint.x, bb->maxPoint.y - bb->minPoint.y, bb->maxPoint.z - bb->minPoint.z, "bbox", 0);  
-    viewer->setShapeRenderingProperties(pcl::visualization::PCL_VISUALIZER_COLOR, 1, 0, 0, "bbox");             
+    pcl::VoxelGrid<pcl::PointXYZRGB> vg;
+    vg.setInputCloud (cloud_in);
+    vg.setLeafSize (cecparams.leaf_size, cecparams.leaf_size, cecparams.leaf_size);
+    vg.setDownsampleAllData (true);
+    vg.filter (*cloud_out);
+    
+    pcl::search::KdTree<pcl::PointXYZRGB>::Ptr search_tree (new pcl::search::KdTree<pcl::PointXYZRGB>);
+
+    pcl::copyPointCloud(*cloud_out, *cloud_with_normals);
+    pcl::NormalEstimation<pcl::PointXYZRGB, pcl::PointXYZRGBNormal> ne;
+    ne.setInputCloud (cloud_out);
+    ne.setSearchMethod (search_tree);
+    ne.setRadiusSearch (cecparams.radius_search);
+    ne.compute (*cloud_with_normals);
+
+    pcl::ConditionalEuclideanClustering<pcl::PointXYZRGBNormal> cec (true);
+    cec.setInputCloud (cloud_with_normals);
+    cec.setConditionFunction (&enforceNormals);
+    cec.setClusterTolerance (cecparams.cluster_tolerance);
+    cec.setMinClusterSize (cloud_with_normals->points.size () / cecparams.min_cluster_size);
+    cec.setMaxClusterSize (cloud_with_normals->points.size () / cecparams.max_cluster_size);
+    cec.segment (*clusters);
+    cec.getRemovedClusters (sclusters, lclusters);
+
+}
+
+
+void drawBoundingBox(BoundingBox *bb, string name)
+{
+    viewer->removeShape(name);
+    viewer->addCube(bb->position, bb->orientation, bb->maxPoint.x - bb->minPoint.x, bb->maxPoint.y - bb->minPoint.y, bb->maxPoint.z - bb->minPoint.z, name, 0);  
+    viewer->setShapeRenderingProperties(pcl::visualization::PCL_VISUALIZER_COLOR, 1, 0, 0, name);             
     viewer->setRepresentationToWireframeForAllActors(); 
 }
 
@@ -434,10 +573,11 @@ void broadcastCorkTransform(BoundingBox *bb)
 */
 bool isClusterBadShaped(BoundingBox cluster)
 {
-    float THRESHOLD_PERCENTAGE = 50.0; // TODO: Add to params
+    float THRESHOLD_PERCENTAGE = bad_shape_percentage_threshold;
     float largura = cluster.maxPoint.y - cluster.minPoint.y;
     float comprimento = cluster.maxPoint.z - cluster.minPoint.z;
-    return ((largura/comprimento) * 100) > THRESHOLD_PERCENTAGE;
+
+    return ((largura/comprimento)) > THRESHOLD_PERCENTAGE;
 }
 
 /*
@@ -445,11 +585,114 @@ bool isClusterBadShaped(BoundingBox cluster)
 */
 bool isClusterTooBig(BoundingBox cluster)
 {
-    float THRESHOLD_VOLUME = 0.001; // TODO: Add to params
+    float THRESHOLD_VOLUME = volume_threshold;
     float largura = cluster.maxPoint.y - cluster.minPoint.y;
     float comprimento = cluster.maxPoint.z - cluster.minPoint.z;
     float altura = cluster.maxPoint.x - cluster.minPoint.x;
     return (largura * comprimento * altura) > THRESHOLD_VOLUME;
+}
+
+
+
+/*
+    Determines if a cork_piece was splitted into two different clusters (Works best if the clusters inserted here are one after the other
+    in the original cluster array, since this means they were clustered one after the other. Clusters where this didn't happend should belong
+    to the same cork_piece).
+*/
+bool isSplittedCluster(CloudInfo cluster0, CloudInfo cluster1)
+{
+
+    double THRESHOLD_SPLIT_DISTANCE = splitted_cork_distance_threshold;
+    Eigen::Vector4f centroid0 = cluster0.bb.centroid;
+    Eigen::Vector4f centroid1 = cluster1.bb.centroid;
+    double distance = sqrt(pow((centroid0.x() - centroid1.x()), 2) + pow((centroid0.y() - centroid1.y()), 2) + pow((centroid0.z() - centroid1.z()), 2));
+    cout << "Distance between clusters: " << distance << endl; 
+    if(distance > THRESHOLD_SPLIT_DISTANCE)
+        return false;
+
+    double THRESHOLD_DOT_PRODUCT = splitted_cork_normal_threshold; 
+    Eigen::Vector3f avg_normal0 = getClusterAverageNormal(cluster0.cloudNormal);
+    Eigen::Vector3f avg_normal1 = getClusterAverageNormal(cluster1.cloudNormal);
+    double dot_product = avg_normal0.dot(avg_normal1);
+
+    cout << "Dot product: " << dot_product << endl;
+    // Check if there are a bunch of points in a common line between them
+    return dot_product < THRESHOLD_DOT_PRODUCT;
+
+}
+
+vector<CloudInfo> joinSplittedClusters(vector<CloudInfo> clusters)
+{
+    vector<CloudInfo> new_vec;
+    cout << "<<<<< JOINING SPLITTED CLUSTERS >>>>>>" << endl;
+    for(int i = 0; i < clusters.size()-1; i++)
+    {
+        if(isSplittedCluster(clusters[i], clusters[i+1]))
+        {
+            cout << "Join " << colors[i%7] << " with " << colors[(i+1)%7] << endl; 
+            CloudInfo new_cluster = joinClusters(clusters[i], clusters[i+1]);
+            new_vec.push_back(new_cluster);
+            i++; // Skip next cluster that was joined with i
+        }else{
+            new_vec.push_back(clusters[i]);
+            if(i == clusters.size()-2) new_vec.push_back(clusters[i+1]);
+        }
+    }
+    cout << "ENDED JOINING SPLITTED CLUSTERS" << endl; 
+    return new_vec;
+}
+
+/*
+    Runs cluster extraction again in the sub clusters that are considered too big or out of shape
+*/
+vector<CloudInfo> segmentBigClusters(vector<CloudInfo> clusters)
+{
+    vector<CloudInfo> new_vec;
+    cout << "<<<<< SEGMENTING BIG/OUT OF SHAPE CLUSTERS >>>>>>" << endl;
+    CloudPtr display_cloud (new Cloud);
+    for(int i = 0; i < clusters.size(); i++)
+    {
+        if(isClusterBadShaped(clusters[i].bb) || isClusterTooBig(clusters[i].bb))
+        {
+            cout << "Cluster " << colors[i%7] << " is either too big or bad shaped. Segmenting again" << endl;
+            // CECExtraction(clusters[i].cloud, )
+            // CloudNormalPtr cloud_with_normals (new CloudNormal);
+            // pcl::IndicesClustersPtr clusts (new pcl::IndicesClusters), small_clusters (new pcl::IndicesClusters), large_clusters (new pcl::IndicesClusters);
+            // CloudPtr cloud_out (new Cloud);
+            
+            // // Save params in aux, change them to improve segmentation
+            // CECExtractionParams aux = cecparams;
+            // cecparams.leaf_size = 0.0095;
+            // cecparams.squared_dist = test_param2;
+            // // cecparams.normal_diff = 0.997;
+            // cecparams.normal_diff = test_param;
+            // cecparams.min_cluster_size = 200;
+
+
+            // CECExtraction(clusters[i].cloud, cloud_out, clusts, small_clusters, large_clusters, cloud_with_normals);
+            // cecparams = aux;
+            // Bring back the original params
+
+            // cout << "cloud info clusters: " << clusts->size() << endl;
+            // cout << "cloud info clusters small : " << small_clusters->size() << endl;
+            // cout << "cloud info clusters big: " << large_clusters->size() << endl;
+            // std::vector<CloudInfo> cloud_info_clusters = clusterIndicesToCloud(clusts, cloud_out, cloud_with_normals);
+            // paintClusters(cloud_out, cloud_info_clusters);
+            // *(display_cloud) += *(cloud_out);
+
+            // setup bb etc etc...
+        }else{
+            new_vec.push_back(clusters[i]);
+        }
+
+    }
+    // viewer->updatePointCloud(display_cloud, "kinectcloud");
+
+
+    cout << "ENDED SEGMENTATION" << endl; 
+    return new_vec;
+
+
 }
 
 
@@ -486,28 +729,19 @@ bool isThereSpace(CloudInfo cluster, CloudPtr fullCloud)
     int counter = 0;
     for(int i = 0; i < points.size(); i++)
     {
-        if(i < 30) cout << distances[i] << endl;
+        // if(i < 30) cout << distances[i] << endl;
         if(distances[i] < DISTANCE_THRESHOLD_COUNT)
         {
             counter++;
         }
     }
-    cout << counter << " POINTS NEARBY CLUSTER" << endl;
-
-    // Debug drawing the points 
-    // for (int i = 0; i < points.size (); ++i)
-    // {
-    // cout << "    "  <<   (*fullCloudNoCluster)[ points[i] ].x 
-    //             << " " << (*fullCloudNoCluster)[ points[i] ].y 
-    //             << " " << (*fullCloudNoCluster)[ points[i] ].z 
-    //             << " " << points[i]
-    //             << " (squared distance: " << distances[i] << ")" << endl;
-
-    //             (*fullCloudNoCluster)[points[i]].r = 255;
-    //             (*fullCloudNoCluster)[points[i]].g = 255;
-    //             (*fullCloudNoCluster)[points[i]].b = 255;
-    // }
-
+    // cout << counter << " POINTS NEARBY CLUSTER" << endl;
+    
+    // Debug drawing points
+    // Color c;
+    // c.r = 255; c.g = 255; c.b = 255;
+    // paintPoints(fullCloudNoCluster, points, c);
+    // *fullCloudNoCluster += *(cluster.cloud);
     // viewer->updatePointCloud(fullCloudNoCluster, "kinectcloud");
 
     return counter < COUNT_THRESHOLD;
@@ -516,32 +750,31 @@ bool isThereSpace(CloudInfo cluster, CloudPtr fullCloud)
 
 
 
-
-CloudPtr chooseBestCluster(pcl::IndicesClustersPtr clusters, CloudPtr fullPointCloud)
+CloudInfo chooseBestCluster(std::vector<CloudInfo> cluster_clouds, CloudPtr fullPointCloud)
 {
 
 
     Index idx = 0;
-    std::vector<CloudInfo> cluster_clouds = clusterIndicesToCloud(clusters, fullPointCloud);
-    cout << "Got cloudinfo" << cluster_clouds.size() << endl;
-    
+    cout << "Got cloudinfo: " << cluster_clouds.size() << endl;
     // Debug print
 
-    for(int i = 0; i < cluster_clouds.size(); i++){
-        float x = cluster_clouds[i].bb.maxPoint.x - cluster_clouds[i].bb.minPoint.x;
-        float y = cluster_clouds[i].bb.maxPoint.y - cluster_clouds[i].bb.minPoint.y;
-        float z = cluster_clouds[i].bb.maxPoint.z - cluster_clouds[i].bb.minPoint.z;
-        cout << "X MAX POINT -- " << x << endl;
-        cout << "Y MAX POINT -- " << y << endl;
-        cout << "Z MAX POINT -- " << z << endl;
-        cout << "% y/z -- " << (y/z) * 100 << "(" << (((y/z) * 100) > 50.0) << ")" << endl;
-        cout << "Total volume -- " << (x * y * z) << "(" <<  ((x*y*z) > 0.001) << ")" << endl;
-        cout << "-----" << endl;
-    }
+    // for(int i = 0; i < cluster_clouds.size(); i++){
+    //     cout << "Cluster " << colors[i%7] << endl;
+    //     float x = cluster_clouds[i].bb.maxPoint.x - cluster_clouds[i].bb.minPoint.x;
+    //     float y = cluster_clouds[i].bb.maxPoint.y - cluster_clouds[i].bb.minPoint.y;
+    //     float z = cluster_clouds[i].bb.maxPoint.z - cluster_clouds[i].bb.minPoint.z;
+    //     cout << "X MAX POINT -- " << x << endl;
+    //     cout << "Y MAX POINT -- " << y << endl;
+    //     cout << "Z MAX POINT -- " << z << endl;
+    //     cout << "% y/z -- " << (y/z) * 100 << "(" << (((y/z) * 100) > 50.0) << ")" << endl;
+    //     cout << "Total volume -- " << (x * y * z) << "(" <<  ((x*y*z) > 0.001) << ")" << endl;
+    //     cout << "-----" << endl;        
+    // }
+
 
     
     if(!choose_best_cork && cluster_clouds.size() > 0){
-        return cluster_clouds[idx].cloud;    
+        return cluster_clouds[idx];    
     }
 
 
@@ -552,136 +785,73 @@ CloudPtr chooseBestCluster(pcl::IndicesClustersPtr clusters, CloudPtr fullPointC
     double THRESHOLD_Z_UP = (THRESHOLD_Z_DOWN - (2*z_threshold));
     double THRESHOLD_CENTER = center_threshold;
     // TODO: Distance to center should increase as cork pieces get removed?
-    // TODO: Add pre-processing step where bad shaped clusters and too big clusters are segmented again
 
     for(int i = 0; i < cluster_clouds.size(); i++){
-
-        isThereSpace(cluster_clouds[i], fullPointCloud);
-
-        if(!isClusterBadShaped(cluster_clouds[i].bb) && !isClusterTooBig(cluster_clouds[i].bb))
+        cout << "-------- Cluster " << colors[i%7] << "----------" << endl;
+       
+        if((cluster_clouds[i].bb.centroid.z() <= THRESHOLD_Z_DOWN) && (cluster_clouds[i].bb.centroid.z() > THRESHOLD_Z_UP))
         {
-            cout << "Cluster " << i << " is well shaped" << endl;
-            if((cluster_clouds[i].bb.centroid.z() <= THRESHOLD_Z_DOWN) && (cluster_clouds[i].bb.centroid.z() > THRESHOLD_Z_UP))
+            cout << "Cluster " << colors[i%7] << " is high enough!" << endl;
+            float dist2center = sqrt((cluster_clouds[i].bb.centroid.x() * cluster_clouds[i].bb.centroid.x()) + (cluster_clouds[i].bb.centroid.y() * cluster_clouds[i].bb.centroid.y())); 
+            if(dist2center <= THRESHOLD_CENTER)
+            {
+                cout << "Cluster " << colors[i%7] << " is close to center!" << endl;
+                if(isThereSpace(cluster_clouds[i], fullPointCloud))
                 {
-                cout << "Cluster " << i << " passed z thresh" << endl;
-                float dist2center = sqrt((cluster_clouds[i].bb.centroid.x() * cluster_clouds[i].bb.centroid.x()) + (cluster_clouds[i].bb.centroid.y() * cluster_clouds[i].bb.centroid.y())); 
-                cout << "Dist2Center: " << dist2center << endl;
-                if(dist2center <= THRESHOLD_CENTER)
-                {
-                    cout << "Cluster " << i << " might be the chosen one!" << endl;
-                    // TODO: Finally check if there is enough space to grab
-                    idx = i;
+                    cout << "There is space around " << colors[i%7] << endl;
+                    cout << "Cluster " << colors[i%7] << " is the chosen one!" << endl;
+                    cout << "========================================" << endl;
+                    return cluster_clouds[i];
                 }
             }
-            cout << "----" << endl;
-        }
-        
+        }    
     }
 
-    return cluster_clouds[idx].cloud;
+    cout << "No 100% choice was made. Choosing the first one of the bunch." << endl;
+    return cluster_clouds[idx];
 }
 
 
 void cluster_extraction (pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_in, pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_out)
 {
 
-
-    pcl::VoxelGrid<pcl::PointXYZRGB> vg;
-    vg.setInputCloud (cloud_in);
-    vg.setLeafSize (leaf_size, leaf_size, leaf_size);
-    vg.setDownsampleAllData (true);
-    vg.filter (*cloud_out);
-    
-    pcl::search::KdTree<pcl::PointXYZRGB>::Ptr search_tree (new pcl::search::KdTree<pcl::PointXYZRGB>);
-    pcl::copyPointCloud(*cloud_out, *cloud_with_normals);
-    pcl::NormalEstimation<pcl::PointXYZRGB, pcl::PointXYZRGBNormal> ne;
-    ne.setInputCloud (cloud_out);
-    ne.setSearchMethod (search_tree);
-    ne.setRadiusSearch (radius_search);
-    ne.compute (*cloud_with_normals);
-    
-    pcl::ConditionalEuclideanClustering<pcl::PointXYZRGBNormal> cec (true);
-    cec.setInputCloud (cloud_with_normals);
-    cec.setConditionFunction (&enforceNormals);
-    cec.setClusterTolerance (cluster_tolerance);
-    cec.setMinClusterSize (cloud_with_normals->points.size () / min_cluster_size);
-    cec.setMaxClusterSize (cloud_with_normals->points.size () / max_cluster_size);
-    cec.segment (*clusters);
-    cec.getRemovedClusters (small_clusters, large_clusters);
-
-    //cout << "small cluster size: " << small_clusters->size() << endl;
-    //cout << "large cluster size: " << large_clusters->size() << endl;
-    //cout << "cluster size: " << clusters->size() << endl;
-    //cout << "original cloud size: " << cloud->width << " - " << cloud->height << endl;
-    //cout << "cloud filtered size: " << cloud_out->width  << " " << cloud_out->height<<  endl;
-    //cout << "number of comparissons: " << num_enforce << endl;
-
-    for (int i = 0; i < small_clusters->size (); ++i)
-    {
-        for (int j = 0; j < (*small_clusters)[i].indices.size (); ++j)
-        {
-            cloud_out->points[(*small_clusters)[i].indices[j]].r = 100;
-            cloud_out->points[(*small_clusters)[i].indices[j]].g = 100;
-            cloud_out->points[(*small_clusters)[i].indices[j]].b = 100;
-
-        }
-    }
-    
-
-    for (int i = 0; i < large_clusters->size (); ++i)
-    {
-        for (int j = 0; j < (*large_clusters)[i].indices.size (); ++j)
-        {
-            cloud_out->points[(*large_clusters)[i].indices[j]].r = 100;
-            cloud_out->points[(*large_clusters)[i].indices[j]].g = 50;
-            cloud_out->points[(*large_clusters)[i].indices[j]].b = 0;
-        }
-    }
+    // pcl::PointCloud<pcl::PointXYZRGBNormal>::Ptr cloud_with_normals (new pcl::PointCloud<pcl::PointXYZRGBNormal>);
+    CloudNormalPtr cloud_with_normals (new CloudNormal);
+    pcl::IndicesClustersPtr clusters (new pcl::IndicesClusters), small_clusters (new pcl::IndicesClusters), large_clusters (new pcl::IndicesClusters);
+    CECExtraction(cloud_in, cloud_out, clusters, small_clusters, large_clusters, cloud_with_normals);
 
     if(clusters->size() == 0){
         cout << "No clusters found. Returning!" << endl;
         return;
     }
 
-    for (int i = 0; i < clusters->size (); ++i)
-    {
-        int randR = rand() % 255;
-        int randG = rand() % 255;
-        int randB = rand() % 255;
-      
-        bitset<8> binary = bitset<8>(i);
-
-        for (int j = 0; j < (*clusters)[i].indices.size (); ++j)
-        {
-            if (i % 8 == 0) 
-            {
-                cloud_out->points[(*clusters)[i].indices[j]].r = 255;
-                cloud_out->points[(*clusters)[i].indices[j]].g = 150;
-                cloud_out->points[(*clusters)[i].indices[j]].b = 0;
-            }
-            else
-            {
-                cloud_out->points[(*clusters)[i].indices[j]].r = 255 * binary[0];
-                cloud_out->points[(*clusters)[i].indices[j]].g = 255 * binary[1];
-                cloud_out->points[(*clusters)[i].indices[j]].b = 255 * binary[2];
-            }   
-        }
+    // Parse information on clusters and group it in a CloudInfo struct
+    std::vector<CloudInfo> cloud_info_clusters = clusterIndicesToCloud(clusters, cloud_out, cloud_with_normals);
+    
+    /*** Pre-processing for chooseBestCluster ***/
+    //    Clustering big and bad shaped clusters again
+    cloud_info_clusters = segmentBigClusters(cloud_info_clusters);
+    //     Grouping clusters belonging to the same cork piece
+    vector<CloudInfo> cluster_clouds = joinSplittedClusters(cloud_info_clusters);
+    paintClustersFull(cloud_out, cluster_clouds, small_clusters, large_clusters);
+    // paintClusters(cloud_out, cluster_clouds);
+    
+    if(cluster_clouds.size() == 0){
+        cout << "No clusters found. Returning!" << endl;
+        return;
     }
 
- 
-    CloudPtr cloud_cluster = chooseBestCluster(clusters, cloud_out);
+    CloudInfo cloud_cluster = chooseBestCluster(cluster_clouds, cloud_out);
 
-    BoundingBox cork_piece = computeCloudBoundingBox(cloud_cluster);
-    broadcastCorkTransform(&cork_piece);
-    drawBoundingBox(&cork_piece);
+    broadcastCorkTransform(&(cloud_cluster.bb));
+    drawBoundingBox(&(cloud_cluster.bb), "cork_piece");
 
-    Eigen::Vector4f pcaCentroid;
-    pcl::compute3DCentroid(*cloud_cluster, pcaCentroid);
+    //drawBoundingBox(&(cluster_clouds[1].bb), "test");
 
     pcl::PointXYZRGB painted;
-    painted.x = pcaCentroid.x();
-    painted.y = pcaCentroid.y();
-    painted.z = pcaCentroid.z(); 
+    painted.x = cloud_cluster.bb.centroid.x();
+    painted.y = cloud_cluster.bb.centroid.y();
+    painted.z = cloud_cluster.bb.centroid.z(); 
 
     painted.r = 0;
     painted.g = 0;
@@ -735,7 +905,7 @@ void surface_normals (pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_in, pcl::Poi
 
     ne.setInputCloud (cloud_in);
     ne.setSearchMethod (tree);
-    ne.setRadiusSearch (radius_search);
+    ne.setRadiusSearch (cecparams.radius_search);
     ne.compute (*cloud_normals);
 
     copyPointCloud(*cloud_in, *cloud_out);
@@ -757,7 +927,7 @@ void surface_curvatures (pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_in, pcl::
 
     ne.setInputCloud (cloud_in);
     ne.setSearchMethod (tree);
-    ne.setRadiusSearch (radius_search);
+    ne.setRadiusSearch (cecparams.radius_search);
     ne.compute (*cloud_normals);
 
     copyPointCloud(*cloud_in, *cloud_out);
@@ -778,17 +948,22 @@ void parameterConfigure(cork_iris::PCLCorkConfig &config, uint32_t level)
     choose_best_cork = config.choose_best_cork;
     add_planning_scene_cork = config.add_planning_scene_cork;
 
+    filter_height = config.filter_height;
+    filter_height_value = config.filter_height_value;
 
-    radius_search = config.radius_search;
+    test_param = config.test_param;
+    test_param2 = config.test_param2;
+
+    cecparams.radius_search = config.radius_search;
 
     // Clustering params
-    leaf_size = config.leaf_size;
-    cluster_tolerance = config.cluster_tolerance;
-    min_cluster_size = config.min_cluster_size;
-    max_cluster_size = config.max_cluster_size;
-    normal_diff = config.normal_diff;
-    squared_dist = config.squared_dist;
-    curv = config.curvature;
+    cecparams.leaf_size = config.leaf_size;
+    cecparams.cluster_tolerance = config.cluster_tolerance;
+    cecparams.min_cluster_size = config.min_cluster_size;
+    cecparams.max_cluster_size = config.max_cluster_size;
+    cecparams.normal_diff = config.normal_diff;
+    cecparams.squared_dist = config.squared_dist;
+    cecparams.curv = config.curvature;
 
     // Statistical outliers params
     meanK = config.mean_k;
@@ -800,6 +975,11 @@ void parameterConfigure(cork_iris::PCLCorkConfig &config, uint32_t level)
     space_distance_threshold = config.space_distance_threshold;
     space_count_points_threshold = config.space_count_points_threshold;
     space_k_neighbors = config.space_k_neighbors;
+    bad_shape_percentage_threshold = config.bad_shape_percentage_threshold;
+    volume_threshold = config.volume_threshold;
+    splitted_cork_distance_threshold = config.splitted_cork_distance_threshold;
+    splitted_cork_normal_threshold = config.splitted_cork_normal_threshold;
+
 
 
     displayed = false;
@@ -862,8 +1042,16 @@ void synced_callback(const sensor_msgs::ImageConstPtr& image,
         { 
             pcl::PointCloud<pcl::PointXYZRGB>::Ptr cork_pieces (new pcl::PointCloud<pcl::PointXYZRGB>);
             vector<cv::Point> corkContours = getCorkContours(cv_image);
-            removeBox(cloud, cork_pieces, &corkContours);
-
+            
+            if(!filter_height)
+            {
+                removeBox(cloud, cork_pieces, &corkContours);
+            }
+            else
+            {
+                filterPointCloudHeight(cloud, cork_pieces, filter_height_value);
+            }
+            
             if (remove_stat_outliers) // Remove Statistical Outliers
             {
                 remove_outliers(cork_pieces, cork_pieces);
@@ -885,7 +1073,7 @@ void synced_callback(const sensor_msgs::ImageConstPtr& image,
                 cluster_extraction(cork_pieces, cork_pieces);
             }
 
-            // Update the viewer and publish the processed pointcloud 
+            // Update the viewer and publish the processed pointcloud  s
             viewer->updatePointCloud(cork_pieces, "kinectcloud");
 
             sensor_msgs::PointCloud2 published_pcd;
@@ -907,9 +1095,6 @@ int main (int argc, char** argv)
 {
     ros::init (argc, argv, "pcl_cork");
     ros::NodeHandle n;
-
-    image_transport::ImageTransport it(n);
-	parsed_pub = it.advertise("/corkiris/parsed", 1);
 
     // Creating subscribers for rgb, depth and cloud images, and syncing a callback for them
     message_filters::Subscriber<sensor_msgs::Image> image_sub(n, "/camera/rgb/image_raw", 1);
@@ -934,7 +1119,7 @@ int main (int argc, char** argv)
     sync.registerCallback(boost::bind(&synced_callback, _1, _2, _3, _4));
 
     // Initializing pcl viewer
-    viewer = normalsVis();
+    viewer = normalVis("3DViewer");
     setViewerPointcloud(cloud);
 
     // Create a ROS publisher for the output point cloud
