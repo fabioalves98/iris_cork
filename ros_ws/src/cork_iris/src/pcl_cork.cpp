@@ -27,7 +27,7 @@
 #include <Eigen/Core>
 #include <Eigen/Geometry>
 #include <pcl/common/transforms.h>
-#include <pcl/filters/passthrough.h>
+#include <pcl/filters/crop_box.h>
 
 // moveit
 #include <moveit_msgs/PlanningScene.h>
@@ -40,7 +40,6 @@
 //Dynamic Parameters Configure
 #include <dynamic_reconfigure/server.h>
 #include <cork_iris/PCLCorkConfig.h>
-#include <cork_iris/BestCorkConfig.h>
 
 // ROS Sync
 #include <message_filters/time_synchronizer.h>
@@ -116,6 +115,7 @@ bool add_planning_scene_cork;
 
 bool filter_height;
 double filter_height_value;
+double filter_height_angle;
 
 double test_param, test_param2;
 CECExtractionParams cecparams;
@@ -146,6 +146,14 @@ void drawImageContours(cv::Mat drawing, std::vector<std::vector<cv::Point>> cont
     {
         drawContours(drawing, contours, i, cv::Scalar(0, 255, 0), 1);
     }
+}
+
+void drawBoundingBox(BoundingBox *bb, string name)
+{
+    viewer->removeShape(name);
+    viewer->addCube(bb->position, bb->orientation, bb->maxPoint.x - bb->minPoint.x, bb->maxPoint.y - bb->minPoint.y, bb->maxPoint.z - bb->minPoint.z, name, 0);  
+    viewer->setShapeRenderingProperties(pcl::visualization::PCL_VISUALIZER_COLOR, 1, 0, 0, name);             
+    viewer->setRepresentationToWireframeForAllActors(); 
 }
 
 pcl::visualization::PCLVisualizer::Ptr normalVis(string name)
@@ -363,14 +371,14 @@ void removeBox(pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_in,
 }
 
 
-void filterPointCloudHeight(CloudPtr cloud_in, CloudPtr cloud_out, float heigth_value)
+void filterPointCloudHeight(CloudPtr cloud_in, CloudPtr cloud_out, float heigth_value, float angle_value)
 {
-    pcl::PassThrough<pcl::PointXYZRGB> pass;
-    pass.setInputCloud (cloud_in);
-    pass.setFilterFieldName ("z");
-    pass.setFilterLimits (0.0, heigth_value);
-    //pass.setFilterLimitsNegative (true);
-    pass.filter (*cloud_out);
+    pcl::CropBox<pcl::PointXYZRGB> boxFilter;
+    boxFilter.setMin(Eigen::Vector4f(-0.2, -1, 0, 1.0));
+    boxFilter.setMax(Eigen::Vector4f(0.2, 2, heigth_value, 1.0));
+    boxFilter.setRotation(Eigen::Vector3f(-angle_value*M_PI/180, 0, 0));
+    boxFilter.setInputCloud(cloud_in);
+    boxFilter.filter(*cloud_out);
 }
 
 
@@ -500,13 +508,7 @@ void CECExtraction(CloudPtr cloud_in, CloudPtr cloud_out,
 }
 
 
-void drawBoundingBox(BoundingBox *bb, string name)
-{
-    viewer->removeShape(name);
-    viewer->addCube(bb->position, bb->orientation, bb->maxPoint.x - bb->minPoint.x, bb->maxPoint.y - bb->minPoint.y, bb->maxPoint.z - bb->minPoint.z, name, 0);  
-    viewer->setShapeRenderingProperties(pcl::visualization::PCL_VISUALIZER_COLOR, 1, 0, 0, name);             
-    viewer->setRepresentationToWireframeForAllActors(); 
-}
+
 
 void broadcastCorkTransform(BoundingBox *bb)
 {
@@ -950,6 +952,7 @@ void parameterConfigure(cork_iris::PCLCorkConfig &config, uint32_t level)
 
     filter_height = config.filter_height;
     filter_height_value = config.filter_height_value;
+    filter_height_angle = config.filter_height_angle;
 
     test_param = config.test_param;
     test_param2 = config.test_param2;
@@ -1041,17 +1044,19 @@ void synced_callback(const sensor_msgs::ImageConstPtr& image,
         else // Original point cloud without the box
         { 
             pcl::PointCloud<pcl::PointXYZRGB>::Ptr cork_pieces (new pcl::PointCloud<pcl::PointXYZRGB>);
-            vector<cv::Point> corkContours = getCorkContours(cv_image);
             
             if(!filter_height)
             {
+                vector<cv::Point> corkContours = getCorkContours(cv_image);
                 removeBox(cloud, cork_pieces, &corkContours);
             }
             else
             {
-                filterPointCloudHeight(cloud, cork_pieces, filter_height_value);
+                filterPointCloudHeight(cloud, cork_pieces, filter_height_value, filter_height_angle);
             }
-            
+
+            cout << "filter point cloud funfa" << endl;
+
             if (remove_stat_outliers) // Remove Statistical Outliers
             {
                 remove_outliers(cork_pieces, cork_pieces);
