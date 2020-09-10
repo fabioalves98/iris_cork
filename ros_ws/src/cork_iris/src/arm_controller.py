@@ -33,7 +33,7 @@ DEFAULT_HANDEYE_NAMESPACE = '/easy_handeye_eye_on_base'
 
 CALIBRATION_FILEPATH = '~/.ros/easy_handeye' + DEFAULT_HANDEYE_NAMESPACE + ".yaml"
 ## Fast control variable just for debugging purposes
-SIM = True
+SIM = False
 
 test_publisher = None
 
@@ -108,7 +108,8 @@ def parseParams(args):
             actionlist_file = args[1]
             actions = parseActionlist(actionlist_file)
             runActionlist(actions)
-
+        elif("grab_cork" in args[0]):
+            grab_cork_routine()
         else:
             return helpString()
 
@@ -192,8 +193,8 @@ def computeCorkGrabPositions():
 
     ## TODO: fix this bug
     if not SIM:
-        grab_pose_1.pose.position.x = grab_pose_1.pose.position.x - 0.02
-        grab_pose_2.pose.position.x = grab_pose_2.pose.position.x - 0.02
+        grab_pose_1.pose.position.x = grab_pose_1.pose.position.x + 0.02
+        grab_pose_2.pose.position.x = grab_pose_2.pose.position.x + 0.02
     
     return (grab_pose_1, grab_pose_2)
 
@@ -309,7 +310,7 @@ def main():
     else:
         arm = ArmControl()
         calibration = Calibration(CORK_IRIS_BASE_DIR)
-        arm.setSpeed(0.1)
+        arm.setSpeed(0.3)
         arm.config_gripper(100.0)
     
     # scene = moveit_commander.PlanningSceneInterface()
