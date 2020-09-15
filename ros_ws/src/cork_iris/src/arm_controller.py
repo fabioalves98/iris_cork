@@ -37,6 +37,7 @@ SIM = False
 
 test_publisher = None
 
+positions_file = "roller_positions"
 positions = {}
 position_names = []
 
@@ -44,7 +45,7 @@ def load_positions(path):
     '''Returns tuple with keys of all possible positions and the dict with the positions previously
        saved in a yaml file'''
 
-    data = rosparam.load_file(CORK_IRIS_BASE_DIR + "/yaml/positions.yaml")
+    data = rosparam.load_file(path)
     k = data[0][0].keys()
 
     return k, data[0][0]
@@ -80,7 +81,7 @@ def takeCommandService(req):
 
 
 def parseParams(args):
-    global positions, position_names
+    global positions, position_names, positions_file
     print("PARSING ARGS")
     try:
         print (args)
@@ -95,15 +96,15 @@ def parseParams(args):
             arm.simpleRotate([args[0], args[1], args[2]])
         elif(command in position_names):
             arm.jointGoal(positions[command])
-            return 'Moving to' + command
+            return 'Moving to ' + command
         elif("grip" in command):
             arm.grip()
         elif("release" in command):
             arm.release()
         elif("save" in command):
             pos_name = args[1]
-            arm.saveJointPosition(CORK_IRIS_BASE_DIR + "/yaml/positions.yaml", pos_name)
-            position_names, positions = load_positions(CORK_IRIS_BASE_DIR + "/yaml/positions.yaml")
+            arm.saveJointPosition(CORK_IRIS_BASE_DIR + "/yaml/" + positions_file + ".yaml", pos_name)
+            position_names, positions = load_positions(CORK_IRIS_BASE_DIR + "/yaml/" + positions_file + ".yaml")
         elif("actionlist" in args[0]):
             actionlist_file = args[1]
             actions = parseActionlist(actionlist_file)
@@ -193,8 +194,11 @@ def computeCorkGrabPositions():
 
     ## TODO: fix this bug
     if not SIM:
-        grab_pose_1.pose.position.x = grab_pose_1.pose.position.x + 0.02
-        grab_pose_2.pose.position.x = grab_pose_2.pose.position.x + 0.02
+        grab_pose_1.pose.position.x = grab_pose_1.pose.position.x + 0.020
+        grab_pose_2.pose.position.x = grab_pose_2.pose.position.x + 0.020
+
+        grab_pose_1.pose.position.y = grab_pose_1.pose.position.y - 0.015
+        grab_pose_2.pose.position.y = grab_pose_2.pose.position.y - 0.015
     
     return (grab_pose_1, grab_pose_2)
 
@@ -294,9 +298,16 @@ def main():
     # moveit_commander.roscpp_initialize(sys.argv)
     rospy.init_node('arm_control', anonymous=False)
 
-    global arm, positions, position_names, test_publisher, calibration, scene
+    global arm, positions, position_names, test_publisher, calibration, scene, positions_file
 
-    position_names, positions = load_positions(CORK_IRIS_BASE_DIR + "/yaml/positions.yaml")
+    try:
+        positions_file = sys.argv[1]
+    except Exception:
+        pass
+
+    rospy.loginfo("Using " + positions_file + " file")
+
+    position_names, positions = load_positions(CORK_IRIS_BASE_DIR + "/yaml/" + positions_file + ".yaml")
     # rospy.Subscriber("/aruco_tracker/result", Image, aruco_callback)
     # rospy.Subscriber("/cork_iris/cork_piece", PoseStamped, robot2cork)
     # rospy.Subscriber("/cork_iris/control", ArmCommand, takeCommand)
