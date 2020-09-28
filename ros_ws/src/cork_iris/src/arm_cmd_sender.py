@@ -26,7 +26,7 @@ def main():
         control_arm = rospy.ServiceProxy('/cork_iris/control_arm', ControlArm)
         feedback = control_arm(arguments)
         rospy.loginfo("Command sent successfully") if feedback.success else rospy.logerr("Command returned with an error")
-        rospy.loginfo("\n" + feedback.output_feedback)
+        rospy.loginfo(feedback.output_feedback)
     except rospy.ServiceException as e:
         print("Service call failed: %s"%e)
                 

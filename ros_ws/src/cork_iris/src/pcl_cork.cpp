@@ -627,6 +627,10 @@ vector<CloudInfo> joinSplittedClusters(vector<CloudInfo> clusters)
 {
     vector<CloudInfo> new_vec;
     cout << "<<<<< JOINING SPLITTED CLUSTERS >>>>>>" << endl;
+    if (clusters.size() == 1)
+    {
+        return clusters;
+    }
     for(int i = 0; i < clusters.size()-1; i++)
     {
         if(isSplittedCluster(clusters[i], clusters[i+1]))
@@ -1055,30 +1059,36 @@ void synced_callback(const sensor_msgs::ImageConstPtr& image,
                 filterPointCloudHeight(cloud, cork_pieces, filter_height_value, filter_height_angle);
             }
 
-            cout << "filter point cloud funfa" << endl;
+            if (cork_pieces->size() == 0)
+            {
+                cout << "No Cork Pieces Found" << endl;
+                viewer->removeShape("cork_piece");
+            }
+            else
+            {          
+                if (remove_stat_outliers) // Remove Statistical Outliers
+                {
+                    remove_outliers(cork_pieces, cork_pieces);
+                }
+                if (smooth_cloud) // Cloud smoothing
+                {
+                    cloud_smoothing(cork_pieces, cork_pieces);
+                }
+                if (display_type == 2) // Surface normals color
+                {
+                    surface_normals(cork_pieces, cork_pieces);
+                }
+                else if(display_type == 3) // Surface curvature color
+                {
+                    surface_curvatures(cork_pieces, cork_pieces);
+                }
+                else if (display_type == 4) // Clustering extraction
+                {
+                    cluster_extraction(cork_pieces, cork_pieces);
+                }
+            }
 
-            if (remove_stat_outliers) // Remove Statistical Outliers
-            {
-                remove_outliers(cork_pieces, cork_pieces);
-            }
-            if (smooth_cloud) // Cloud smoothing
-            {
-                cloud_smoothing(cork_pieces, cork_pieces);
-            }
-            if (display_type == 2) // Surface normals color
-            {
-                surface_normals(cork_pieces, cork_pieces);
-            }
-            else if(display_type == 3) // Surface curvature color
-            {
-                surface_curvatures(cork_pieces, cork_pieces);
-            }
-            else if (display_type == 4) // Clustering extraction
-            {
-                cluster_extraction(cork_pieces, cork_pieces);
-            }
-
-            // Update the viewer and publish the processed pointcloud  s
+            // Update the viewer and publish the processed pointclouds
             viewer->updatePointCloud(cork_pieces, "kinectcloud");
 
             sensor_msgs::PointCloud2 published_pcd;

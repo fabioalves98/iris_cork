@@ -184,6 +184,7 @@ class ArmControl:
         ans = set_speed(speed)
         if ans.success:
             self.currentSpeed = speed
+            return self.currentSpeed
 
     def getSpeed(self):
         if(not self.currentSpeed):

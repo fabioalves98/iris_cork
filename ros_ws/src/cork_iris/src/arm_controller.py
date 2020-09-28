@@ -59,6 +59,7 @@ def parseRotationArgs(args):
 def helpString():
     help = "Usage: rosrun cork_iris arm_controller.py <command> <command_params>\n \
     Available commands:\n \
+    \tspeed  <0 - 1>     -> Set robot speed \
     \tmove   <x> <y> <z> -> Simple cartesian movement relative to last position\n \
     \trotate <x> <y> <z> -> Simple rotation relative to last position\n \
     \tgrip               -> Close the gripper fingers\n \
@@ -89,7 +90,9 @@ def parseParams(args):
         # X > 0 - Forward
         # y > 0 - Left
         # Z > 0 - Upwards
-        if("move" in command):
+        if("speed" in command):
+            return "Current Speed - " + str(arm.setSpeed(float(args[1])))
+        elif("move" in command):
             arm.simpleMove([float(args[1]), float(args[2]), float(args[3])], pi/4)
         elif("rotate" in command):
             args = parseRotationArgs(args[1:4])
@@ -110,7 +113,7 @@ def parseParams(args):
             actions = parseActionlist(actionlist_file)
             runActionlist(actions)
         elif("grab_cork" in args[0]):
-            grab_cork_routine()
+            return grab_cork_routine()
         else:
             return helpString()
 
@@ -169,10 +172,10 @@ def runActionlist(actions):
 
 
 
-def computeCorkGrabPositions():
+def computeCorkGrabPositions(trans):
     ## Gets a position -0.15 meters behind the original cork piece. this should be the 
     ## grabbing position
-    trans = getTransform('base_link', 'cork_piece')
+    # trans = getTransform('base_link', 'cork_piece')
 
     aux = newPoseStamped([-0.15, 0, 0], frame_id="base_link")
     grab_pose_1 = tf2_geometry_msgs.do_transform_pose(aux, trans)
@@ -265,10 +268,16 @@ def grab_cork_routine():
     while not rospy.is_shutdown():
         # listener.waitForTransform("/cork_piece", "/base_link", rospy.Time.now(), rospy.Duration(4.0))
         trans = None
-        while not trans:
-            trans = getTransform("camera_depth_optical_frame", "cork_piece")
+        tries = 2
+        while not trans and tries > 0:
+            trans = getTransform("base_link", "cork_piece")
+            tries -= 1
         
-        grab1, grab2 = computeCorkGrabPositions()
+        if trans == None:
+            setPCLCorkParameter({"live" : "false"})
+            return "No Cork Piece found"
+
+        grab1, grab2 = computeCorkGrabPositions(trans)
         setPCLCorkParameter({"live" : "false"})
         test_publisher.publish(grab1)
         
