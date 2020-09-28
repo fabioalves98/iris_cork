@@ -67,15 +67,15 @@ def main():
     status = wait_for_state_update("camera_box", object_is_known=True)
     rospy.loginfo("Created camera box") if status else rospy.logwarn("Failed creating camera box")
 
-    pos[0] += 0.1
-    pos[1] += 0.1
-    camera_plane = newPoseStamped(pos, quaternion_from_euler(0, 0, -pi/4), "base_link")
-    scene.add_box("camera_plane", camera_plane, size=(1, 0.05, 2))    
-    status = wait_for_state_update("camera_plane", object_is_known=True)
-    rospy.loginfo("Created camera plane") if status else rospy.logwarn("Failed creating camera plane")
+    # pos[0] += 0.1
+    # pos[1] += 0.1
+    # camera_plane = newPoseStamped(pos, quaternion_from_euler(0, 0, -pi/4), "base_link")
+    # scene.add_box("camera_plane", camera_plane, size=(1, 0.05, 2))    
+    # status = wait_for_state_update("camera_plane", object_is_known=True)
+    # rospy.loginfo("Created camera plane") if status else rospy.logwarn("Failed creating camera plane")
 
 
-    base_plane = newPoseStamped([-0.1, -0.1, 0], quaternion_from_euler(pi/2, 0, pi/4), "base_link")
+    base_plane = newPoseStamped([0, 0, 0], quaternion_from_euler(pi/2, 0, pi/4), "base_link")
     scene.add_box("base_plane", base_plane, size=(1, 0.05, 1))
     status = wait_for_state_update("base_plane", object_is_known=True) 
     rospy.loginfo("Created base plane") if status else rospy.logwarn("Failed creating base plane")

@@ -1,0 +1,15 @@
+Repetitions,Command,Arguments,TakeSamples
+1,jointGoal,init_calibration_pos,True
+3,rotate,[pi/9 0 0],True
+1,jointGoal,init_calibration_pos,False
+3,rotate,[-pi/9 0 0],True
+1,jointGoal,init_calibration_pos,False
+2,rotate,[0 pi/12 0],True
+1,jointGoal,init_calibration_pos,False
+2,rotate,[0 -pi/9 0],True
+1,jointGoal,init_calibration_pos,False
+3,rotate,[0 0 pi/9],True
+1,jointGoal,init_calibration_pos,False
+3,rotate,[0 0 -pi/9],True
+1,jointGoal,init_calibration_pos,False
+1,compute,None,None

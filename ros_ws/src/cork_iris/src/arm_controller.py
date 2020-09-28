@@ -146,7 +146,7 @@ def parseActionlist(filename):
                 # parseRotationArgs to transform string values (pi/2 -> 1.57 etc) into real numbers
                 arguments = parseRotationArgs(row[2].replace("[", "").replace("]", "").split(" "))
             else: arguments = row[2]
-            actions.append((row[0], row[1], arguments, row[3]))
+            actions.append((row[0], row[1], arguments, row[3] == 'True'))
         line_nr += 1
 
     return actions
@@ -167,7 +167,7 @@ def runActionlist(actions):
             elif "compute" in cmd and not SIM:
                 calibration.compute_calibration()
                 break
-
+            
             if(sample and not SIM): calibration.take_sample()
 
 
@@ -180,17 +180,20 @@ def computeCorkGrabPositions(trans):
     aux = newPoseStamped([-0.15, 0, 0], frame_id="base_link")
     grab_pose_1 = tf2_geometry_msgs.do_transform_pose(aux, trans)
 
+    inverted_angle = 0
+
     if grab_pose_1.pose.position.z < trans.transform.translation.z:
-
         rospy.loginfo("Inverting cork piece orientation!")
-        inv_quaternion = tf.transformations.quaternion_multiply(
-            (trans.transform.rotation.x, trans.transform.rotation.y, trans.transform.rotation.z, trans.transform.rotation.w),
-            quaternion_from_euler(0, pi, 0))
+        inverted_angle = pi
 
-        trans.transform.rotation = Quaternion(*inv_quaternion)
-        aux.pose.position.x = -0.15
+    inv_quaternion = tf.transformations.quaternion_multiply(
+        (trans.transform.rotation.x, trans.transform.rotation.y, trans.transform.rotation.z, trans.transform.rotation.w),
+        quaternion_from_euler(pi, inverted_angle, 0))
 
-        grab_pose_1 = tf2_geometry_msgs.do_transform_pose(aux, trans)
+    trans.transform.rotation = Quaternion(*inv_quaternion)
+    aux.pose.position.x = -0.15
+
+    grab_pose_1 = tf2_geometry_msgs.do_transform_pose(aux, trans)
 
     aux.pose.position.x = -0.070
     grab_pose_2 = tf2_geometry_msgs.do_transform_pose(aux, trans)
