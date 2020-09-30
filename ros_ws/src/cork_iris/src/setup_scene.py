@@ -60,6 +60,7 @@ def main():
     print(camera_transform)
     rospy.sleep(2)
     
+    # Camera Box Scene
     pos = objectToArray(camera_transform.transform.translation)
     ori = objectToArray(camera_transform.transform.rotation)
     camera_box = newPoseStamped(pos, ori, "base_link")
@@ -67,19 +68,28 @@ def main():
     status = wait_for_state_update("camera_box", object_is_known=True)
     rospy.loginfo("Created camera box") if status else rospy.logwarn("Failed creating camera box")
 
-    # pos[0] += 0.1
-    # pos[1] += 0.1
-    # camera_plane = newPoseStamped(pos, quaternion_from_euler(0, 0, -pi/4), "base_link")
-    # scene.add_box("camera_plane", camera_plane, size=(1, 0.05, 2))    
-    # status = wait_for_state_update("camera_plane", object_is_known=True)
-    # rospy.loginfo("Created camera plane") if status else rospy.logwarn("Failed creating camera plane")
-
-
+    # Robot Desk Scene
     base_plane = newPoseStamped([0, 0, 0], quaternion_from_euler(pi/2, 0, pi/4), "base_link")
     scene.add_box("base_plane", base_plane, size=(1, 0.05, 1))
     status = wait_for_state_update("base_plane", object_is_known=True) 
     rospy.loginfo("Created base plane") if status else rospy.logwarn("Failed creating base plane")
-    
+
+    # Lateral Planes
+    right_plane = newPoseStamped([-0.5, 0.2, 0.5], quaternion_from_euler(0, 0, -pi/4), "base_link")
+    scene.add_box("right_plane", right_plane, size=(0.05, 1.5, 1))
+    status = wait_for_state_update("right_plane", object_is_known=True)
+    rospy.loginfo("Created right plane") if status else rospy.logwarn("Failed creating right plane")
+
+    left_plane = newPoseStamped([0.2, -0.5, 0.5], quaternion_from_euler(0, 0, -pi/4), "base_link")
+    scene.add_box("left_plane", left_plane, size=(0.05, 1.5, 1))
+    status = wait_for_state_update("left_plane", object_is_known=True)
+    rospy.loginfo("Created right plane") if status else rospy.logwarn("Failed creating left plane")
+
+    # Upper Plane 
+    upper_plane = newPoseStamped([0, 0, 1], quaternion_from_euler(pi/2, 0, pi/4), "base_link")
+    scene.add_box("upper_plane", upper_plane, size=(1, 0.05, 1))
+    status = wait_for_state_update("upper_plane", object_is_known=True) 
+    rospy.loginfo("Created base plane") if status else rospy.logwarn("Failed creating base plane")
 
 
     rospy.spin()
