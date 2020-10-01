@@ -11,3 +11,4 @@ ros_ws/bags
 ros_ws/logs
 .vscode
 .catkin_tools
+.rosinstall*

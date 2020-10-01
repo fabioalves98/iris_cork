@@ -68,11 +68,14 @@ class ArmControl:
 
 
     def cartesianGoal(self, waypoints):
+        self.move_group.set_start_state(self.robot.get_current_state())
+
         (plan, fraction) = self.move_group.compute_cartesian_path(
             waypoints,   # waypoints to follow
             0.05,        # eef_step
             0.0)         # jump_threshold
         time.sleep(1.0) # Gives time for plan to show
+
         self.move_group.execute(plan, wait=True)
 
     def jointGoal(self, joints):
@@ -87,8 +90,15 @@ class ArmControl:
         # # The go command can be called with joint values, poses, or without any
         # # parameters if you have already set the pose or joint target for the group
         rospy.loginfo("Sending Joint Action - %s", joints)
-        plan = self.move_group.go(joint_goal, wait=True)
 
+        # STOMP
+        self.move_group.set_start_state(self.robot.get_current_state())
+        plan = self.move_group.plan(joint_goal)
+        self.move_group.execute(plan)
+
+        # # OMPL
+        # plan = self.move_group.go(joint_goal, wait=True)
+        
         # # Calling ``stop()`` ensures that there is no residual movement
         self.move_group.stop()
 
@@ -105,11 +115,18 @@ class ArmControl:
         pose_goal.orientation.z = orientation[2] if orientation[2] != None else self.getPose().orientation.z
         pose_goal.orientation.w = orientation[3] if orientation[3] != None else self.getPose().orientation.w
         
-        self.move_group.set_pose_target(pose_goal)
-
-        ## Now, we call the planner to compute the plan and execute it.
         rospy.loginfo("Sending Pose goal - %s \n %s", coordinates, orientation)
-        plan = self.move_group.go(wait=True)
+
+        # STOMP
+        self.move_group.set_start_state(self.robot.get_current_state())
+        plan = self.move_group.plan(pose_goal)
+        self.move_group.execute(plan)
+        
+        # # OMPL
+        # self.move_group.set_pose_target(pose_goal)
+        # plan = self.move_group.go(wait=True)
+        
+        
         # Calling `stop()` ensures that there is no residual movement
         self.move_group.stop()
         # It is always good to clear your targets after planning with poses.

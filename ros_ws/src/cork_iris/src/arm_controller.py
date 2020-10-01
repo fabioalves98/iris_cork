@@ -213,54 +213,47 @@ def grab_cork(cork, cork_grab_pose):
     '''Temporary function to grab a cork piece given its pose'''
     global arm, scene
 
+    cork_piece_scene = scene.get_objects(["cork_piece"])["cork_piece"]
 
     if(not keep_going("grab_cork")):
         return
 
     arm.poseGoal(posePositionToArray(cork_grab_pose.position), poseOrientationToArray(cork_grab_pose.orientation))
+
+    scene.remove_world_object("cork_piece")
    
     if(not keep_going("go towards cork")):
         return 
-
-    time.sleep(2)
     
     arm.poseGoal(posePositionToArray(cork.position), poseOrientationToArray(cork.orientation))
 
     if(not keep_going("grip")):
         return 
     
-    # TODO: Change the gripper function to take care of attaching stuff or not (and release function to detach)
-    # TODO: More testing in live
-    # scene.attach_box("ee_link", "cork_piece", touch_links=arm.getLinks())
-    # time.sleep(2)
-    # print(scene.get_attached_objects())
-    arm.grip()
+    position = cork_piece_scene.primitive_poses[0].position
+    orientation = cork_piece_scene.primitive_poses[0].orientation
+    dimensions = cork_piece_scene.primitives[0].dimensions
+    scene.add_box("cork_piece", newPoseStamped(posePositionToArray(position), poseOrientationToArray(orientation)), dimensions)
+    scene.attach_box("ee_link", "cork_piece", touch_links=arm.getLinks())
 
+    arm.grip()
     
     if(not keep_going("stand back")):
         return 
 
-
     # TODO: Move towards the center of the box in an upwards direction, not always upwards like this here
     arm.simpleMove([0, 0, 0.15])
-    if(not keep_going("out of camera")):
-        return 
+    
     arm.jointGoal(positions['out_of_camera_pos'])
 
-    if(not keep_going("place pos")):
-        return 
     arm.jointGoal(positions['place_pos'])
 
-    if(not keep_going("release")):
-        return
     arm.release()
 
-    if(not keep_going("out of camera")):
-        return 
+    scene.remove_attached_object("ee_link", "cork_piece")
+    scene.remove_world_object("cork_piece")
+
     arm.jointGoal(positions['out_of_camera_pos'])
-
-
-    # rospy.signal_shutdown("grabbed cork debug stop")
 
 
 def grab_cork_routine():
@@ -336,8 +329,8 @@ def main():
         arm.setSpeed(0.3)
         arm.config_gripper(100.0)
     
-    # scene = moveit_commander.PlanningSceneInterface()
-    
+    scene = moveit_commander.PlanningSceneInterface(synchronous=True)
+
     # time.sleep(2)
     # print(scene.get_attached_objects())
     rospy.spin()

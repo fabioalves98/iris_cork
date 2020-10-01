@@ -54,11 +54,8 @@ def main():
     rospy.init_node('setup_scene', anonymous=False)
     rospy.on_shutdown(delete_objects)
     
-    scene = moveit_commander.PlanningSceneInterface()
-
+    scene = moveit_commander.PlanningSceneInterface(synchronous=True)
     camera_transform = getTransform('base_link', 'camera_link')
-    print(camera_transform)
-    rospy.sleep(2)
     
     # Camera Box Scene
     pos = objectToArray(camera_transform.transform.translation)
@@ -69,8 +66,8 @@ def main():
     rospy.loginfo("Created camera box") if status else rospy.logwarn("Failed creating camera box")
 
     # Robot Desk Scene
-    base_plane = newPoseStamped([0, 0, 0], quaternion_from_euler(pi/2, 0, pi/4), "base_link")
-    scene.add_box("base_plane", base_plane, size=(1, 0.05, 1))
+    base_plane = newPoseStamped([-0.3, -0.3, -0.05], quaternion_from_euler(pi/2, 0, pi/4), "base_link")
+    scene.add_box("base_plane", base_plane, size=(1.8, 0.05, 1))
     status = wait_for_state_update("base_plane", object_is_known=True) 
     rospy.loginfo("Created base plane") if status else rospy.logwarn("Failed creating base plane")
 
@@ -90,7 +87,6 @@ def main():
     scene.add_box("upper_plane", upper_plane, size=(1, 0.05, 1))
     status = wait_for_state_update("upper_plane", object_is_known=True) 
     rospy.loginfo("Created base plane") if status else rospy.logwarn("Failed creating base plane")
-
 
     rospy.spin()
 

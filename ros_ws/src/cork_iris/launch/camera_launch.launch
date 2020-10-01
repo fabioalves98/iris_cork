@@ -1,0 +1,16 @@
+<?xml version="1.0" ?>
+<launch>
+
+  <arg name="box" default="false"  doc="If true sets nodes for box setup"/>
+    
+    <group if="$(arg box)">
+        <include  file="$(find openni_launch)/launch/openni.launch">
+          <arg name="depth_registration" default="true" />
+        </include>
+    </group>
+    <group unless="$(arg box)">
+        <include file="$(find astra_camera)/launch/astra.launch">
+        </include>
+    </group>
+
+</launch>
