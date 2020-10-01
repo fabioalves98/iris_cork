@@ -116,8 +116,8 @@ bool add_planning_scene_cork;
 bool filter_height;
 double filter_height_value;
 double filter_height_angle;
+double filter_width_value;
 
-double test_param, test_param2;
 CECExtractionParams cecparams;
 
 // int min_cluster_size, max_cluster_size;
@@ -371,11 +371,11 @@ void removeBox(pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_in,
 }
 
 
-void filterPointCloudHeight(CloudPtr cloud_in, CloudPtr cloud_out, float heigth_value, float angle_value)
+void filterPointCloudHeight(CloudPtr cloud_in, CloudPtr cloud_out, float width_value, float heigth_value, float angle_value)
 {
     pcl::CropBox<pcl::PointXYZRGB> boxFilter;
-    boxFilter.setMin(Eigen::Vector4f(-0.2, -1, 0, 1.0));
-    boxFilter.setMax(Eigen::Vector4f(0.2, 2, heigth_value, 1.0));
+    boxFilter.setMin(Eigen::Vector4f(-width_value, -1, 0, 1.0));
+    boxFilter.setMax(Eigen::Vector4f(width_value, 2, heigth_value, 1.0));
     boxFilter.setRotation(Eigen::Vector3f(-angle_value*M_PI/180, 0, 0));
     boxFilter.setInputCloud(cloud_in);
     boxFilter.filter(*cloud_out);
@@ -543,7 +543,7 @@ void broadcastCorkTransform(BoundingBox *bb)
         primitive.type = primitive.BOX;
         primitive.dimensions.resize(3);
         primitive.dimensions[0] = bb->maxPoint.x - bb->minPoint.x;
-        primitive.dimensions[1] = (bb->maxPoint.y - bb->minPoint.y) * 0.9;
+        primitive.dimensions[1] = bb->maxPoint.y - bb->minPoint.y;
         primitive.dimensions[2] = bb->maxPoint.z - bb->minPoint.z;
 
         attached_object.object.primitives.push_back(primitive);
@@ -555,7 +555,6 @@ void broadcastCorkTransform(BoundingBox *bb)
         planning_scene.world.collision_objects.push_back(attached_object.object);
         planning_scene.is_diff = true;
         planning_scene_diff_publisher.publish(planning_scene);
-
     }
 
     static tf::TransformBroadcaster br;
@@ -852,8 +851,6 @@ void cluster_extraction (pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_in, pcl::
     broadcastCorkTransform(&(cloud_cluster.bb));
     drawBoundingBox(&(cloud_cluster.bb), "cork_piece");
 
-    //drawBoundingBox(&(cluster_clouds[1].bb), "test");
-
     pcl::PointXYZRGB painted;
     painted.x = cloud_cluster.bb.centroid.x();
     painted.y = cloud_cluster.bb.centroid.y();
@@ -957,9 +954,7 @@ void parameterConfigure(cork_iris::PCLCorkConfig &config, uint32_t level)
     filter_height = config.filter_height;
     filter_height_value = config.filter_height_value;
     filter_height_angle = config.filter_height_angle;
-
-    test_param = config.test_param;
-    test_param2 = config.test_param2;
+    filter_width_value = config.filter_width_value;
 
     cecparams.radius_search = config.radius_search;
 
@@ -987,11 +982,7 @@ void parameterConfigure(cork_iris::PCLCorkConfig &config, uint32_t level)
     splitted_cork_distance_threshold = config.splitted_cork_distance_threshold;
     splitted_cork_normal_threshold = config.splitted_cork_normal_threshold;
 
-
-
     displayed = false;
-
-
 }
 
 
@@ -1056,7 +1047,7 @@ void synced_callback(const sensor_msgs::ImageConstPtr& image,
             }
             else
             {
-                filterPointCloudHeight(cloud, cork_pieces, filter_height_value, filter_height_angle);
+                filterPointCloudHeight(cloud, cork_pieces, filter_width_value, filter_height_value, filter_height_angle);
             }
 
             if (cork_pieces->size() == 0)

@@ -177,7 +177,9 @@ def computeCorkGrabPositions(trans):
     ## grabbing position
     # trans = getTransform('base_link', 'cork_piece')
 
+    # aux = newPoseStamped([-0.15, 0, 0.10], frame_id="base_link")
     aux = newPoseStamped([-0.15, 0, 0], frame_id="base_link")
+
     grab_pose_1 = tf2_geometry_msgs.do_transform_pose(aux, trans)
 
     inverted_angle = 0
