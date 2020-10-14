@@ -4,8 +4,6 @@ import dynamic_reconfigure.client
 from geometry_msgs.msg import PoseStamped, Quaternion, Point
 
 
-
-
 def posePositionToArray(position):
     return [position.x, position.y, position.z]
 

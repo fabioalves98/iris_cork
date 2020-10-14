@@ -11,6 +11,8 @@ from math import pi, cos, sin
 
 from cork_iris.msg import ArmCommand
 from cork_iris.srv import ControlArm
+from moveit_msgs.msg import PlanningSceneComponents, PlanningScene
+from moveit_msgs.srv import ApplyPlanningScene
 # from std_msgs.msg import String
 # from sensor_msgs.msg import Image
 from geometry_msgs.msg import Point, TransformStamped, Pose, PoseStamped, Quaternion
@@ -23,6 +25,7 @@ from tf.transformations import euler_from_quaternion, quaternion_from_euler, qua
 from ArmControl import ArmControl
 from Calibration import Calibration
 from HelperFunctions import *
+from setup_scene import wait_for_state_update
 
 arm = None
 calibration = None
@@ -177,8 +180,8 @@ def computeCorkGrabPositions(trans):
     ## grabbing position
     # trans = getTransform('base_link', 'cork_piece')
 
-    # aux = newPoseStamped([-0.15, 0, 0.10], frame_id="base_link")
-    aux = newPoseStamped([-0.15, 0, 0], frame_id="base_link")
+    aux = newPoseStamped([-0.15, 0, -0.10], frame_id="base_link")
+    # aux = newPoseStamped([-0.15, 0, 0], frame_id="base_link")
 
     grab_pose_1 = tf2_geometry_msgs.do_transform_pose(aux, trans)
 
@@ -238,8 +241,37 @@ def grab_cork(cork, cork_grab_pose):
     scene.add_box("cork_piece", newPoseStamped(posePositionToArray(position), poseOrientationToArray(orientation)), dimensions)
     arm.move_group.attach_object("cork_piece", "ee_link")
 
+    
+    #  Testing attach box and make sure it doenst colide
+    # pubPlanningScene = rospy.Publisher('planning_scene', PlanningScene, queue_size=1)
+
+    # rospy.wait_for_service("/apply_planning_scene", 10.0)
+    # apply_planning = rospy.ServiceProxy("/apply_planning_scene", ApplyPlanningScene)
+
+    # rospy.wait_for_service("/get_planning_scene", 10.0)
+    # planning_scene = rospy.ServiceProxy("/get_planning_scene", moveit_msgs.srv.GetPlanningScene)
+    
+    # request = PlanningSceneComponents(components=128)
+    # new_scene = planning_scene(request)
+
+    # acm = new_scene.scene.allowed_collision_matrix
+
+    # acm.default_entry_names += ['cork_piece']
+    # acm.default_entry_values += [True]
+
+    # planning_scene_diff = PlanningScene(
+    #         is_diff=True,
+    #         allowed_collision_matrix=acm)
+
+    # pubPlanningScene.publish(planning_scene_diff)
+
+    # print(apply_planning(planning_scene_diff))
+
+    # rospy.sleep(1.0)
+
     arm.grip()
     
+
     if(not keep_going("stand back")):
         return 
 
@@ -332,7 +364,7 @@ def main():
         arm.config_gripper(100.0)
     
     scene = moveit_commander.PlanningSceneInterface(synchronous=True)
-
+    
     # time.sleep(2)
     # print(scene.get_attached_objects())
     rospy.spin()
