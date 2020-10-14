@@ -236,7 +236,7 @@ def grab_cork(cork, cork_grab_pose):
     orientation = cork_piece_scene.primitive_poses[0].orientation
     dimensions = cork_piece_scene.primitives[0].dimensions
     scene.add_box("cork_piece", newPoseStamped(posePositionToArray(position), poseOrientationToArray(orientation)), dimensions)
-    scene.attach_box("ee_link", "cork_piece", touch_links=arm.getLinks())
+    arm.move_group.attach_object("cork_piece", "ee_link")
 
     arm.grip()
     
