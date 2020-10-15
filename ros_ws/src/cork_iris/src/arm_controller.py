@@ -238,8 +238,8 @@ def grab_cork(cork, cork_grab_pose):
     position = cork_piece_scene.primitive_poses[0].position
     orientation = cork_piece_scene.primitive_poses[0].orientation
     dimensions = cork_piece_scene.primitives[0].dimensions
-    scene.add_box("cork_piece", newPoseStamped(posePositionToArray(position), poseOrientationToArray(orientation)), dimensions)
-    arm.move_group.attach_object("cork_piece", "ee_link")
+    scene.add_box("cork_piece_attached", newPoseStamped([0,0,0], poseOrientationToArray(orientation), "ee_link"), dimensions)
+    arm.move_group.attach_object("cork_piece_attached", "ee_link")
 
     
     #  Testing attach box and make sure it doenst colide
@@ -284,8 +284,8 @@ def grab_cork(cork, cork_grab_pose):
 
     arm.release()
 
-    scene.remove_attached_object("ee_link", "cork_piece")
-    scene.remove_world_object("cork_piece")
+    scene.remove_attached_object("ee_link", "cork_piece_attached")
+    scene.remove_world_object("cork_piece_attached")
 
     arm.jointGoal(positions['out_of_camera_pos'])
 

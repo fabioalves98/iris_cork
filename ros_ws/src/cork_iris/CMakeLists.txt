@@ -54,5 +54,8 @@ target_link_libraries(capture ${OpenCV_LIBS} ${catkin_LIBRARIES})
 add_executable(pcl_cork src/pcl_cork.cpp src/ImageParser.cpp src/box.cpp src/DepthParser.cpp)
 target_link_libraries(pcl_cork ${catkin_LIBRARIES} ${PCL_LIBRARIES})
 
+add_executable(test_scene src/test_scene.cpp)
+target_link_libraries(test_scene ${catkin_LIBRARIES})
+
 add_dependencies(pcl_cork ${PROJECT_NAME}_gencfg)
 
