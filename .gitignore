@@ -12,3 +12,5 @@ ros_ws/logs
 .vscode
 .catkin_tools
 .rosinstall*
+
+/xtremecork-vision-master/src/CorkClassifier/xtreme-venv/
