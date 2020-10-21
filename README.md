@@ -1,8 +1,8 @@
 ## Install project dependencies
 rosdep install -iyr --from-paths src (--os ubuntu:bionic)
 
-## Record Kinect Bag
-rosbag record --duration=10 camera/rgb/image_raw camera/depth_registered/image_raw camera/depth_registered/points camera/depth_registered/camera_info /tf
+## Record Camera Bag
+rosbag record --duration=5 camera/rgb/image_raw camera/depth_registered/image_raw camera/depth_registered/points camera/depth_registered/camera_info /tf
 
 ## Set Robot Speed
 rosservice call /ur_hardware_interface/set_speed_slider "speed_slider_fraction: 0.1"
