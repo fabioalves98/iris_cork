@@ -1,3 +1,6 @@
 [submodule "ros_ws/src/stomp"]
 	path = ros_ws/src/stomp
 	url = https://github.com/ros-industrial/stomp_ros.git
+[submodule "xtremecork-vision"]
+	path = xtremecork-vision
+	url = https://gitlab.com/iris-ua/xtremecork/xtremecork-vision.git
