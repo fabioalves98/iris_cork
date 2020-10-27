@@ -7,6 +7,50 @@ Box::Box(cv::Mat image)
     this->image = image;
 }
 
+void Box::removeBox(pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_in, 
+                    pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_out,
+                    cv::Mat cv_image)
+{
+    std::vector<cv::Point> contours = getCorkContours(cv_image);
+
+    const float bad_point = std::numeric_limits<float>::quiet_NaN();
+    copyPointCloud(*cloud_in, *cloud_out);
+
+    for (int x = 0; x < cloud_in->width; x++)
+    {
+        for (int y = 0; y < cloud_in->height; y++)
+        {
+            if (cv::pointPolygonTest(contours, cv::Point(x, y), false) != 1)
+            {
+                cloud_out->at(x, y).x = cloud_out->at(x, y).y = cloud_out->at(x, y).z = bad_point;
+            }
+        }
+    }
+}
+
+std::vector<cv::Point> Box::getCorkContours(cv::Mat cv_image)
+{        
+    // Image box
+    cv::Mat box_image =  cv_image.clone();
+    Box box(box_image);
+    std::vector<cv::Point> points = box.get_blue_box();
+    // Get blue box painted all blue points bright red. Get the mask for all bright red points
+    cv::Mat mask = box.getMaskInRange(cv::Scalar(0, 0, 250), cv::Scalar(0, 0, 255));
+
+    // Contours
+    int min_area = 20000;
+    int max_area = 200000;
+    std::vector<std::vector<cv::Point>> contour_points;
+    ImageParser ip(mask);
+
+    // This contour should be the inside contour (excluding the all the box around the cork pieces)
+    // This is a heavy assumption since we are considering that only two contours exist after the first
+    // area filter, the outer box cntour and the inner box contour.
+    contour_points.push_back(ip.smallestAreaContour(ip.filterContoursByArea(ip.parseImageContours(-1), min_area, max_area)));
+    
+    return contour_points.at(0);
+}
+
 std::vector<cv::Point> Box::get_blue_box()
 {
     std::vector<cv::Point> box;

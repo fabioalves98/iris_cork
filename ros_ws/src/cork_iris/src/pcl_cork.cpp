@@ -59,8 +59,6 @@
 #include <opencv2/opencv.hpp>
 // Project 
 #include "box.h"
-#include "DepthParser.h"
-#include "ImageParser.h"
 
 
 using namespace std;
@@ -113,10 +111,10 @@ bool smooth_cloud;
 bool choose_best_cork;
 bool add_planning_scene_cork;
 
-bool filter_height;
-double filter_height_value;
-double filter_height_angle;
-double filter_width_value;
+bool roller;
+double roller_height_value;
+double roller_height_angle;
+double roller_width_value;
 
 CECExtractionParams cecparams;
 
@@ -176,34 +174,6 @@ void setViewerPointcloudNormal(pcl::PointCloud<pcl::PointXYZRGB>::ConstPtr cloud
                                pcl::PointCloud<pcl::Normal>::ConstPtr cloud_normals)
 {
     viewer->addPointCloudNormals<pcl::PointXYZRGB, pcl::Normal> (cloud, cloud_normals, 70, 0.01, "normals");
-}
-
-vector<cv::Point> getCorkContours(cv::Mat image)
-{        
-    // Image box
-    cv::Mat box_image =  image.clone();
-    Box box(box_image);
-    std::vector<cv::Point> points = box.get_blue_box();
-    // Get blue box painted all blue points bright red. Get the mask for all bright red points
-    cv::Mat mask = box.getMaskInRange(cv::Scalar(0, 0, 250), cv::Scalar(0, 0, 255));
-
-    // Contours
-    int min_area = 20000;
-    int max_area = 200000;
-    std::vector<std::vector<cv::Point>> contour_points;
-    ImageParser ip(mask);
-
-    // This contour should be the inside contour (excluding the all the box around the cork pieces)
-    // This is a heavy assumption since we are considering that only two contours exist after the first
-    // area filter, the outer box cntour and the inner box contour.
-    contour_points.push_back(ip.smallestAreaContour(ip.filterContoursByArea(ip.parseImageContours(-1), min_area, max_area)));
-    
-    return contour_points.at(0);
-}
-
-bool isPointInside(cv::Point point, std::vector<cv::Point>* contour)
-{
-    return cv::pointPolygonTest(*contour, point, false) == 1;
 }
 
 
@@ -348,26 +318,6 @@ CloudInfo joinClusters(CloudInfo cluster0, CloudInfo cluster1)
 
 
     return cluster0;
-}
-
-
-void removeBox(pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_in, 
-               pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_out,
-               vector<cv::Point>* contours)
-{
-    const float bad_point = std::numeric_limits<float>::quiet_NaN();
-    copyPointCloud(*cloud_in, *cloud_out);
-
-    for (int x = 0; x < cloud_in->width; x++)
-    {
-        for (int y = 0; y < cloud_in->height; y++)
-        {
-            if (!isPointInside(cv::Point(x, y), contours))
-            {
-                cloud_out->at(x, y).x = cloud_out->at(x, y).y = cloud_out->at(x, y).z = bad_point;
-            }
-        }
-    }
 }
 
 
@@ -951,10 +901,10 @@ void parameterConfigure(cork_iris::PCLCorkConfig &config, uint32_t level)
     choose_best_cork = config.choose_best_cork;
     add_planning_scene_cork = config.add_planning_scene_cork;
 
-    filter_height = config.filter_height;
-    filter_height_value = config.filter_height_value;
-    filter_height_angle = config.filter_height_angle;
-    filter_width_value = config.filter_width_value;
+    roller = config.roller;
+    roller_height_value = config.roller_height_value;
+    roller_height_angle = config.roller_height_angle;
+    roller_width_value = config.roller_width_value;
 
     cecparams.radius_search = config.radius_search;
 
@@ -997,8 +947,6 @@ void synced_callback(const sensor_msgs::ImageConstPtr& image,
     cv::Mat cv_image;
     cv::Mat cv_depth;
 
-    
-
     try
     {
         // Convert sensor msg to cv mat
@@ -1040,14 +988,13 @@ void synced_callback(const sensor_msgs::ImageConstPtr& image,
         { 
             pcl::PointCloud<pcl::PointXYZRGB>::Ptr cork_pieces (new pcl::PointCloud<pcl::PointXYZRGB>);
             
-            if(!filter_height)
+            if(!roller)
             {
-                vector<cv::Point> corkContours = getCorkContours(cv_image);
-                removeBox(cloud, cork_pieces, &corkContours);
+                Box::removeBox(cloud, cork_pieces, cv_image);
             }
             else
             {
-                filterPointCloudHeight(cloud, cork_pieces, filter_width_value, filter_height_value, filter_height_angle);
+                filterPointCloudHeight(cloud, cork_pieces, roller_width_value, roller_height_value, roller_height_angle);
             }
 
             if (cork_pieces->size() == 0)

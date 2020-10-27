@@ -1,6 +1,6 @@
 <launch>
     
-    <arg name="bag" default="big5_mikado.bag"  doc="Choose bag to use"/>
+    <arg name="bag" default="big5_roller.bag"  doc="Choose bag to use"/>
     <arg name="camera" default="false"  doc="If camera is true then the real camera driver is used"/>
 
     <include file="$(find iris_ur10e)/launch/sim.launch">
@@ -13,15 +13,13 @@
     <group unless="$(arg camera)">
 
         <node pkg="rosbag" type="play" name="rosbag" 
-        args="-l /home/fraga/Documents/Programming/Bolsa/$(arg bag) tf:=/tf_nouse camera/rgb/image_raw:=/rgb/image_raw_nouse 
+        args="-l $(find cork_iris)/../../bags/$(arg bag) tf:=/tf_nouse camera/rgb/image_raw:=/rgb/image_raw_nouse 
         camera/depth_registered/image_raw:=/depth_registered/image_raw_nouse camera/depth_registered/points:=/depth_registered/points_nouse
         camera/depth_registered/camera_info:=/depth_registered/camera_info_nouse"/>
 
         <node pkg="cork_iris" name="bag_time_sync" type="bag_time_sync.py" output="screen"/>
 
     </group>
-
-
 
     <include file="$(find cork_iris)/launch/handeye_publish.launch">
     </include>
