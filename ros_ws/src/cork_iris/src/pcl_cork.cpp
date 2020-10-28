@@ -59,14 +59,15 @@
 #include <opencv2/opencv.hpp>
 // Project 
 #include "box.h"
+#include "pcl_functions.h"
 
 
 using namespace std;
-typedef pcl::PointCloud<pcl::PointXYZRGB> Cloud;
-typedef Cloud::Ptr CloudPtr;
-typedef pcl::PointCloud<pcl::PointXYZRGBNormal> CloudNormal;
-typedef CloudNormal::Ptr CloudNormalPtr;
-typedef pcl::RGB Color;
+// typedef pcl::PointCloud<pcl::PointXYZRGB> Cloud;
+// typedef Cloud::Ptr CloudPtr;
+// typedef pcl::PointCloud<pcl::PointXYZRGBNormal> CloudNormal;
+// typedef CloudNormal::Ptr CloudNormalPtr;
+// typedef pcl::RGB Color;
 typedef int Index;
 
 
@@ -102,7 +103,6 @@ std::vector<std::string> colors = {"orange", "red", "green", "yellow", "blue", "
 
 bool displayed = false;
 
-
 // Global parameter values
 int display_type;
 bool live;
@@ -137,14 +137,6 @@ ros::Publisher planning_scene_diff_publisher;
 // PointXYZRGB cloud
 pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud (new pcl::PointCloud<pcl::PointXYZRGB>);
 
-
-void drawImageContours(cv::Mat drawing, std::vector<std::vector<cv::Point>> contours)
-{
-    for( int i = 0; i < contours.size(); i++ )
-    {
-        drawContours(drawing, contours, i, cv::Scalar(0, 255, 0), 1);
-    }
-}
 
 void drawBoundingBox(BoundingBox *bb, string name)
 {
@@ -318,17 +310,6 @@ CloudInfo joinClusters(CloudInfo cluster0, CloudInfo cluster1)
 
 
     return cluster0;
-}
-
-
-void filterPointCloudHeight(CloudPtr cloud_in, CloudPtr cloud_out, float width_value, float heigth_value, float angle_value)
-{
-    pcl::CropBox<pcl::PointXYZRGB> boxFilter;
-    boxFilter.setMin(Eigen::Vector4f(-width_value, -1, 0, 1.0));
-    boxFilter.setMax(Eigen::Vector4f(width_value, 2, heigth_value, 1.0));
-    boxFilter.setRotation(Eigen::Vector3f(-angle_value*M_PI/180, 0, 0));
-    boxFilter.setInputCloud(cloud_in);
-    boxFilter.filter(*cloud_out);
 }
 
 
@@ -813,83 +794,8 @@ void cluster_extraction (pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_in, pcl::
     cloud_out->push_back(painted);
 }
 
-void remove_outliers (pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_in, pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_out)
-{
 
-    pcl::StatisticalOutlierRemoval<pcl::PointXYZRGB> sor;
-    sor.setInputCloud (cloud_in);
-    sor.setMeanK(meanK);
-    sor.setStddevMulThresh (1.0);
-    sor.filter (*cloud_out);
-}
 
-void cloud_smoothing (pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_in, pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_out)
-{
-    pcl::search::KdTree<pcl::PointXYZRGB>::Ptr tree (new pcl::search::KdTree<pcl::PointXYZRGB>);
-
-    // Output has the PointNormal type in order to store the normals calculated by MLS
-    pcl::PointCloud<pcl::PointXYZRGBNormal> mls_points;
-
-    // Init object (second point type is for the normals, even if unused)
-    pcl::MovingLeastSquares<pcl::PointXYZRGB, pcl::PointXYZRGBNormal> mls;
-        
-    mls.setComputeNormals (true);
-    // Set parameters
-    vector<int> test;
-    pcl::removeNaNFromPointCloud(*cloud_in, *cloud_in, test);
-    mls.setInputCloud (cloud_in);
-    mls.setPolynomialOrder (2);
-    mls.setSearchMethod (tree);
-    mls.setSearchRadius (0.03);
-
-    // Reconstruct
-    mls.process (mls_points);
-        
-    // Alterar tipo da cloud para PointXYZRGB
-    copyPointCloud(mls_points, *cloud_out);
-}
-
-void surface_normals (pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_in, pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_out)
-{
-    // Compute normals
-    pcl::search::KdTree<pcl::PointXYZRGB>::Ptr tree (new pcl::search::KdTree<pcl::PointXYZRGB> ());
-    pcl::NormalEstimation<pcl::PointXYZRGB, pcl::Normal> ne;
-    pcl::PointCloud<pcl::Normal>::Ptr cloud_normals (new pcl::PointCloud<pcl::Normal>);
-
-    ne.setInputCloud (cloud_in);
-    ne.setSearchMethod (tree);
-    ne.setRadiusSearch (cecparams.radius_search);
-    ne.compute (*cloud_normals);
-
-    copyPointCloud(*cloud_in, *cloud_out);
-        
-    for (int i = 0; i < cloud_in->size(); i++)
-    {
-        cloud_out->points[i].r = abs(cloud_normals->points[i].normal[0]) * 255;
-        cloud_out->points[i].g = abs(cloud_normals->points[i].normal[1]) * 255;
-        cloud_out->points[i].b = abs(cloud_normals->points[i].normal[2]) * 255;
-    }
-}
-
-void surface_curvatures (pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_in, pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_out)
-{
-    // Compute normals
-    pcl::search::KdTree<pcl::PointXYZRGB>::Ptr tree (new pcl::search::KdTree<pcl::PointXYZRGB> ());
-    pcl::NormalEstimation<pcl::PointXYZRGB, pcl::Normal> ne;
-    pcl::PointCloud<pcl::Normal>::Ptr cloud_normals (new pcl::PointCloud<pcl::Normal>);
-
-    ne.setInputCloud (cloud_in);
-    ne.setSearchMethod (tree);
-    ne.setRadiusSearch (cecparams.radius_search);
-    ne.compute (*cloud_normals);
-
-    copyPointCloud(*cloud_in, *cloud_out);
-        
-    for (int i = 0; i < cloud_in->size(); i++)
-    {
-        cloud_out->points[i].r = cloud_out->points[i].g = cloud_out->points[i].b = 55 + abs(cloud_normals->points[i].curvature / 0.3) * 200;
-    }
-}
 
 void parameterConfigure(cork_iris::PCLCorkConfig &config, uint32_t level) 
 {
@@ -993,7 +899,7 @@ void synced_callback(const sensor_msgs::ImageConstPtr& image,
             }
             else
             {
-                filterPointCloudHeight(cloud, cork_pieces, roller_width_value, roller_height_value, roller_height_angle);
+                PCLFunctions::filterRollerBox(cloud, cork_pieces, roller_width_value, roller_height_value, roller_height_angle);
             }
 
             if (cork_pieces->size() == 0)
@@ -1005,20 +911,20 @@ void synced_callback(const sensor_msgs::ImageConstPtr& image,
             {          
                 if (remove_stat_outliers) // Remove Statistical Outliers
                 {
-                    remove_outliers(cork_pieces, cork_pieces);
+                    PCLFunctions::remove_outliers(cork_pieces, cork_pieces, meanK);
                 }
                 if (smooth_cloud) // Cloud smoothing
                 {
-                    cloud_smoothing(cork_pieces, cork_pieces);
+                    PCLFunctions::cloud_smoothing(cork_pieces, cork_pieces);
                 }
                 
                 if (display_type == 2) // Surface normals color
                 {
-                    surface_normals(cork_pieces, cork_pieces);
+                    PCLFunctions::surface_normals(cork_pieces, cork_pieces, cecparams.radius_search);
                 }
                 else if(display_type == 3) // Surface curvature color
                 {
-                    surface_curvatures(cork_pieces, cork_pieces);
+                    PCLFunctions::surface_curvatures(cork_pieces, cork_pieces, cecparams.radius_search);
                 }
                 else if (display_type == 4) // Clustering extraction
                 {

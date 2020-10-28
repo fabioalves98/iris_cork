@@ -8,22 +8,14 @@
 
 #include <pcl/common/io.h>
 
-
 class Box
 {
     private:
-        cv::Mat image;
         static std::vector<cv::Point> getCorkContours(cv::Mat cv_image);
-
+        static cv::Mat get_blue_box(cv::Mat cv_image);
+        static cv::Mat getMaskInRange(cv::Mat cv_image, cv::Scalar min, cv::Scalar max);
     public:
-        Box(cv::Mat image);
         static void removeBox(pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_in, 
                        pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_out,
                        cv::Mat cv_image);
-
-        std::vector<cv::Point> get_blue_box();
-
-        std::vector<cv::Point> get_box_corners(std::vector<cv::Point> box_contour); 
-        cv::Mat getMaskInRange(cv::Scalar min, cv::Scalar max);
-       
 };
