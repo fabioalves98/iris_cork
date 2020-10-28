@@ -34,21 +34,45 @@ std::vector<cv::Point> Box::getCorkContours(cv::Mat cv_image)
     cv::Mat box_image =  cv_image.clone();
     Box box(box_image);
     std::vector<cv::Point> points = box.get_blue_box();
+    
     // Get blue box painted all blue points bright red. Get the mask for all bright red points
     cv::Mat mask = box.getMaskInRange(cv::Scalar(0, 0, 250), cv::Scalar(0, 0, 255));
 
     // Contours
     int min_area = 20000;
     int max_area = 200000;
-    std::vector<std::vector<cv::Point>> contour_points;
-    ImageParser ip(mask);
 
-    // This contour should be the inside contour (excluding the all the box around the cork pieces)
-    // This is a heavy assumption since we are considering that only two contours exist after the first
-    // area filter, the outer box cntour and the inner box contour.
-    contour_points.push_back(ip.smallestAreaContour(ip.filterContoursByArea(ip.parseImageContours(-1), min_area, max_area)));
-    
-    return contour_points.at(0);
+    std::vector<std::vector<cv::Point>> contours;
+    cv::Mat hierarchy;
+
+    cv::findContours(mask, contours, hierarchy, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, cv::Point(0, 0));
+    hierarchy.release();
+
+    std::vector<std::vector<cv::Point>> filtered_contours;
+
+    for( int i = 0; i < contours.size(); i++ )
+    {
+        int area = cv::contourArea(contours[i]);
+        if(area < max_area && area > min_area)
+        {
+            filtered_contours.push_back(contours[i]);
+        }
+    }
+
+    min_area = cv::contourArea(filtered_contours[0]);
+    int idx = 0;
+
+    for( int i = 0; i < filtered_contours.size(); i++ )
+    {
+        int area = cv::contourArea(filtered_contours[i]);
+        if(area < min_area)
+        {
+            min_area = area;
+            idx = i;
+        }
+    }
+
+    return filtered_contours[idx];
 }
 
 std::vector<cv::Point> Box::get_blue_box()

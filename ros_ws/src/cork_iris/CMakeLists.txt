@@ -48,7 +48,7 @@ generate_messages(
   std_msgs
 )
 
-add_executable(pcl_cork src/pcl_cork.cpp src/ImageParser.cpp src/box.cpp)
+add_executable(pcl_cork src/pcl_cork.cpp src/box.cpp)
 target_link_libraries(pcl_cork ${catkin_LIBRARIES} ${PCL_LIBRARIES})
 
 add_executable(test_scene src/test_scene.cpp)

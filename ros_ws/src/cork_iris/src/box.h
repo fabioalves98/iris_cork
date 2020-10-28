@@ -8,7 +8,6 @@
 
 #include <pcl/common/io.h>
 
-#include "ImageParser.h"
 
 class Box
 {

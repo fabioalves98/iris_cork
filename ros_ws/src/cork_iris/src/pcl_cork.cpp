@@ -957,7 +957,6 @@ void synced_callback(const sensor_msgs::ImageConstPtr& image,
 
 		// Convert depth enconding
 		cv::Mat(cv_depth).convertTo(cv_depth, CV_8UC1, 255. / (1000));
-	
 	}
     catch(cv_bridge::Exception& e)
     {
@@ -1012,6 +1011,7 @@ void synced_callback(const sensor_msgs::ImageConstPtr& image,
                 {
                     cloud_smoothing(cork_pieces, cork_pieces);
                 }
+                
                 if (display_type == 2) // Surface normals color
                 {
                     surface_normals(cork_pieces, cork_pieces);
