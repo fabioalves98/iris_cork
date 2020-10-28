@@ -11,6 +11,7 @@ from math import pi, cos, sin
 
 from cork_iris.msg import ArmCommand
 from cork_iris.srv import ControlArm
+from cork_classifier.srv import ClassifyCork
 from moveit_msgs.msg import PlanningSceneComponents, PlanningScene
 from moveit_msgs.srv import ApplyPlanningScene
 # from std_msgs.msg import String
@@ -354,17 +355,42 @@ def main():
 
     test_publisher = rospy.Publisher('cork_iris/grabbing_position', PoseStamped, queue_size=1)
     
-    if SIM:
-        rospy.logwarn("[CORK-IRIS] Connecting to simulation. Change the arm_control code var to change this.")
-        arm = ArmControl('localhost')
-    else:
-        arm = ArmControl()
-        calibration = Calibration(CORK_IRIS_BASE_DIR)
-        arm.setSpeed(0.3)
-        arm.config_gripper(100.0)
+    # if SIM:
+    #     rospy.logwarn("[CORK-IRIS] Connecting to simulation. Change the arm_control code var to change this.")
+    #     arm = ArmControl('localhost')
+    # else:
+    #     arm = ArmControl()
+    #     calibration = Calibration(CORK_IRIS_BASE_DIR)
+    #     arm.setSpeed(0.3)
+    #     arm.config_gripper(100.0)
     
     scene = moveit_commander.PlanningSceneInterface(synchronous=True)
     
+
+
+    cork_piece_scene = scene.get_objects(["cork_piece"])["cork_piece"]
+
+
+    position = cork_piece_scene.primitive_poses[0].position
+    orientation = cork_piece_scene.primitive_poses[0].orientation
+    dimensions = cork_piece_scene.primitives[0].dimensions
+
+    print(position)
+    print(orientation)
+    print(dimensions)
+    
+    p = Pose()
+    # p.position = position
+    # p.orientation = orientation
+
+
+    rospy.wait_for_service('classify_cork')
+    try:
+        classif = rospy.ServiceProxy('classify_cork', ClassifyCork)
+        resp1 = classif(p, [0.01, 0.05, 0.1])
+        return resp1.result
+    except rospy.ServiceException as e:
+        print("Service call failed: %s"%e)
     # time.sleep(2)
     # print(scene.get_attached_objects())
     rospy.spin()

@@ -132,6 +132,7 @@ double splitted_cork_distance_threshold, splitted_cork_normal_threshold;
 
 ros::Publisher pub;
 ros::Publisher point_pub;
+ros::Publisher cork_cloud;
 ros::Publisher planning_scene_diff_publisher;
 
 // PointXYZRGB cloud
@@ -278,6 +279,39 @@ CloudPtr subtractCloud(CloudPtr cloud, pcl::PointIndices::Ptr indices)
     extract.filter (*cloud_subtracted);
 
     return cloud_subtracted;
+
+}
+
+CloudPtr cropBoundingBox(CloudPtr cloud, BoundingBox bb)
+{
+    CloudPtr cloudOut (new Cloud); 
+   
+
+    Eigen::Vector4f minPoint;
+    minPoint[0]= bb.minPoint.x;
+    minPoint[1]= bb.minPoint.y;
+    minPoint[2]= bb.minPoint.z;
+    Eigen::Vector4f maxPoint;
+    maxPoint[0]= bb.maxPoint.x;
+    maxPoint[1]= bb.maxPoint.y;  
+    maxPoint[2]= bb.maxPoint.z;
+    maxPoint[3] = 1;
+    minPoint[3] = 1;
+
+    Eigen::Affine3f trans = Eigen::Affine3f::Identity(); // create transform
+    Eigen::Affine3f inverse_transform = Eigen::Affine3f::Identity(); 
+    trans.translate(bb.position);                    
+    trans.rotate(bb.orientation);  
+    inverse_transform = trans.inverse (); 
+    
+    pcl::CropBox<pcl::PointXYZRGB> cropFilter;
+    cropFilter.setInputCloud (cloud);
+    cropFilter.setMin(minPoint);
+    cropFilter.setMax(maxPoint);
+    cropFilter.setTransform(inverse_transform); 
+    cropFilter.filter (*cloudOut);
+
+    return cloudOut; 
 
 }
 
@@ -751,7 +785,9 @@ CloudInfo chooseBestCluster(std::vector<CloudInfo> cluster_clouds, CloudPtr full
 void cluster_extraction (pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_in, pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_out)
 {
 
-    // pcl::PointCloud<pcl::PointXYZRGBNormal>::Ptr cloud_with_normals (new pcl::PointCloud<pcl::PointXYZRGBNormal>);
+    CloudPtr cloud_original (new Cloud);
+    *cloud_original = *cloud_in; 
+
     CloudNormalPtr cloud_with_normals (new CloudNormal);
     pcl::IndicesClustersPtr clusters (new pcl::IndicesClusters), small_clusters (new pcl::IndicesClusters), large_clusters (new pcl::IndicesClusters);
     CECExtraction(cloud_in, cloud_out, clusters, small_clusters, large_clusters, cloud_with_normals);
@@ -782,16 +818,11 @@ void cluster_extraction (pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_in, pcl::
     broadcastCorkTransform(&(cloud_cluster.bb));
     drawBoundingBox(&(cloud_cluster.bb), "cork_piece");
 
-    pcl::PointXYZRGB painted;
-    painted.x = cloud_cluster.bb.centroid.x();
-    painted.y = cloud_cluster.bb.centroid.y();
-    painted.z = cloud_cluster.bb.centroid.z(); 
-
-    painted.r = 0;
-    painted.g = 0;
-    painted.b = 255;
-
-    cloud_out->push_back(painted);
+    CloudPtr cloud_cluster_full_res = cropBoundingBox(cloud_original, cloud_cluster.bb);
+    sensor_msgs::PointCloud2 published_cork_pcd;
+    pcl::toROSMsg(*cloud_cluster_full_res, published_cork_pcd);
+    published_cork_pcd.header.frame_id = "camera_depth_optical_frame";
+    cork_cloud.publish(published_cork_pcd); 
 }
 
 
@@ -984,6 +1015,7 @@ int main (int argc, char** argv)
     // Create a ROS publisher for the output point cloud
     pub = n.advertise<sensor_msgs::PointCloud2> ("/cork_iris/processed_pointcloud", 1);
     point_pub = n.advertise<geometry_msgs::PoseStamped> ("/cork_iris/cork_piece", 1);
+    cork_cloud = n.advertise<sensor_msgs::PointCloud2> ("/cork_iris/cork_piece_cloud", 1);
 
 
     planning_scene_diff_publisher = n.advertise<moveit_msgs::PlanningScene>("planning_scene", 1);

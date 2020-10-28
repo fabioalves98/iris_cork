@@ -2,9 +2,12 @@
     
     <arg name="bag" default="big5_roller.bag"  doc="Choose bag to use"/>
     <arg name="camera" default="false"  doc="If camera is true then the real camera driver is used"/>
+    <arg name="robot" default="true"  doc="If you want the robot sim"/>
 
-    <include file="$(find iris_ur10e)/launch/sim.launch">
-    </include>
+    <group if="$(arg robot)">
+        <include file="$(find iris_ur10e)/launch/sim.launch">
+        </include>
+    </group>
 
     <group if="$(arg camera)">
         <include file="$(find cork_iris)/launch/kinect_launch.launch">
