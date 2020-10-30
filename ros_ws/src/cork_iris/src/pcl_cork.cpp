@@ -136,7 +136,8 @@ ros::Publisher cork_cloud;
 ros::Publisher planning_scene_diff_publisher;
 
 // PointXYZRGB cloud
-pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud (new pcl::PointCloud<pcl::PointXYZRGB>);
+// pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud (new pcl::PointCloud<pcl::PointXYZRGB>);
+CloudPtr cloud (new Cloud);
 
 
 void drawBoundingBox(BoundingBox *bb, string name)
@@ -286,7 +287,6 @@ CloudPtr cropBoundingBox(CloudPtr cloud, BoundingBox bb)
 {
     CloudPtr cloudOut (new Cloud); 
    
-
     Eigen::Vector4f minPoint;
     minPoint[0]= bb.minPoint.x;
     minPoint[1]= bb.minPoint.y;
@@ -309,6 +309,7 @@ CloudPtr cropBoundingBox(CloudPtr cloud, BoundingBox bb)
     cropFilter.setMin(minPoint);
     cropFilter.setMax(maxPoint);
     cropFilter.setTransform(inverse_transform); 
+    cropFilter.setKeepOrganized(true);
     cropFilter.filter (*cloudOut);
 
     return cloudOut; 
@@ -818,7 +819,7 @@ void cluster_extraction (pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_in, pcl::
     broadcastCorkTransform(&(cloud_cluster.bb));
     drawBoundingBox(&(cloud_cluster.bb), "cork_piece");
 
-    CloudPtr cloud_cluster_full_res = cropBoundingBox(cloud_original, cloud_cluster.bb);
+    CloudPtr cloud_cluster_full_res = cropBoundingBox(cloud, cloud_cluster.bb);
     sensor_msgs::PointCloud2 published_cork_pcd;
     pcl::toROSMsg(*cloud_cluster_full_res, published_cork_pcd);
     published_cork_pcd.header.frame_id = "camera_depth_optical_frame";

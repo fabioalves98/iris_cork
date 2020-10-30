@@ -1,8 +1,7 @@
 #!/usr/bin/env python
 
-import sys, time, csv #os #yaml
-import rospy, rospkg, rosparam, tf #dynamic_reconfigure.client
-# import tf2_ros, tf2_geometry_msgs
+import sys, time, csv
+import rospy, rospkg, rosparam, tf
 import moveit_commander
 import moveit_msgs.msg
 import geometry_msgs.msg
@@ -14,15 +13,9 @@ from cork_iris.srv import ControlArm
 from cork_classifier.srv import ClassifyCork
 from moveit_msgs.msg import PlanningSceneComponents, PlanningScene
 from moveit_msgs.srv import ApplyPlanningScene
-# from std_msgs.msg import String
-# from sensor_msgs.msg import Image
 from geometry_msgs.msg import Point, TransformStamped, Pose, PoseStamped, Quaternion
-# from moveit_commander.conversions import pose_to_list
+from sensor_msgs.msg import PointCloud2
 from tf.transformations import euler_from_quaternion, quaternion_from_euler, quaternion_multiply
-# from easy_handeye.srv import TakeSample, ComputeCalibration
-# from std_srvs.srv import Empty, Trigger
-# from ur_msgs.srv import SetSpeedSliderFraction
-# from ur_dashboard_msgs.srv import Load, GetProgramState, GetLoadedProgram
 from ArmControl import ArmControl
 from Calibration import Calibration
 from HelperFunctions import *
@@ -355,42 +348,28 @@ def main():
 
     test_publisher = rospy.Publisher('cork_iris/grabbing_position', PoseStamped, queue_size=1)
     
-    # if SIM:
-    #     rospy.logwarn("[CORK-IRIS] Connecting to simulation. Change the arm_control code var to change this.")
-    #     arm = ArmControl('localhost')
-    # else:
-    #     arm = ArmControl()
-    #     calibration = Calibration(CORK_IRIS_BASE_DIR)
-    #     arm.setSpeed(0.3)
-    #     arm.config_gripper(100.0)
-    
+    if SIM:
+        rospy.logwarn("[CORK-IRIS] Connecting to simulation. Change the arm_control code var to change this.")
+        arm = ArmControl('localhost')
+    else:
+        arm = ArmControl()
+        calibration = Calibration(CORK_IRIS_BASE_DIR)
+        arm.setSpeed(0.3)
+        arm.config_gripper(100.0)
     scene = moveit_commander.PlanningSceneInterface(synchronous=True)
     
-
-
-    cork_piece_scene = scene.get_objects(["cork_piece"])["cork_piece"]
-
-
-    position = cork_piece_scene.primitive_poses[0].position
-    orientation = cork_piece_scene.primitive_poses[0].orientation
-    dimensions = cork_piece_scene.primitives[0].dimensions
-
-    print(position)
-    print(orientation)
-    print(dimensions)
     
-    p = Pose()
-    # p.position = position
-    # p.orientation = orientation
+    # Debug
+    # cork_cloud = rospy.wait_for_message('cork_iris/cork_piece_cloud', PointCloud2, timeout=3)
+    # rospy.wait_for_service('classify_cork')
+    # try:
+    #     classif = rospy.ServiceProxy('classify_cork', ClassifyCork)
+    #     resp1 = classif(cork_cloud)
+    #     print(resp1)
+    # except rospy.ServiceException as e:
+    #     print("Service call failed: %s"%e)
 
 
-    rospy.wait_for_service('classify_cork')
-    try:
-        classif = rospy.ServiceProxy('classify_cork', ClassifyCork)
-        resp1 = classif(p, [0.01, 0.05, 0.1])
-        return resp1.result
-    except rospy.ServiceException as e:
-        print("Service call failed: %s"%e)
     # time.sleep(2)
     # print(scene.get_attached_objects())
     rospy.spin()
