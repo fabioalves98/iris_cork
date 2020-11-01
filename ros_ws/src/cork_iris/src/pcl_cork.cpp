@@ -85,16 +85,6 @@ struct CloudInfo{
     BoundingBox bb;
 };
 
-struct CECExtractionParams{
-    double normal_diff;
-    double squared_dist;
-    double curv;
-    double leaf_size;
-    double cluster_tolerance;
-    double radius_search;
-    int min_cluster_size, max_cluster_size;
-};
-
 pcl::visualization::PCLVisualizer::Ptr viewer;
 
 
@@ -112,15 +102,8 @@ bool choose_best_cork;
 bool add_planning_scene_cork;
 
 bool roller;
-double roller_height_value;
-double roller_height_angle;
-double roller_width_value;
-
-CECExtractionParams cecparams;
 
 // int min_cluster_size, max_cluster_size;
-
-int meanK;
 
 double z_threshold, center_threshold;
 double space_distance_threshold, space_count_points_threshold, space_k_neighbors;
@@ -411,69 +394,6 @@ void paintPoints(CloudPtr cloud_out, vector<int> points, Color color)
         (*cloud_out)[points[i]].b = color.b;
     }
 }
-
-
-
-
-bool enforceNormals (const pcl::PointXYZRGBNormal& point_a, const pcl::PointXYZRGBNormal& point_b, float squared_distance)
-{
-    Eigen::Map<const Eigen::Vector3f> point_a_normal = point_a.getNormalVector3fMap (), 
-    point_b_normal = point_b.getNormalVector3fMap ();
-
-
-    double enf_normal_diff = point_a_normal.dot(point_b_normal);
-    if (squared_distance < cecparams.squared_dist)
-    {
-        if (enf_normal_diff >= cecparams.normal_diff)
-        {
-            return (true);
-            // if (point_b.curvature < cecparams.curv)
-            // {
-            //     return (true);
-            // }   
-        }
-    }
-
-    return (false);
-}
-
-
-/*
-    Segments the cloud_in using CEC and ultimately returns a new processed cloud, indices for clusters, small clusters and big clusters.
-    Also returns the cloud with normals estimated during the process
-*/
-
-void CECExtraction(CloudPtr cloud_in, CloudPtr cloud_out, 
-                   pcl::IndicesClustersPtr clusters, pcl::IndicesClustersPtr& sclusters, pcl::IndicesClustersPtr& lclusters,
-                   CloudNormalPtr cloud_with_normals)
-{
-    pcl::VoxelGrid<pcl::PointXYZRGB> vg;
-    vg.setInputCloud (cloud_in);
-    vg.setLeafSize (cecparams.leaf_size, cecparams.leaf_size, cecparams.leaf_size);
-    vg.setDownsampleAllData (true);
-    vg.filter (*cloud_out);
-    
-    pcl::search::KdTree<pcl::PointXYZRGB>::Ptr search_tree (new pcl::search::KdTree<pcl::PointXYZRGB>);
-
-    pcl::copyPointCloud(*cloud_out, *cloud_with_normals);
-    pcl::NormalEstimation<pcl::PointXYZRGB, pcl::PointXYZRGBNormal> ne;
-    ne.setInputCloud (cloud_out);
-    ne.setSearchMethod (search_tree);
-    ne.setRadiusSearch (cecparams.radius_search);
-    ne.compute (*cloud_with_normals);
-
-    pcl::ConditionalEuclideanClustering<pcl::PointXYZRGBNormal> cec (true);
-    cec.setInputCloud (cloud_with_normals);
-    cec.setConditionFunction (&enforceNormals);
-    cec.setClusterTolerance (cecparams.cluster_tolerance);
-    cec.setMinClusterSize (cloud_with_normals->points.size () / cecparams.min_cluster_size);
-    cec.setMaxClusterSize (cloud_with_normals->points.size () / cecparams.max_cluster_size);
-    cec.segment (*clusters);
-    cec.getRemovedClusters (sclusters, lclusters);
-
-}
-
-
 
 
 void broadcastCorkTransform(BoundingBox *bb)
@@ -783,15 +703,14 @@ CloudInfo chooseBestCluster(std::vector<CloudInfo> cluster_clouds, CloudPtr full
 }
 
 
-void cluster_extraction (pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_in, pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_out)
+void cluster_extraction (CloudPtr cloud_in, CloudPtr cloud_out)
 {
-
     CloudPtr cloud_original (new Cloud);
     *cloud_original = *cloud_in; 
 
     CloudNormalPtr cloud_with_normals (new CloudNormal);
     pcl::IndicesClustersPtr clusters (new pcl::IndicesClusters), small_clusters (new pcl::IndicesClusters), large_clusters (new pcl::IndicesClusters);
-    CECExtraction(cloud_in, cloud_out, clusters, small_clusters, large_clusters, cloud_with_normals);
+    PCLFunctions::cec_extraction(cloud_in, cloud_out, clusters, small_clusters, large_clusters, cloud_with_normals);
 
     if(clusters->size() == 0){
         cout << "No clusters found. Returning!" << endl;
@@ -840,23 +759,25 @@ void parameterConfigure(cork_iris::PCLCorkConfig &config, uint32_t level)
     add_planning_scene_cork = config.add_planning_scene_cork;
 
     roller = config.roller;
-    roller_height_value = config.roller_height_value;
-    roller_height_angle = config.roller_height_angle;
-    roller_width_value = config.roller_width_value;
 
-    cecparams.radius_search = config.radius_search;
+    PCLFunctions::updateParams(config);
+    // roller_height_value = config.roller_height_value;
+    // roller_height_angle = config.roller_height_angle;
+    // roller_width_value = config.roller_width_value;
 
-    // Clustering params
-    cecparams.leaf_size = config.leaf_size;
-    cecparams.cluster_tolerance = config.cluster_tolerance;
-    cecparams.min_cluster_size = config.min_cluster_size;
-    cecparams.max_cluster_size = config.max_cluster_size;
-    cecparams.normal_diff = config.normal_diff;
-    cecparams.squared_dist = config.squared_dist;
-    cecparams.curv = config.curvature;
+    // cecparams.radius_search = config.radius_search;
+
+    // // Clustering params
+    // cecparams.leaf_size = config.leaf_size;
+    // cecparams.cluster_tolerance = config.cluster_tolerance;
+    // cecparams.min_cluster_size = config.min_cluster_size;
+    // cecparams.max_cluster_size = config.max_cluster_size;
+    // cecparams.normal_diff = config.normal_diff;
+    // cecparams.squared_dist = config.squared_dist;
+    // cecparams.curv = config.curvature;
 
     // Statistical outliers params
-    meanK = config.mean_k;
+    // meanK = config.mean_k;
 
 
     // Best cork algorithm params
@@ -931,7 +852,7 @@ void synced_callback(const sensor_msgs::ImageConstPtr& image,
             }
             else
             {
-                PCLFunctions::filterRollerBox(cloud, cork_pieces, roller_width_value, roller_height_value, roller_height_angle);
+                PCLFunctions::filterRollerBox(cloud, cork_pieces);
             }
 
             if (cork_pieces->size() == 0)
@@ -943,7 +864,7 @@ void synced_callback(const sensor_msgs::ImageConstPtr& image,
             {          
                 if (remove_stat_outliers) // Remove Statistical Outliers
                 {
-                    PCLFunctions::remove_outliers(cork_pieces, cork_pieces, meanK);
+                    PCLFunctions::remove_outliers(cork_pieces, cork_pieces);
                 }
                 if (smooth_cloud) // Cloud smoothing
                 {
@@ -952,11 +873,11 @@ void synced_callback(const sensor_msgs::ImageConstPtr& image,
                 
                 if (display_type == 2) // Surface normals color
                 {
-                    PCLFunctions::surface_normals(cork_pieces, cork_pieces, cecparams.radius_search);
+                    PCLFunctions::surface_normals(cork_pieces, cork_pieces);
                 }
                 else if(display_type == 3) // Surface curvature color
                 {
-                    PCLFunctions::surface_curvatures(cork_pieces, cork_pieces, cecparams.radius_search);
+                    PCLFunctions::surface_curvatures(cork_pieces, cork_pieces);
                 }
                 else if (display_type == 4) // Clustering extraction
                 {
