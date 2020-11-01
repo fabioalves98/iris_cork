@@ -1,11 +1,14 @@
 #!/usr/bin/env python
 import rospy, socket, sys, struct, ctypes, math, cv2, numpy
-import rospkg 
+import rospkg
 
 from cork_classifier.srv import ClassifyCork
 from Classifier import classify
-from sensor_msgs.msg import PointCloud2
+from sensor_msgs.msg import PointCloud2, Image
 import sensor_msgs.point_cloud2 as pc2
+from cv_bridge import CvBridge
+
+print("ok")
 
 # # RESOURCES = os.path.join(os.path.dirname(os.path.dirname(__file__)), "res")
 # # print(RESOURCES)
@@ -30,8 +33,6 @@ import sensor_msgs.point_cloud2 as pc2
 # #         # image = image to classify, model = path to model,
 # #         # gpu = enable GPU for a single classification (for better performance enable on main function)
 # #         (classification_category, classification_accuracy) = classify(image, model)
-
-
 
 
 MODEL = "conv-32-drop25-dense-128-drop50-64-drop50-1572285048.h5"
@@ -85,11 +86,16 @@ def unskewImage(img, rect):
     return dst
 
 
+''' Apply contours etc. Get a bounding rectangle of the cork and unskew it. Finally get the desired pixels from the
+    image_raw image.'''
 def getClassifiableCorkImage(img):
-
+    
     box = getCorkBoundingRect(img)
     # cv2.drawContours(img,[box],0,(0,0,255),2)
-    unskewed = unskewImage(img, box)
+    data = rospy.wait_for_message('camera/rgb/image_raw', Image, timeout=1)
+    br = CvBridge()
+    im2 = br.imgmsg_to_cv2(data, 'bgr8')
+    unskewed = unskewImage(im2, box)
     # cv2.drawContours(img, cnt, 0, (255,0 ,0), 3)
     # cv2.imshow("image", img)
     # cv2.waitKey()
@@ -109,16 +115,18 @@ def valueToRgb(val):
     return (r, g, b)
 
 
+
+
 def classify_cork_piece(data):
 
     data = data.cork_cloud
-    # print(data.header)
+
 
     parsed_cloud = pc2.read_points(data)
     int_data = list(parsed_cloud)
 
-    ## TODO: Fix color bug
-    img = numpy.full((data.height,data.width,3), 255, dtype=numpy.uint8)    
+    # Build a simple image from the cloud data
+    img = numpy.full((data.height,data.width,3), 255, dtype=numpy.uint8)
     for i in range(0, data.height):
       for j in range(0, data.width):
         if(not math.isnan(int_data[data.width * i + j][0])):
@@ -127,18 +135,13 @@ def classify_cork_piece(data):
             img[i][j][1] = g
             img[i][j][2] = r
 
-    # cv2.imshow("image", img)
-    # cv2.imwrite("xx.jpg", img)
-    # print("saved")
-    # cv2.waitKey()
+
     img = getClassifiableCorkImage(img)
+
     (classification_category, classification_accuracy) = classify(img, MODEL_PATH)
-    # print(classification_accuracy, classification_category)
+    # # print(classification_accuracy, classification_category)
 
     return [classification_category, classification_accuracy]
-
-
-    return 1
                     
 if __name__ == '__main__':
     
@@ -146,14 +149,6 @@ if __name__ == '__main__':
         rospy.init_node('cork_classification', anonymous=False)  
 
         s = rospy.Service("classify_cork", ClassifyCork, classify_cork_piece)
-
-
-        # img = cv2.imread("xx.jpg")
-        # img = getClassifiableCorkImage(img)
-        # (classification_category, classification_accuracy) = classify(img, MODEL_PATH)
-        # print(type(classification_accuracy))
-        # print(classification_accuracy, classification_category)
-
 
         rospy.spin()
     except rospy.ROSInterruptException:

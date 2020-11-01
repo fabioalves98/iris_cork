@@ -169,6 +169,19 @@ def runActionlist(actions):
 
 
 
+def getCorkClassification():
+    cork_cloud = rospy.wait_for_message('cork_iris/cork_piece_cloud', PointCloud2, timeout=3)
+    rospy.wait_for_service('classify_cork')
+    try:
+        classif = rospy.ServiceProxy('classify_cork', ClassifyCork)
+        resp1 = classif(cork_cloud)
+        print(resp1)
+        return (resp1.accuracy, resp1.result)
+    except rospy.ServiceException as e:
+        print("Couldn't call classification service: %s"%e)
+
+
+
 def computeCorkGrabPositions(trans):
     ## Gets a position -0.15 meters behind the original cork piece. this should be the 
     ## grabbing position
@@ -269,7 +282,6 @@ def grab_cork(cork, cork_grab_pose):
     if(not keep_going("stand back")):
         return 
 
-    # TODO: Move towards the center of the box in an upwards direction, not always upwards like this here
     arm.simpleMove([0, 0, 0.15])
     
     arm.jointGoal(positions['out_of_camera_pos'])
@@ -300,6 +312,10 @@ def grab_cork_routine():
         if trans == None:
             setPCLCorkParameter({"live" : "false"})
             return "No Cork Piece found"
+
+
+        ## TODO: Do something with this
+        classification_accuracy, classification_result = getCorkClassification()
 
         grab1, grab2 = computeCorkGrabPositions(trans)
         setPCLCorkParameter({"live" : "false"})
