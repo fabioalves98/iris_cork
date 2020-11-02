@@ -1,4 +1,4 @@
-sensor_msgs/PointCloud2 cork_cloud
+sensor_msgs/Image cork_cloud
 ---
 string result
 float32 accuracy

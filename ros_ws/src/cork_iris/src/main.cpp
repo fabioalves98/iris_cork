@@ -54,7 +54,7 @@ bool roller;
 
 ros::Publisher pub;
 ros::Publisher point_pub;
-ros::Publisher cork_cloud;
+ros::Publisher cork_cloud_img;
 ros::Publisher planning_scene_diff_publisher;
 
 CloudPtr cloud (new Cloud);
@@ -286,10 +286,13 @@ void synced_callback(const sensor_msgs::ImageConstPtr& image,
                     drawBoundingBox(&(cloud_cluster.bb), "cork_piece");
 
                     CloudPtr cloud_cluster_full_res = cropBoundingBox(cloud, cloud_cluster.bb);
-                    sensor_msgs::PointCloud2 published_cork_pcd;
-                    pcl::toROSMsg(*cloud_cluster_full_res, published_cork_pcd);
-                    published_cork_pcd.header.frame_id = "camera_depth_optical_frame";
-                    cork_cloud.publish(published_cork_pcd);
+                    
+                    pcl::PCLImage image = PCLFunctions::extractImageFromCloud(cloud_cluster_full_res, true);
+                    sensor_msgs::Image cloud_img;
+                    pcl_conversions::moveFromPCL(image, cloud_img);
+                    cork_cloud_img.publish(cloud_img);
+                    
+
                 }
             }
 
@@ -342,7 +345,7 @@ int main (int argc, char** argv)
     // Create a ROS publisher for the output point cloud
     pub = n.advertise<sensor_msgs::PointCloud2> ("/cork_iris/processed_pointcloud", 1);
     point_pub = n.advertise<geometry_msgs::PoseStamped> ("/cork_iris/cork_piece", 1);
-    cork_cloud = n.advertise<sensor_msgs::PointCloud2> ("/cork_iris/cork_piece_cloud", 1);
+    cork_cloud_img = n.advertise<sensor_msgs::Image> ("/cork_iris/cork_piece_cloud_img", 1);
 
     // ROS publisher for the planning scene
     planning_scene_diff_publisher = n.advertise<moveit_msgs::PlanningScene>("planning_scene", 1);

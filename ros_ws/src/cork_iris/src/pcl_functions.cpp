@@ -225,3 +225,12 @@ void PCLFunctions::getNearestNeighbors(int K, Eigen::Vector4f searchPoint, Cloud
 
     kdtree.nearestKSearch (startingPoint, K, points, dists);
 }
+
+pcl::PCLImage PCLFunctions::extractImageFromCloud(CloudPtr cloud_in, bool paintNaNBlack)
+{
+    pcl::PCLImage image;
+    pcl::io::PointCloudImageExtractorFromRGBField<pcl::PointXYZRGB> image_extractor;
+    image_extractor.setPaintNaNsWithBlack(paintNaNBlack);
+    bool success = image_extractor.extract(*cloud_in, image);
+    return image;
+}

@@ -14,7 +14,7 @@ from cork_classifier.srv import ClassifyCork
 from moveit_msgs.msg import PlanningSceneComponents, PlanningScene
 from moveit_msgs.srv import ApplyPlanningScene
 from geometry_msgs.msg import Point, TransformStamped, Pose, PoseStamped, Quaternion
-from sensor_msgs.msg import PointCloud2
+from sensor_msgs.msg import Image
 from tf.transformations import euler_from_quaternion, quaternion_from_euler, quaternion_multiply
 from ArmControl import ArmControl
 from Calibration import Calibration
@@ -170,7 +170,7 @@ def runActionlist(actions):
 
 
 def getCorkClassification():
-    cork_cloud = rospy.wait_for_message('cork_iris/cork_piece_cloud', PointCloud2, timeout=3)
+    cork_cloud = rospy.wait_for_message('cork_iris/cork_piece_cloud_img', Image, timeout=3)
     rospy.wait_for_service('classify_cork')
     try:
         classif = rospy.ServiceProxy('classify_cork', ClassifyCork)
@@ -376,15 +376,7 @@ def main():
     
     
     # Debug
-    # cork_cloud = rospy.wait_for_message('cork_iris/cork_piece_cloud', PointCloud2, timeout=3)
-    # rospy.wait_for_service('classify_cork')
-    # try:
-    #     classif = rospy.ServiceProxy('classify_cork', ClassifyCork)
-    #     resp1 = classif(cork_cloud)
-    #     print(resp1)
-    # except rospy.ServiceException as e:
-    #     print("Service call failed: %s"%e)
-
+    # getCorkClassification()
 
     # time.sleep(2)
     # print(scene.get_attached_objects())

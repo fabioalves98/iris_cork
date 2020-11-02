@@ -91,11 +91,7 @@ def unskewImage(img, rect):
 def getClassifiableCorkImage(img):
     
     box = getCorkBoundingRect(img)
-    # cv2.drawContours(img,[box],0,(0,0,255),2)
-    data = rospy.wait_for_message('camera/rgb/image_raw', Image, timeout=1)
-    br = CvBridge()
-    im2 = br.imgmsg_to_cv2(data, 'bgr8')
-    unskewed = unskewImage(im2, box)
+    unskewed = unskewImage(img, box)
     # cv2.drawContours(img, cnt, 0, (255,0 ,0), 3)
     # cv2.imshow("image", img)
     # cv2.waitKey()
@@ -104,37 +100,15 @@ def getClassifiableCorkImage(img):
     return unskewed
 
 
-def valueToRgb(val):
-    s = struct.pack('>f' ,val)
-    i = struct.unpack('>l',s)[0]
-    # you can get back the float value by the inverse operations
-    pack = ctypes.c_uint32(i).value
-    r = (pack & 0x00FF0000)>> 16
-    g = (pack & 0x0000FF00)>> 8
-    b = (pack & 0x000000FF)
-    return (r, g, b)
-
 
 
 
 def classify_cork_piece(data):
 
     data = data.cork_cloud
-
-
-    parsed_cloud = pc2.read_points(data)
-    int_data = list(parsed_cloud)
-
-    # Build a simple image from the cloud data
-    img = numpy.full((data.height,data.width,3), 255, dtype=numpy.uint8)
-    for i in range(0, data.height):
-      for j in range(0, data.width):
-        if(not math.isnan(int_data[data.width * i + j][0])):
-            r, g, b = valueToRgb(int_data[data.width * i + j][3])
-            img[i][j][0] = b
-            img[i][j][1] = g
-            img[i][j][2] = r
-
+    br = CvBridge()
+    img = br.imgmsg_to_cv2(data, 'bgr8')
+    img[numpy.where((img==[0,0,0]).all(axis=2))] = [255, 255, 255]
 
     img = getClassifiableCorkImage(img)
 

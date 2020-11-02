@@ -8,6 +8,8 @@
 #include <pcl/segmentation/conditional_euclidean_clustering.h>
 #include <pcl/filters/voxel_grid.h>
 #include <pcl/filters/extract_indices.h>
+#include <pcl/io/point_cloud_image_extractors.h>
+#include <pcl/conversions.h>
 
 #include <cork_iris/PCLCorkConfig.h>
 
@@ -73,6 +75,7 @@ public:
     static BoundingBox computeCloudBoundingBox(CloudPtr cloud_in);
     static CloudPtr subtractCloud(CloudPtr cloud, pcl::PointIndices::Ptr indices);
     static void getNearestNeighbors(int K, Eigen::Vector4f searchPoint, CloudPtr cloud, std::vector<int>& points, std::vector<float>& dists);
+    static pcl::PCLImage extractImageFromCloud(CloudPtr cloud_in, bool paintNaNBlack);
 };
 
 
