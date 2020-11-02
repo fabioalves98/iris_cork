@@ -110,24 +110,7 @@ void PCLFunctions::surface_curvatures(CloudPtr cloud_in, CloudPtr cloud_out)
     }
 }
 
-bool PCLFunctions::enforceNormals (const pcl::PointXYZRGBNormal& point_a, const pcl::PointXYZRGBNormal& point_b, float squared_distance)
-{
-    Eigen::Map<const Eigen::Vector3f> point_a_normal = point_a.getNormalVector3fMap (), 
-    point_b_normal = point_b.getNormalVector3fMap ();
-
-
-    double enf_normal_diff = point_a_normal.dot(point_b_normal);
-    if (squared_distance < cec_params.squared_dist)
-    {
-        if (enf_normal_diff >= cec_params.normal_diff)
-        {
-            return (true);  
-        }
-    }
-    return (false);
-}
-
-void PCLFunctions::cec_extraction(CloudPtr cloud_in, CloudPtr cloud_out, IndxClustersPtr clusters, IndxClustersPtr sclusters, IndxClustersPtr lclusters, CloudNormalPtr cloud_with_normals)
+void PCLFunctions::cec_extraction(CloudPtr cloud_in, CloudPtr cloud_out, IdxClustersPtr clusters, IdxClustersPtr sclusters, IdxClustersPtr lclusters, CloudNormalPtr cloud_with_normals)
 {
     pcl::VoxelGrid<pcl::PointXYZRGB> vg;
     vg.setInputCloud (cloud_in);
@@ -154,3 +137,91 @@ void PCLFunctions::cec_extraction(CloudPtr cloud_in, CloudPtr cloud_out, IndxClu
     cec.getRemovedClusters (sclusters, lclusters);    
 }
 
+bool PCLFunctions::enforceNormals (const pcl::PointXYZRGBNormal& point_a, const pcl::PointXYZRGBNormal& point_b, float squared_distance)
+{
+    Eigen::Map<const Eigen::Vector3f> point_a_normal = point_a.getNormalVector3fMap (), 
+    point_b_normal = point_b.getNormalVector3fMap ();
+
+
+    double enf_normal_diff = point_a_normal.dot(point_b_normal);
+    if (squared_distance < cec_params.squared_dist)
+    {
+        if (enf_normal_diff >= cec_params.normal_diff)
+        {
+            return (true);  
+        }
+    }
+    return (false);
+}
+
+BoundingBox PCLFunctions::computeCloudBoundingBox(CloudPtr cloud_in)
+{
+    // Compute principal directions
+    Eigen::Vector4f pcaCentroid;
+    pcl::compute3DCentroid(*cloud_in, pcaCentroid);
+
+    Eigen::Matrix3f covariance;
+    computeCovarianceMatrixNormalized(*cloud_in, pcaCentroid, covariance);
+    Eigen::SelfAdjointEigenSolver<Eigen::Matrix3f> eigen_solver(covariance, Eigen::ComputeEigenvectors);
+    Eigen::Matrix3f eigenVectorsPCA = eigen_solver.eigenvectors();
+    /// This line is necessary for proper orientation in some cases. The numbers come out the same without it, but
+    ///    the signs are different and the box doesn't get correctly oriented in some cases.
+    eigenVectorsPCA.col(2) = eigenVectorsPCA.col(0).cross(eigenVectorsPCA.col(1));  
+                                                                               
+    // Transform the original cloud to the origin where the principal components correspond to the axes.
+    Eigen::Matrix4f projectionTransform(Eigen::Matrix4f::Identity());
+    projectionTransform.block<3,3>(0,0) = eigenVectorsPCA.transpose();
+    projectionTransform.block<3,1>(0,3) = -1.f * (projectionTransform.block<3,3>(0,0) * pcaCentroid.head<3>());
+    pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloudPointsProjected (new pcl::PointCloud<pcl::PointXYZRGB>);
+    pcl::transformPointCloud(*cloud_in, *cloudPointsProjected, projectionTransform);
+    // Get the minimum and maximum points of the transformed cloud.
+    pcl::PointXYZRGB minPoint, maxPoint;
+    pcl::getMinMax3D(*cloudPointsProjected, minPoint, maxPoint);
+    const Eigen::Vector3f meanDiagonal = 0.5f*(maxPoint.getVector3fMap() + minPoint.getVector3fMap());
+
+    // Final transform
+    const Eigen::Quaternionf bboxQuaternion(eigenVectorsPCA);
+    const Eigen::Vector3f bboxTransform = eigenVectorsPCA * meanDiagonal + pcaCentroid.head<3>();
+
+    BoundingBox bb;
+    bb.orientation = bboxQuaternion;
+    bb.position = bboxTransform;
+    bb.minPoint = minPoint;
+    bb.maxPoint = maxPoint;
+    // MaxPoint - MinPoint
+    // x -> altura da caixa
+    // y -> largura da caixa
+    // z -> comprimento da caixa
+    bb.centroid = pcaCentroid;
+
+    return bb;
+}
+
+CloudPtr PCLFunctions::subtractCloud(CloudPtr cloud, pcl::PointIndices::Ptr indices)
+{
+    CloudPtr cloud_subtracted (new Cloud);
+
+    pcl::ExtractIndices<pcl::PointXYZRGB> extract;
+    extract.setInputCloud (cloud);
+    extract.setIndices (indices);
+    extract.setNegative (true);
+    extract.filter (*cloud_subtracted);
+
+    return cloud_subtracted;
+}
+
+
+void PCLFunctions::getNearestNeighbors(int K, Eigen::Vector4f searchPoint, CloudPtr cloud, std::vector<int>& points, std::vector<float>& dists)
+{
+    pcl::KdTreeFLANN<pcl::PointXYZRGB> kdtree;
+    kdtree.setInputCloud (cloud);
+
+    cout << searchPoint.x() << " " << searchPoint.y() << " " << searchPoint.z() << endl;
+
+    pcl::PointXYZRGB startingPoint;
+    startingPoint.x = searchPoint.x();
+    startingPoint.y = searchPoint.y();
+    startingPoint.z = searchPoint.z(); 
+
+    kdtree.nearestKSearch (startingPoint, K, points, dists);
+}
