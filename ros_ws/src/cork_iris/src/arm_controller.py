@@ -30,7 +30,7 @@ DEFAULT_HANDEYE_NAMESPACE = '/easy_handeye_eye_on_base'
 
 CALIBRATION_FILEPATH = '~/.ros/easy_handeye' + DEFAULT_HANDEYE_NAMESPACE + ".yaml"
 ## Fast control variable just for debugging purposes
-SIM = False
+SIM = True
 
 test_publisher = None
 
@@ -55,16 +55,16 @@ def parseRotationArgs(args):
 
 def helpString():
     help = "Usage: rosrun cork_iris arm_controller.py <command> <command_params>\n \
-    Available commands:\n \
-    \tspeed  <0 - 1>     -> Set robot speed \
+    \nAvailable commands:\n \
+    \tspeed  <0 - 1>     -> Set robot speed\n \
     \tmove   <x> <y> <z> -> Simple cartesian movement relative to last position\n \
     \trotate <x> <y> <z> -> Simple rotation relative to last position\n \
     \tgrip               -> Close the gripper fingers\n \
     \trelease            -> Release the gripper\n \
-    \t<position_name>    -> Joint goal to a <position_name>. Names are loaded at the start from positions.yaml\n \
+    \t<position_name>    -> Joint goal to a <position_name>. Names from positions.yaml\n \
     \tsave   <pos_name>  -> Save the current joint values of the arm\n \
     \tactionlist <file>  -> Run movements defined in action list <file>\n \
-    \tgrab_cork          -> If everything is setup correctly, the controller should send signal to grab a cork piece\n"
+    \tgrab_cork          -> Send signal to grab a cork piece\n"
     # print(help)
     return help
 
@@ -364,19 +364,19 @@ def main():
 
     test_publisher = rospy.Publisher('cork_iris/grabbing_position', PoseStamped, queue_size=1)
     
-    if SIM:
-        rospy.logwarn("[CORK-IRIS] Connecting to simulation. Change the arm_control code var to change this.")
-        arm = ArmControl('localhost')
-    else:
-        arm = ArmControl()
-        calibration = Calibration(CORK_IRIS_BASE_DIR)
-        arm.setSpeed(0.3)
-        arm.config_gripper(100.0)
-    scene = moveit_commander.PlanningSceneInterface(synchronous=True)
+    # if SIM:
+    #     rospy.logwarn("[CORK-IRIS] Connecting to simulation. Change the arm_control code var to change this.")
+    #     arm = ArmControl('localhost')
+    # else:
+    #     arm = ArmControl()
+    #     calibration = Calibration(CORK_IRIS_BASE_DIR)
+    #     arm.setSpeed(0.3)
+    #     arm.config_gripper(100.0)
+    # scene = moveit_commander.PlanningSceneInterface(synchronous=True)
     
     
     # Debug
-    # getCorkClassification()
+    getCorkClassification()
 
     # time.sleep(2)
     # print(scene.get_attached_objects())

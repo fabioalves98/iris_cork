@@ -6,6 +6,8 @@
 // ROS Common
 #include <ros/ros.h>
 #include <tf/transform_broadcaster.h>
+#include <tf/transform_listener.h>
+#include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 // PCL
 #include <pcl_conversions/pcl_conversions.h>
 #include <pcl/visualization/pcl_visualizer.h>
@@ -51,9 +53,12 @@ bool remove_stat_outliers;
 bool smooth_cloud;
 bool add_planning_scene_cork;
 bool roller;
+double grab_pos;
 
 ros::Publisher pub;
 ros::Publisher point_pub;
+ros::Publisher aux_point_pub_1;
+ros::Publisher aux_point_pub_2;
 ros::Publisher cork_cloud_img;
 ros::Publisher planning_scene_diff_publisher;
 
@@ -176,6 +181,47 @@ void broadcastCorkTransform(BoundingBox *bb)
     tf::Quaternion q(orientation.x, orientation.y, orientation.z, orientation.w);  
     transform.setRotation(q);
     br.sendTransform(tf::StampedTransform(transform, ros::Time::now(), "camera_depth_optical_frame", "cork_piece"));
+
+    double comp = bb->maxPoint.z - bb->minPoint.z;
+
+    geometry_msgs::Point aux_center_1;
+    aux_center_1.x = 0;
+    aux_center_1.y = 0;
+    aux_center_1.z = comp/2 - grab_pos;
+    geometry_msgs::Point aux_center_2;
+    aux_center_2.x = 0;
+    aux_center_2.y = 0;
+    aux_center_2.z = -(comp/2 - grab_pos);
+    geometry_msgs::Quaternion aux_orientation;
+    aux_orientation.x = 0;
+    aux_orientation.y = 0;
+    aux_orientation.z = 0;
+    aux_orientation.w = 1;
+    geometry_msgs::PoseStamped aux_cork_piece_1;
+    aux_cork_piece_1.header.stamp = ros::Time::now();
+    aux_cork_piece_1.header.frame_id = "camera_depth_optical_frame";
+    aux_cork_piece_1.pose.position = aux_center_1;
+    aux_cork_piece_1.pose.orientation = aux_orientation;
+    geometry_msgs::PoseStamped aux_cork_piece_2 = aux_cork_piece_1;
+    aux_cork_piece_2.pose.position = aux_center_2;
+
+    geometry_msgs::TransformStamped cork_transform;
+    cork_transform.header.stamp = ros::Time::now();
+    cork_transform.header.frame_id = "camera_depth_optical_frame";
+    cork_transform.child_frame_id = "cork_piece";
+    cork_transform.transform.translation.x = bb->centroid.x();
+    cork_transform.transform.translation.y = bb->centroid.y();
+    cork_transform.transform.translation.z = bb->centroid.z();
+    cork_transform.transform.rotation.x = corkOrientation.vec()[0];
+    cork_transform.transform.rotation.y = corkOrientation.vec()[1];
+    cork_transform.transform.rotation.z = corkOrientation.vec()[2];
+    cork_transform.transform.rotation.w = q.w();
+
+    tf2::doTransform(aux_cork_piece_1, aux_cork_piece_1, cork_transform);
+    tf2::doTransform(aux_cork_piece_2, aux_cork_piece_2, cork_transform);
+
+    aux_point_pub_1.publish(aux_cork_piece_1);
+    aux_point_pub_2.publish(aux_cork_piece_2);
 }
 
 void parameterConfigure(cork_iris::PCLCorkConfig &config, uint32_t level) 
@@ -187,6 +233,7 @@ void parameterConfigure(cork_iris::PCLCorkConfig &config, uint32_t level)
     smooth_cloud = config.smooth_cloud;
     add_planning_scene_cork = config.add_planning_scene_cork;
     roller = config.roller;
+    grab_pos = config.grab_pos;
 
     PCLFunctions::updateParams(config);
     CorkIris::updateParams(config);
@@ -343,6 +390,8 @@ int main (int argc, char** argv)
     // Create a ROS publisher for the output point cloud
     pub = n.advertise<sensor_msgs::PointCloud2> ("/cork_iris/processed_pointcloud", 1);
     point_pub = n.advertise<geometry_msgs::PoseStamped> ("/cork_iris/cork_piece", 1);
+    aux_point_pub_1 = n.advertise<geometry_msgs::PoseStamped> ("/cork_iris/cork_piece_aux1", 1);
+    aux_point_pub_2 = n.advertise<geometry_msgs::PoseStamped> ("/cork_iris/cork_piece_aux2", 1);
     cork_cloud_img = n.advertise<sensor_msgs::Image> ("/cork_iris/cork_piece_cloud_img", 1);
 
     // ROS publisher for the planning scene

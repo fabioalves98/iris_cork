@@ -4,11 +4,13 @@
     <arg name="camera" default="false"  doc="If camera is true then the real camera driver is used"/>
     <arg name="robot" default="true"  doc="If you want the robot sim"/>
 
+    <!-- Robot Node -->
     <group if="$(arg robot)">
         <include file="$(find iris_ur10e)/launch/sim.launch">
         </include>
     </group>
-
+    
+    <!-- Camera Node -->
     <group if="$(arg camera)">
         <include file="$(find cork_iris)/launch/kinect_launch.launch">
         </include>
@@ -24,7 +26,11 @@
 
     </group>
 
+    <!-- Calibration Node -->
     <include file="$(find cork_iris)/launch/handeye_publish.launch">
     </include>
+
+    <!-- Scenes Node -->
+    <node pkg="cork_iris" type="setup_scene.py" name="setup_scene" output="screen" />
 
 </launch>

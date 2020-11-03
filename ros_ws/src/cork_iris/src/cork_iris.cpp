@@ -49,15 +49,6 @@ CloudInfo CorkIris::clusterExtraction(CloudPtr cloud_in, CloudPtr cloud_out)
 
     // Chooses one single cluster from all present in cloud
     return chooseBestCluster(cluster_clouds, cloud_out);
-
-    // broadcastCorkTransform(&(cloud_cluster.bb));
-    // drawBoundingBox(&(cloud_cluster.bb), "cork_piece");
-
-    // CloudPtr cloud_cluster_full_res = cropBoundingBox(cloud, cloud_cluster.bb);
-    // sensor_msgs::PointCloud2 published_cork_pcd;
-    // pcl::toROSMsg(*cloud_cluster_full_res, published_cork_pcd);
-    // published_cork_pcd.header.frame_id = "camera_depth_optical_frame";
-    // cork_cloud.publish(published_cork_pcd);
 }
 
 std::vector<CloudInfo> CorkIris::clusterIndicesToCloud(IdxClustersPtr clusters, CloudPtr original_cloud, CloudNormalPtr original_cloud_normal)
@@ -79,7 +70,7 @@ std::vector<CloudInfo> CorkIris::clusterIndicesToCloud(IdxClustersPtr clusters, 
         cloud_info.cloudNormal = cloud_normal_cluster;
         cloud_info.bb = PCLFunctions::computeCloudBoundingBox(cloud_cluster);
         cloud_info.indices = cloud_indices;
-        cloud_clusters.push_back(cloud_info);  
+        cloud_clusters.push_back(cloud_info); 
     }
 
     return cloud_clusters;

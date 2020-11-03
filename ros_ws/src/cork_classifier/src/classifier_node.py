@@ -92,15 +92,15 @@ def getClassifiableCorkImage(img):
     
     box = getCorkBoundingRect(img)
     unskewed = unskewImage(img, box)
+
+    unskewed[numpy.where((unskewed==[255,255,255]).all(axis=2))] = [0, 80, 0]
+    
     # cv2.drawContours(img, cnt, 0, (255,0 ,0), 3)
     # cv2.imshow("image", img)
     # cv2.waitKey()
     # cv2.imshow("image", unskewed)
-    # cv2.waitKey(0)
+    # cv2.waitKey()
     return unskewed
-
-
-
 
 
 def classify_cork_piece(data):

@@ -141,9 +141,8 @@ bool PCLFunctions::enforceNormals (const pcl::PointXYZRGBNormal& point_a, const 
 {
     Eigen::Map<const Eigen::Vector3f> point_a_normal = point_a.getNormalVector3fMap (), 
     point_b_normal = point_b.getNormalVector3fMap ();
-
-
     double enf_normal_diff = point_a_normal.dot(point_b_normal);
+    
     if (squared_distance < cec_params.squared_dist)
     {
         if (enf_normal_diff >= cec_params.normal_diff)
@@ -151,6 +150,7 @@ bool PCLFunctions::enforceNormals (const pcl::PointXYZRGBNormal& point_a, const 
             return (true);  
         }
     }
+
     return (false);
 }
 

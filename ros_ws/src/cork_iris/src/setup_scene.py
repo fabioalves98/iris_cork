@@ -78,10 +78,10 @@ def main():
     status = wait_for_state_update(scene, "right_plane", object_is_known=True)
     rospy.loginfo("Created right plane") if status else rospy.logwarn("Failed creating right plane")
 
-    left_plane = newPoseStamped([0.2, -0.5, 0.5], quaternion_from_euler(0, 0, -pi/4), "base_link")
-    scene.add_box("left_plane", left_plane, size=(0.05, 1.5, 1))
-    status = wait_for_state_update(scene, "left_plane", object_is_known=True)
-    rospy.loginfo("Created right plane") if status else rospy.logwarn("Failed creating left plane")
+    # left_plane = newPoseStamped([0.2, -0.5, 0.5], quaternion_from_euler(0, 0, -pi/4), "base_link")
+    # scene.add_box("left_plane", left_plane, size=(0.05, 1.5, 1))
+    # status = wait_for_state_update(scene, "left_plane", object_is_known=True)
+    # rospy.loginfo("Created left plane") if status else rospy.logwarn("Failed creating left plane")
 
     # Upper Plane 
     upper_plane = newPoseStamped([0, 0, 1], quaternion_from_euler(pi/2, 0, pi/4), "base_link")
