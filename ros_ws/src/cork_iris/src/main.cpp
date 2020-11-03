@@ -291,8 +291,6 @@ void synced_callback(const sensor_msgs::ImageConstPtr& image,
                     sensor_msgs::Image cloud_img;
                     pcl_conversions::moveFromPCL(image, cloud_img);
                     cork_cloud_img.publish(cloud_img);
-                    
-
                 }
             }
 

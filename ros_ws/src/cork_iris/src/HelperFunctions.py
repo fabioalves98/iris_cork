@@ -57,13 +57,6 @@ def newPoseStamped(position=[0,0,0], orientation=[0,0,0,1], frame_id="base_link"
 
 
 
-
-
-def main():
+if __name__=="__main__":
     rospy.init_node('helper_functions', anonymous=False)
     rospy.spin()
-
-
-
-if __name__=="__main__":
-    main()
