@@ -92,23 +92,11 @@ def getClassifiableCorkImage(img):
     
     box = getCorkBoundingRect(img)
     
-    data = rospy.wait_for_message("camera/rgb/image_raw", Image, timeout=2)
+    data = rospy.wait_for_message("camera/rgb/image_raw", Image, timeout=1)    
     bridge = CvBridge()
     raw_img = bridge.imgmsg_to_cv2(data, 'bgr8')
     unskewed = unskewImage(raw_img, box)
 
-    # print(numpy.mean(unskewed))
-    # print(unskewed.shape)
-    # smaller_row = unskewed[10:100, 5:35]
-    # n_white_pix = numpy.sum(smaller_row == 255)
-    # print(n_white_pix, smaller_row.shape)
-
-    # # unskewed[numpy.where((unskewed==[255,255,255]).all(axis=2))] = [0, 80, 0]
-    # smaller_row[numpy.where((smaller_row==[255,255,255]).all(axis=2))] = [0, 80, 0]
-    
-    # cv2.drawContours(img, cnt, 0, (255,0 ,0), 3)
-    # cv2.imshow("image", img)
-    # cv2.waitKey()
     cv2.imshow("image", unskewed)
     cv2.waitKey()
 

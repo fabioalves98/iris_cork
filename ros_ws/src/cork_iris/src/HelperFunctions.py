@@ -36,7 +36,7 @@ def getTransform(src_tf, dest_tf):
     return trans
 
 def keep_going(text):
-    goon = raw_input("[ACTION] -> " + text + "['n' to stop]")
+    goon = raw_input("\n[ACTION] -> " + text + " ['n' to stop]: ")
     if('n' in goon):
         return False
     return True

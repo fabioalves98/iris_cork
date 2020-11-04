@@ -30,7 +30,7 @@ DEFAULT_HANDEYE_NAMESPACE = '/easy_handeye_eye_on_base'
 
 CALIBRATION_FILEPATH = '~/.ros/easy_handeye' + DEFAULT_HANDEYE_NAMESPACE + ".yaml"
 ## Fast control variable just for debugging purposes
-SIM = True
+SIM = False
 
 test_publisher = None
 
@@ -80,7 +80,7 @@ def takeCommandService(req):
 
 def parseParams(args):
     global positions, position_names, positions_file
-    print("PARSING ARGS")
+    print("\nPARSING ARGS")
     try:
         print (args)
         command = args[0]
@@ -170,8 +170,9 @@ def runActionlist(actions):
 
 
 def getCorkClassification():
-    cork_cloud = rospy.wait_for_message('cork_iris/cork_piece_cloud_img', Image, timeout=3)
+    cork_cloud = rospy.wait_for_message('cork_iris/cork_piece_cloud_img', Image, timeout=1)
     rospy.wait_for_service('classify_cork')
+
     try:
         classif = rospy.ServiceProxy('classify_cork', ClassifyCork)
         resp1 = classif(cork_cloud)
@@ -187,8 +188,8 @@ def computeCorkGrabPositions(trans):
     ## grabbing position
     # trans = getTransform('base_link', 'cork_piece')
 
-    aux = newPoseStamped([-0.15, 0, -0.10], frame_id="base_link")
-    # aux = newPoseStamped([-0.15, 0, 0], frame_id="base_link")
+    # aux = newPoseStamped([-0.15, 0, -0.10], frame_id="base_link")
+    aux = newPoseStamped([-0.15, 0, 0], frame_id="base_link")
 
     grab_pose_1 = tf2_geometry_msgs.do_transform_pose(aux, trans)
 
@@ -245,7 +246,7 @@ def grab_cork(cork, cork_grab_pose):
     position = cork_piece_scene.primitive_poses[0].position
     orientation = cork_piece_scene.primitive_poses[0].orientation
     dimensions = cork_piece_scene.primitives[0].dimensions
-    scene.add_box("cork_piece_attached", newPoseStamped([0,0,0], poseOrientationToArray(orientation), "ee_link"), dimensions)
+    scene.add_box("cork_piece_attached", newPoseStamped(posePositionToArray(position), poseOrientationToArray(orientation)), dimensions)
     arm.move_group.attach_object("cork_piece_attached", "ee_link")
 
     
@@ -277,14 +278,15 @@ def grab_cork(cork, cork_grab_pose):
     # rospy.sleep(1.0)
 
     arm.grip()
-    
-
-    if(not keep_going("stand back")):
-        return 
 
     arm.simpleMove([0, 0, 0.15])
     
     arm.jointGoal(positions['out_of_camera_pos'])
+
+    if(not keep_going("place")):
+        scene.remove_attached_object("ee_link", "cork_piece_attached")
+        scene.remove_world_object("cork_piece_attached")
+        return 
 
     arm.jointGoal(positions['place_pos'])
 
@@ -305,24 +307,29 @@ def grab_cork_routine():
         # listener.waitForTransform("/cork_piece", "/base_link", rospy.Time.now(), rospy.Duration(4.0))
         trans = None
         tries = 2
+        
         while not trans and tries > 0:
             trans = getTransform("base_link", "cork_piece")
             tries -= 1
         
+        setPCLCorkParameter({"live" : "false"})
+
         if trans == None:
-            setPCLCorkParameter({"live" : "false"})
             return "No Cork Piece found"
 
-
         ## TODO: Do something with this
-        classification_accuracy, classification_result = getCorkClassification()
+        print("\nCork Classification")
+        # classification_accuracy, classification_result = getCorkClassification()
+        print("")
 
         grab1, grab2 = computeCorkGrabPositions(trans)
-        setPCLCorkParameter({"live" : "false"})
         test_publisher.publish(grab1)
         
         grab_cork(grab2.pose, grab1.pose)
+        
         rospy.loginfo("Ended grabbing routine")
+        setPCLCorkParameter()
+
         break
         
 
@@ -364,19 +371,19 @@ def main():
 
     test_publisher = rospy.Publisher('cork_iris/grabbing_position', PoseStamped, queue_size=1)
     
-    # if SIM:
-    #     rospy.logwarn("[CORK-IRIS] Connecting to simulation. Change the arm_control code var to change this.")
-    #     arm = ArmControl('localhost')
-    # else:
-    #     arm = ArmControl()
-    #     calibration = Calibration(CORK_IRIS_BASE_DIR)
-    #     arm.setSpeed(0.3)
-    #     arm.config_gripper(100.0)
-    # scene = moveit_commander.PlanningSceneInterface(synchronous=True)
+    if SIM:
+        rospy.logwarn("[CORK-IRIS] Connecting to simulation. Change the arm_control code var to change this.")
+        arm = ArmControl('localhost')
+    else:
+        arm = ArmControl()
+        calibration = Calibration(CORK_IRIS_BASE_DIR)
+        arm.setSpeed(0.3)
+        arm.config_gripper(100.0)
+    scene = moveit_commander.PlanningSceneInterface(synchronous=True)
     
     
     # Debug
-    getCorkClassification()
+    # getCorkClassification()
 
     # time.sleep(2)
     # print(scene.get_attached_objects())

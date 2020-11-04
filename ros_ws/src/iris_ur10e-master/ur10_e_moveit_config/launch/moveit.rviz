@@ -6,6 +6,7 @@ Panels:
       Expanded:
         - /Global Options1
         - /MotionPlanning1/Planning Request1
+        - /TF1
         - /TF1/Frames1
       Splitter Ratio: 0.5809379816055298
     Tree Height: 390
@@ -313,6 +314,8 @@ Visualization Manager:
           Value: false
         tool0:
           Value: false
+        tool0_controller:
+          Value: false
         upper_arm_link:
           Value: false
         world:
@@ -332,7 +335,8 @@ Visualization Manager:
         world:
           base_link:
             base:
-              {}
+              tool0_controller:
+                {}
             camera_link:
               camera_depth_frame:
                 camera_depth_optical_frame:
@@ -475,7 +479,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 3.0189218521118164
+      Distance: 3.834238052368164
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
@@ -490,10 +494,10 @@ Visualization Manager:
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.7547976970672607
+      Pitch: 0.7397977113723755
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
-      Yaw: 3.670396327972412
+      Yaw: 3.645390510559082
     Saved: ~
 Window Geometry:
   Displays:
