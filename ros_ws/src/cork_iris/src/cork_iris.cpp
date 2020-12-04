@@ -152,7 +152,7 @@ std::vector<CloudInfo> CorkIris::joinSplittedClusters(std::vector<CloudInfo> clu
 {
     std::vector<CloudInfo> new_vec;
     cout << "<<<<< JOINING SPLITTED CLUSTERS >>>>>>" << endl;
-    if (clusters.size() == 1)
+    if (clusters.size() <= 1)
     {
         return clusters;
     }

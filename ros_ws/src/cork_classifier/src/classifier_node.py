@@ -8,32 +8,8 @@ from sensor_msgs.msg import PointCloud2, Image
 import sensor_msgs.point_cloud2 as pc2
 from cv_bridge import CvBridge
 
-print("ok")
-
-# # RESOURCES = os.path.join(os.path.dirname(os.path.dirname(__file__)), "res")
-# # print(RESOURCES)
-
-# # def main():
-# #     # Choose a model from "models" folder in resources
-# #     model = os.path.join(RESOURCES, "models", "conv-32-drop25-dense-128-drop50-64-drop50-1572285048.h5")
-# #     print(model)
-
-# #     # Demo images
-# #     images_path = []
-# #     try:
-# #         images_path = [os.path.join(os.path.join(RESOURCES, "demo_images"), f) for f in os.listdir(os.path.join(RESOURCES, "demo_images"))]
-# #     except Exception:
-# #         pass
-
-# #     for img in images_path:
-# #         # Read image from file
-# #         image = cv2.imread(img)
-# #         cv2.imshow("Demo Classification v0.1", image)
-
-# #         # image = image to classify, model = path to model,
-# #         # gpu = enable GPU for a single classification (for better performance enable on main function)
-# #         (classification_category, classification_accuracy) = classify(image, model)
-
+name = 'belly_right'
+img_id = 0
 
 MODEL = "conv-32-drop25-dense-128-drop50-64-drop50-1572285048.h5"
 rp = rospkg.RosPack()
@@ -42,7 +18,6 @@ MODEL_PATH = BASE_PATH + "/models/" + MODEL
 
 
 def getCorkBoundingRect(img):
-
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     ret,thresh = cv2.threshold(gray,250,255,0)
 
@@ -50,14 +25,19 @@ def getCorkBoundingRect(img):
     thresh = cv2.erode(thresh, kernel, iterations=1)
     # thresh = cv2.dilate(thresh, kernel, iterations=2)
 
+    max_cont = None
+    max_area = 0
 
-    contours,hierarchy = cv2.findContours(thresh, 1,  cv2.CHAIN_APPROX_SIMPLE)
+    contours, hierarchy = cv2.findContours(thresh, 1,  cv2.CHAIN_APPROX_SIMPLE)
     conts = []
     for c in contours:
         if(cv2.contourArea(c) > 100 and cv2.contourArea(c) < 30000):
+            if cv2.contourArea(c) > max_area:
+                max_cont = c
+                max_area = cv2.contourArea(c)
             conts.append(c)
 
-    cnt = cv2.minAreaRect(conts[0])
+    cnt = cv2.minAreaRect(max_cont)
     box = cv2.boxPoints(cnt)
     box = numpy.int0(box)
 
@@ -97,8 +77,15 @@ def getClassifiableCorkImage(img):
     raw_img = bridge.imgmsg_to_cv2(data, 'bgr8')
     unskewed = unskewImage(raw_img, box)
 
-    cv2.imshow("image", unskewed)
-    cv2.waitKey()
+    global img_id
+
+    if unskewed.shape[0] < unskewed.shape[1]:
+        unskewed = cv2.rotate(unskewed, cv2.cv2.ROTATE_90_CLOCKWISE) 
+
+    cv2.imwrite('img/' + name + '_' + str(img_id) + '.jpg', unskewed)
+    img_id += 1
+    # cv2.imshow("image", unskewed)
+    # cv2.waitKey()
 
     return unskewed
 
@@ -112,10 +99,11 @@ def classify_cork_piece(data):
 
     img = getClassifiableCorkImage(img)
 
-    (classification_category, classification_accuracy) = classify(img, MODEL_PATH)
+    # (classification_category, classification_accuracy) = classify(img, MODEL_PATH)
     # # print(classification_accuracy, classification_category)
 
-    return [classification_category, classification_accuracy]
+    # return [classification_category, classification_accuracy]
+    return ['', 0.0]
                     
 if __name__ == '__main__':
     

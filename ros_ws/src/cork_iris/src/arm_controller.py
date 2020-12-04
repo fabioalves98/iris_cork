@@ -30,7 +30,7 @@ DEFAULT_HANDEYE_NAMESPACE = '/easy_handeye_eye_on_base'
 
 CALIBRATION_FILEPATH = '~/.ros/easy_handeye' + DEFAULT_HANDEYE_NAMESPACE + ".yaml"
 ## Fast control variable just for debugging purposes
-SIM = False
+SIM = True
 
 test_publisher = None
 
@@ -371,23 +371,23 @@ def main():
 
     test_publisher = rospy.Publisher('cork_iris/grabbing_position', PoseStamped, queue_size=1)
     
-    if SIM:
-        rospy.logwarn("[CORK-IRIS] Connecting to simulation. Change the arm_control code var to change this.")
-        arm = ArmControl('localhost')
-    else:
-        arm = ArmControl()
-        calibration = Calibration(CORK_IRIS_BASE_DIR)
-        arm.setSpeed(0.3)
-        arm.config_gripper(100.0)
-    scene = moveit_commander.PlanningSceneInterface(synchronous=True)
+    # if SIM:
+    #     rospy.logwarn("[CORK-IRIS] Connecting to simulation. Change the arm_control code var to change this.")
+    #     arm = ArmControl('localhost')
+    # else:
+    #     arm = ArmControl()
+    #     calibration = Calibration(CORK_IRIS_BASE_DIR)
+    #     arm.setSpeed(0.3)
+    #     arm.config_gripper(100.0)
+    # scene = moveit_commander.PlanningSceneInterface(synchronous=True)
     
     
     # Debug
-    # getCorkClassification()
+    getCorkClassification()
 
     # time.sleep(2)
     # print(scene.get_attached_objects())
-    rospy.spin()
+    # rospy.spin()
     # parseParams(sys.argv[1:])
 
 

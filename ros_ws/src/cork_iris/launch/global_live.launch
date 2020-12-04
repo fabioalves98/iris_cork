@@ -7,14 +7,14 @@
     <!-- Camera Node -->
     <arg name="box" default="false"  doc="If true sets nodes for box setup"/>
     
-    <group if="$(arg box)">
+    <!-- <group if="$(arg box)">
         <include file="$(find cork_iris)/launch/kinect_launch.launch">
         </include>
     </group>
     <group unless="$(arg box)">
         <include file="$(find astra_camera)/launch/astra.launch">
         </include>
-    </group>
+    </group> -->
 
     <!-- Calibration Node -->
     <arg name="calibrate" default="false"  doc="If true launches calibrate node, else launches the publish calibration node"/>
