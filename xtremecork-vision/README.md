@@ -1,2 +1,0 @@
-# XtremeCork-Vision
-
