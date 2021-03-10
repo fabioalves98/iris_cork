@@ -383,7 +383,10 @@ def main():
     
     
     # Debug
-    getCorkClassification()
+    for i in range(5):
+        setPCLCorkParameter({"selected_cork_strip" : str(i)})
+        time.sleep(0.5)
+        getCorkClassification()
 
     # time.sleep(2)
     # print(scene.get_attached_objects())

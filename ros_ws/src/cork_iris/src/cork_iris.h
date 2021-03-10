@@ -8,6 +8,7 @@ using std::endl;
 static std::vector<std::string> colors = {"orange", "red", "green", "yellow", "blue", "pink", "cyan"};
 
 static bool choose_best_cork;
+static Index chosen_cork_strip;
 static double z_threshold, center_threshold;
 static double space_distance_threshold, space_count_points_threshold, space_k_neighbors;
 static double bad_shape_percentage_threshold, volume_threshold;

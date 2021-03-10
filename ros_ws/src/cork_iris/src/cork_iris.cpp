@@ -4,6 +4,8 @@ void CorkIris::updateParams(cork_iris::PCLCorkConfig &config)
 {
     choose_best_cork = config.choose_best_cork;
 
+    chosen_cork_strip = config.selected_cork_strip;
+
     // Best cork algorithm params
     z_threshold = config.z_threshold;
     center_threshold = config.center_threshold;
@@ -296,6 +298,10 @@ CloudInfo CorkIris::chooseBestCluster(std::vector<CloudInfo> cluster_clouds, Clo
     //     cout << "Total volume -- " << (x * y * z) << "(" <<  ((x*y*z) > 0.001) << ")" << endl;
     //     cout << "-----" << endl;        
     // }
+
+    if(chosen_cork_strip > -1 && chosen_cork_strip < cluster_clouds.size()){
+        return cluster_clouds[chosen_cork_strip];
+    }
 
     if(!choose_best_cork && cluster_clouds.size() > 0){
         return cluster_clouds[idx];    

@@ -8,8 +8,8 @@ from sensor_msgs.msg import PointCloud2, Image
 import sensor_msgs.point_cloud2 as pc2
 from cv_bridge import CvBridge
 
-name = 'belly_right'
-img_id = 0
+name = 'back'
+img_id = 100
 
 MODEL = "conv-32-drop25-dense-128-drop50-64-drop50-1572285048.h5"
 rp = rospkg.RosPack()
@@ -39,7 +39,7 @@ def getCorkBoundingRect(img):
 
     cnt = cv2.minAreaRect(max_cont)
     box = cv2.boxPoints(cnt)
-    box = numpy.int0(box)
+    box = numpy.intp(box)
 
     return box
 
