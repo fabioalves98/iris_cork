@@ -360,6 +360,10 @@ Index CorkIris::getHighestCluster(std::vector<CloudInfo> clusters)
 bool CorkIris::isThereSpace(CloudInfo cluster, CloudPtr fullCloud)
 {
     CloudPtr fullCloudNoCluster = PCLFunctions::subtractCloud(fullCloud, cluster.indices);
+    if (fullCloudNoCluster->size() == 0)
+    {
+        return true;
+    }
     
     int K = space_k_neighbors;
     float DISTANCE_THRESHOLD_COUNT = space_distance_threshold;

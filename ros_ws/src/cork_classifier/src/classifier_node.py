@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 import rospy, socket, sys, struct, ctypes, math, cv2, numpy
 import rospkg
+import os
 
 from cork_classifier.srv import ClassifyCork
 from Classifier import classify
@@ -8,13 +9,14 @@ from sensor_msgs.msg import PointCloud2, Image
 import sensor_msgs.point_cloud2 as pc2
 from cv_bridge import CvBridge
 
-name = 'back'
+name = 'belly_right'
 img_id = 100
 
 MODEL = "conv-32-drop25-dense-128-drop50-64-drop50-1572285048.h5"
 rp = rospkg.RosPack()
 BASE_PATH = rp.get_path('cork_classifier')
 MODEL_PATH = BASE_PATH + "/models/" + MODEL
+
 
 
 def getCorkBoundingRect(img):
@@ -82,7 +84,8 @@ def getClassifiableCorkImage(img):
     if unskewed.shape[0] < unskewed.shape[1]:
         unskewed = cv2.rotate(unskewed, cv2.cv2.ROTATE_90_CLOCKWISE) 
 
-    cv2.imwrite('img/' + name + '_' + str(img_id) + '.jpg', unskewed)
+    print(cv2.imwrite(BASE_PATH + '/img/' + name + '_' + str(img_id) + '.jpg', unskewed))
+   
     img_id += 1
     # cv2.imshow("image", unskewed)
     # cv2.waitKey()
@@ -117,3 +120,6 @@ if __name__ == '__main__':
         pass
 
     print("ok")
+
+    for i in range(0, 179):
+
