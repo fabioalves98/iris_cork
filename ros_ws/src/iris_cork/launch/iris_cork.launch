@@ -1,0 +1,11 @@
+<launch>
+
+    <arg name="reconfigure" default="true"  doc="Launches rqt reconfigure"/>
+
+    <node pkg="iris_cork" type="iris_cork" name="iris_cork" output="screen" />
+    
+    <group if="$(arg reconfigure)">
+        <node pkg="rqt_reconfigure" type="rqt_reconfigure" name="configure_params" output="screen" /> 
+    </group>
+
+</launch>
