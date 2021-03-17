@@ -4,3 +4,9 @@
 [submodule "xtremecork-vision"]
 	path = xtremecork-vision
 	url = https://gitlab.com/iris-ua/xtremecork/xtremecork-vision.git
+[submodule "ros_ws/src/iris_sami"]
+	path = ros_ws/src/iris_sami
+	url = ../iris_sami.git
+[submodule "ros_ws/src/iris_ur10e"]
+	path = ros_ws/src/iris_ur10e
+	url = ../iris_ur10e.git
