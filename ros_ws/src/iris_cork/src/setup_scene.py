@@ -4,7 +4,7 @@ import rospy
 import moveit_commander
 
 from geometry_msgs.msg import PoseStamped, Quaternion, Point
-from HelperFunctions import getTransform, newPoseStamped
+from helpers import getTransform, newPoseStamped
 from tf.transformations import quaternion_from_euler
 from math import pi
 
@@ -73,8 +73,8 @@ def main():
     rospy.loginfo("Created base plane") if status else rospy.logwarn("Failed creating base plane")
 
     # Lateral Planes
-    right_plane = newPoseStamped([-0.5, 0.2, 0.5], quaternion_from_euler(0, 0, -pi/4), "base_link")
-    scene.add_box("right_plane", right_plane, size=(0.05, 1.5, 1))
+    right_plane = newPoseStamped([-0.35, 0.35, 0.5], quaternion_from_euler(0, 0, -pi/4), "base_link")
+    scene.add_box("right_plane", right_plane, size=(0.05, 1, 1))
     status = wait_for_state_update(scene, "right_plane", object_is_known=True)
     rospy.loginfo("Created right plane") if status else rospy.logwarn("Failed creating right plane")
 

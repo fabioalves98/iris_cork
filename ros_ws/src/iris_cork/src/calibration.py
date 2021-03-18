@@ -4,8 +4,6 @@ from sensor_msgs.msg import Image
 from easy_handeye.srv import TakeSample, ComputeCalibration
 from std_srvs.srv import Empty
 
-
-
 class Calibration:
 
     DEFAULT_HANDEYE_NAMESPACE = '/easy_handeye_eye_on_base'

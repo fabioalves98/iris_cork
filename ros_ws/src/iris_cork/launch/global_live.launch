@@ -1,8 +1,6 @@
 <launch>
-
     <!-- Robot Node -->
-    <include file="$(find iris_ur10e)/launch/live.launch">
-    </include>
+    <include file="$(find iris_ur10e)/launch/live.launch"/>
 
     <!-- Camera Node -->
     <arg name="box" default="false"  doc="If true sets nodes for box setup"/>
@@ -20,15 +18,12 @@
     <arg name="calibrate" default="false"  doc="If true launches calibrate node, else launches the publish calibration node"/>
 
     <group if="$(arg calibrate)">
-        <include file="$(find cork_iris)/launch/handeye_calibrate.launch">
-        </include>        
+        <include file="$(find iris_cork)/launch/handeye_calibrate.launch"/>
     </group>
     <group unless="$(arg calibrate)">
-        <include file="$(find cork_iris)/launch/handeye_publish.launch">
-        </include>       
+        <include file="$(find iris_cork)/launch/handeye_publish.launch"/>
     </group>
 
     <!-- Scenes Node -->
-    <node pkg="cork_iris" type="setup_scene.py" name="setup_scene" output="screen" />
-
+    <node pkg="iris_cork" type="setup_scene.py" name="setup_scene" output="screen" />
 </launch>
