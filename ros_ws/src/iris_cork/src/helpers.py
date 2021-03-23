@@ -90,7 +90,7 @@ def samiMoveService(move):
     rospy.wait_for_service('iris_sami/move')
     try:
         moveServ = rospy.ServiceProxy('iris_sami/move', RelativeMove)
-        resp = moveServ(move[0], move[1], move[2], 0, 0, 0)
+        resp = moveServ(*move)
         return resp.feedback
     except rospy.ServiceException as e:
         print("Service call failed: %s"%e)

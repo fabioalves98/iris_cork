@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 import sys, time, csv
 import rospy, rospkg, rosparam, tf
+import tf2_geometry_msgs
 import geometry_msgs.msg
 from ast import literal_eval
 from math import pi, cos, sin
@@ -8,7 +9,8 @@ from math import pi, cos, sin
 from geometry_msgs.msg import Point, TransformStamped, Pose, PoseStamped, Quaternion
 from sensor_msgs.msg import Image
 from tf.transformations import euler_from_quaternion, quaternion_from_euler, quaternion_multiply
-from helpers import *
+from helpers import newPoseStamped, samiPoseService, samiMoveService, samiGripperService, \
+    samiAliasService, keep_going, setPCLCorkParameter, getTransform
 
 
 def computeCorkGrabPositions(trans):
@@ -57,8 +59,7 @@ def grab_cork(cork_pose, cork_grab_pose):
     if(not keep_going('go towards cork')):
         return 
     
-    # samiPoseService(cork_pose)
-    samiMoveService([0.08, 0, 0])
+    samiMoveService([0.08, 0, 0] + [0, 0, 0])
 
     if(not keep_going('grip')):
         return 
@@ -67,7 +68,7 @@ def grab_cork(cork_pose, cork_grab_pose):
 
     time.sleep(0.5)
 
-    samiMoveService([-0.15, 0, 0])
+    samiMoveService([-0.15, 0, 0] + [0, 0, 0])
     
     samiAliasService('out_of_camera')
 
