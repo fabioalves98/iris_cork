@@ -6,15 +6,25 @@
 #include <pcl/surface/mls.h>
 #include <pcl/features/normal_3d.h>
 #include <pcl/segmentation/conditional_euclidean_clustering.h>
+#include <pcl/segmentation/region_growing.h> // testing
+#include <pcl/segmentation/supervoxel_clustering.h> // testing
+#include <pcl/segmentation/lccp_segmentation.h> // testing
+#include <pcl/segmentation/cpc_segmentation.h> // testing
 #include <pcl/filters/voxel_grid.h>
 #include <pcl/filters/extract_indices.h>
 #include <pcl/io/point_cloud_image_extractors.h>
 #include <pcl/conversions.h>
 
+#include <pcl/features/boundary.h> // testing
+
+
 #include <iris_cork/PCLCorkConfig.h>
 
 using std::cout;
 using std::endl;
+using namespace pcl;
+
+
 
 typedef pcl::PointCloud<pcl::PointXYZRGB> Cloud;
 typedef Cloud::Ptr CloudPtr;
@@ -72,6 +82,9 @@ public:
     static void surface_normals(CloudPtr cloud_in, CloudPtr cloud_out);
     static void surface_curvatures(CloudPtr cloud_in, CloudPtr cloud_out);
     static void cec_extraction(CloudPtr cloud_in, CloudPtr cloud_out, IdxClustersPtr clusters, IdxClustersPtr sclusters, IdxClustersPtr lclusters, CloudNormalPtr cloud_with_normals);
+    static void regionGrowingSegmentation(CloudPtr cloud_in, CloudPtr cloud_out, std::vector<pcl::PointIndices> &clusters);
+    static void superbodyClustering(CloudPtr cloud_in, CloudPtr cloud_out, std::vector <pcl::PointIndices> &clusters);
+    static void iterativeBoundaryRemoval(CloudPtr cloud_in, CloudPtr cloud_out, int iterations);
     static BoundingBox computeCloudBoundingBox(CloudPtr cloud_in);
     static CloudPtr subtractCloud(CloudPtr cloud, pcl::PointIndices::Ptr indices);
     static void getNearestNeighbors(int K, Eigen::Vector4f searchPoint, CloudPtr cloud, std::vector<int>& points, std::vector<float>& dists);

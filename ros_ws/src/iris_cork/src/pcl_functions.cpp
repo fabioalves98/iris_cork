@@ -1,5 +1,8 @@
 #include "pcl_functions.h"
 
+double test1, test2;
+int test3, test4;
+
 void PCLFunctions::updateParams(iris_cork::PCLCorkConfig &config)
 {
     // Filter Box params
@@ -21,6 +24,11 @@ void PCLFunctions::updateParams(iris_cork::PCLCorkConfig &config)
     cec_params.normal_diff = config.normal_diff;
     cec_params.squared_dist = config.squared_dist;
     cec_params.curv = config.curvature;
+
+    test1 = config.test_param1;
+    test2 = config.test_param2;
+    test3 = config.test_param3;
+    test4 = config.test_param4;
 }
 
 void PCLFunctions::filterRollerBox(CloudPtr cloud_in, CloudPtr cloud_out)
@@ -153,6 +161,176 @@ bool PCLFunctions::enforceNormals (const pcl::PointXYZRGBNormal& point_a, const 
 
     return (false);
 }
+
+
+void PCLFunctions::regionGrowingSegmentation(CloudPtr cloud_in, CloudPtr cloud_out, std::vector <pcl::PointIndices> &clusters){
+   
+    pcl::search::Search<pcl::PointXYZRGB>::Ptr tree (new pcl::search::KdTree<pcl::PointXYZRGB>);
+    pcl::PointCloud <pcl::Normal>::Ptr normals (new pcl::PointCloud <pcl::Normal>);
+    pcl::NormalEstimation<pcl::PointXYZRGB, pcl::Normal> normal_estimator;
+    normal_estimator.setSearchMethod (tree);
+    normal_estimator.setInputCloud (cloud_in);
+    normal_estimator.setKSearch (50);
+    normal_estimator.compute (*normals);
+
+    pcl::RegionGrowing<pcl::PointXYZRGB, pcl::Normal> reg;
+    reg.setMinClusterSize (50);
+    reg.setMaxClusterSize (1000000);
+    reg.setSearchMethod (tree);
+    reg.setNumberOfNeighbours (30);
+    reg.setInputCloud (cloud_in);
+    //reg.setIndices (indices);
+    reg.setInputNormals (normals);
+    reg.setSmoothnessThreshold (test2 / 180.0 * M_PI);
+    reg.setCurvatureThreshold (test1);
+
+    // std::vector <pcl::PointIndices> clusters;
+    reg.extract (clusters);
+
+ 
+    cout << "cloud size: " << cloud_in->size() << endl;
+ 
+
+    std::cout << "Number of clusters is equal to " << clusters.size () << std::endl;
+    for(int i = 0; i < clusters.size(); i++){
+        std::cout << "First cluster has " << clusters[i].indices.size () << " points." << std::endl;
+
+    }
+
+}
+
+void PCLFunctions::superbodyClustering(CloudPtr cloud_in, CloudPtr cloud_out, std::vector <pcl::PointIndices> &clusters){
+
+    float voxel_resolution = 0.008f;
+    float seed_resolution = 0.1f;
+    float color_importance = 0.2;
+    float spatial_importance = test1;
+    float normal_importance = test2;
+
+    //Generate crystallizer
+    pcl::SupervoxelClustering<pcl::PointXYZRGB> super(voxel_resolution, seed_resolution);
+   
+    //Enter point cloud and crystallization parameters
+    super.setInputCloud(cloud_in);
+    super.setColorImportance(color_importance);
+    super.setSpatialImportance(spatial_importance);
+    super.setNormalImportance(normal_importance);
+    //Output the result of crystal segmentation: the result is a mapping table
+    std::map <uint32_t, pcl::Supervoxel<pcl::PointXYZRGB>::Ptr > supervoxel_clusters;
+    super.extract(supervoxel_clusters);
+    std::multimap<uint32_t, uint32_t> supervoxel_adjacency;
+    super.getSupervoxelAdjacency(supervoxel_adjacency);
+
+    // //Generate LCCP splitter
+    // pcl::LCCPSegmentation<pcl::PointXYZRGB> seg;
+    // //Enter the result of superbody clustering
+    // seg.setInputSupervoxels(supervoxel_clusters,supervoxel_adjacency);
+    // //CC test beta value
+    // seg.setConcavityToleranceThreshold(test4);
+    // //K neighbors of CC effect
+    // seg.setKFactor(0);
+    // //
+    // seg.setSmoothnessCheck(false, voxel_resolution, seed_resolution, 0.1);
+    // //SC validation
+    // seg.setSanityCheck(false);
+    // //Minimum split size
+    // seg.setMinSegmentSize(0);
+
+    // seg.segment();
+
+
+    pcl::CPCSegmentation<pcl::PointXYZRGB> seg;
+    //Enter the result of superbody clustering
+    seg.setInputSupervoxels(supervoxel_clusters,supervoxel_adjacency);
+    //Set segmentation parameters
+    // seg.setCutting (max_cuts = 20,
+    //             cutting_min_segments = 0,
+    //             cutting_min_score = 0.16,
+    //             locally_constrained = true,
+    //             directed_cutting = true,
+    //             clean_cutting = false)；
+    seg.setCutting();
+    seg.setRANSACIterations(test3);
+    seg.segment();
+
+    pcl::PointCloud<pcl::PointXYZL>::Ptr sv_labeled_cloud = super.getLabeledCloud ();
+    pcl::PointCloud<pcl::PointXYZL>::Ptr lccp_labeled_cloud = sv_labeled_cloud->makeShared ();
+    seg.relabelCloud (*lccp_labeled_cloud);
+
+    cout << "cluters: " << lccp_labeled_cloud->size() << endl;
+
+    cout << "cluters: " << clusters.size() << endl;
+
+    int max_label = lccp_labeled_cloud->points[0].label;
+
+    for(int i = 0; i  < lccp_labeled_cloud->size(); i++){
+        if (lccp_labeled_cloud->points[i].label > max_label){
+            max_label = lccp_labeled_cloud->points[i].label;
+        }
+    }
+
+    clusters.resize(max_label);
+
+    for(int i = 0; i < lccp_labeled_cloud->size(); i++){
+        cout << "label " << i << " :" << lccp_labeled_cloud->points[i].label << endl;
+        clusters[lccp_labeled_cloud->points[i].label-1].indices.push_back(i);
+    }
+
+    
+    // seg.relabelCloud(pcl::PointCloud<pcl::PointXYZL> &labeled_cloud_arg);
+
+}
+
+void PCLFunctions::iterativeBoundaryRemoval(CloudPtr cloud_in, CloudPtr cloud_out, int iterations){
+    pcl::NormalEstimation<PointXYZRGB, Normal> ne;
+	pcl::search::KdTree<PointXYZRGB>::Ptr tree (new search::KdTree<PointXYZRGB> ());
+    PointCloud<Normal>::Ptr cloud_normals (new PointCloud<Normal>);
+    pcl::PointCloud<pcl::Boundary> boundaries;
+    pcl::BoundaryEstimation<pcl::PointXYZRGB, pcl::Normal, pcl::Boundary> est;
+
+	// CloudPtr process_cloud (new PointCloud<PointXYZRGB>);
+    // copyPointCloud(*cloud_in, *process_cloud);
+
+    std::cout << "proces cloud size: " << cloud_out->size() << std::endl;
+
+    for(int i = 0; i < iterations; i++){
+
+        ne.setInputCloud (cloud_out);
+        ne.setSearchMethod (tree);
+        ne.setRadiusSearch (1.5);
+        ne.setViewPoint(0.0,0.0,0.0);
+        ne.compute (*cloud_normals);  
+
+        est.setInputCloud (cloud_out);
+        est.setInputNormals (cloud_normals);
+        // float radius = 0.02 + (i * 0.02);
+        float radius = 0.1;
+        std::cout << "radius: " << radius << std::endl;
+        est.setRadiusSearch (radius);   // 2cm radius
+        est.setSearchMethod (typename pcl::search::KdTree<PointXYZRGB>::Ptr (new pcl::search::KdTree<PointXYZRGB>));
+        est.compute (boundaries);
+
+        pcl::PointIndices::Ptr inliers(new pcl::PointIndices());
+        pcl::ExtractIndices<pcl::PointXYZRGB> extract;
+        for(int i = 0; i < cloud_out->points.size(); i++)
+        {
+            if(boundaries[i].boundary_point < 1)
+            {
+                    inliers->indices.push_back(i);
+            }
+        }
+        extract.setInputCloud(cloud_out);
+        extract.setIndices(inliers);
+        extract.setNegative(false);
+        extract.filter(*cloud_out);
+
+        std::cout << "proces cloud size: " << cloud_out->size() << std::endl;
+    
+    }
+
+}
+
+
 
 BoundingBox PCLFunctions::computeCloudBoundingBox(CloudPtr cloud_in)
 {

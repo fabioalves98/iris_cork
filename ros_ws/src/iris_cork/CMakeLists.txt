@@ -25,6 +25,8 @@ find_package(OpenCV REQUIRED COMPONENTS
   imgcodecs
 )
 
+
+#find_package(PCL REQUIRED COMPONENTS common io visualization features surface segmentation filters conversions)
 find_package(PCL REQUIRED)
 
 include_directories(${OpenCV_INCLUDE_DIRS})

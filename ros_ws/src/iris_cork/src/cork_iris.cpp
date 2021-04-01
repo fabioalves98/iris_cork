@@ -1,4 +1,5 @@
 #include "cork_iris.h"
+#include <pcl/io/pcd_io.h> // testing
 
 void CorkIris::updateParams(iris_cork::PCLCorkConfig &config)
 {
@@ -12,7 +13,7 @@ void CorkIris::updateParams(iris_cork::PCLCorkConfig &config)
     space_distance_threshold = config.space_distance_threshold;
     space_count_points_threshold = config.space_count_points_threshold;
     space_k_neighbors = config.space_k_neighbors;
-    bad_shape_percentage_threshold = config.bad_shape_percentage_threshold;
+    bad_shape_width_threshold = config.bad_shape_width_threshold;
     volume_threshold = config.volume_threshold;
     splitted_cork_distance_threshold = config.splitted_cork_distance_threshold;
     splitted_cork_normal_threshold = config.splitted_cork_normal_threshold;
@@ -35,14 +36,13 @@ CloudInfo CorkIris::clusterExtraction(CloudPtr cloud_in, CloudPtr cloud_out)
     std::vector<CloudInfo> cloud_info_clusters = clusterIndicesToCloud(clusters, cloud_out, cloud_with_normals);
     
     // Clustering big and bad shaped clusters again
-    cloud_info_clusters = segmentBigClusters(cloud_info_clusters);
+    cloud_info_clusters = segmentBigClusters(cloud_out, cloud_with_normals, cloud_info_clusters);
     
     // Grouping clusters belonging to the same cork piece
     std::vector<CloudInfo> cluster_clouds = joinSplittedClusters(cloud_info_clusters);
     
     // Paint Clusters for visualization
     paintClustersFull(cloud_out, cluster_clouds, small_clusters, large_clusters);
-        
     if(cluster_clouds.size() == 0){
         cout << "No clusters found. Returning!" << endl;
         CloudInfo empty;
@@ -78,33 +78,86 @@ std::vector<CloudInfo> CorkIris::clusterIndicesToCloud(IdxClustersPtr clusters, 
     return cloud_clusters;
 }
 
-std::vector<CloudInfo> CorkIris::segmentBigClusters(std::vector<CloudInfo> clusters)
+
+
+std::vector<CloudInfo> CorkIris::segmentBigClusters(CloudPtr cloud_in, CloudNormalPtr cloud_with_normals, std::vector<CloudInfo> clusters)
 {
     std::vector<CloudInfo> new_vec;
     cout << "<<<<< SEGMENTING BIG/OUT OF SHAPE CLUSTERS >>>>>>" << endl;
     CloudPtr display_cloud (new Cloud);
     for(int i = 0; i < clusters.size(); i++)
-    {
+    {  
+
         if(isClusterBadShaped(clusters[i].bb) || isClusterTooBig(clusters[i].bb))
         {
             cout << "Cluster " << colors[i%7] << " is either too big or bad shaped. Segmenting again" << endl;
-            // CECExtraction(clusters[i].cloud, )
-            // CloudNormalPtr cloud_with_normals (new CloudNormal);
-            // pcl::IndicesClustersPtr clusts (new pcl::IndicesClusters), small_clusters (new pcl::IndicesClusters), large_clusters (new pcl::IndicesClusters);
-            // CloudPtr cloud_out (new Cloud);
+            cout << "Cluster bad shaped: " << isClusterBadShaped(clusters[i].bb) << endl;
+            cout << "Cluster too big: " << isClusterTooBig(clusters[i].bb) << endl;
+            // TODO: refactor here.
+            std::vector<pcl::PointIndices> x;
+            PCLFunctions::iterativeBoundaryRemoval(clusters[i].cloud, clusters[i].cloud, 4);
+            copyPointCloud(*(clusters[i].cloud), *cloud_in); // viz only
             
-            // // Save params in aux, change them to improve segmentation
-            // CECExtractionParams aux = cecparams;
-            // cecparams.leaf_size = 0.0095;
-            // cecparams.squared_dist = test_param2;
-            // // cecparams.normal_diff = 0.997;
-            // cecparams.normal_diff = test_param;
-            // cecparams.min_cluster_size = 200;
+            // CloudNormalPtr cloud_with_normals (new CloudNormal);
+            // CloudPtr cloud_out (new Cloud);
+            // IdxClustersPtr clusters (new IdxClusters), small_clusters (new IdxClusters), large_clusters (new IdxClusters);
+            // PCLFunctions::cec_extraction(cloud2, cloud_out, clusters, small_clusters, large_clusters, cloud_with_normals);
+
+            // // if(clusters->size() == 0){
+            // //     std::cout << "No clusters found. Returning!" << std::endl;
+            // //     CloudInfo empty;
+            // //     return empty;
+            // // }
+
+            // Parse information on clusters and group it in a CloudInfo struct
+            // std::vector<CloudInfo> cloud_info_clusters = clusterIndicesToCloud(clusters, cloud_out, cloud_with_normals);
+            // cout << "NEW cluster size: " << cloud_info_clusters.size() << endl;
+
+            // for(int i = 0; i < cloud_info_clusters.size(); i++)
+            //     new_vec.push_back(cloud_info_clusters[i]);
+
+            
+            
+            // PCLFunctions::regionGrowingSegmentation(clusters[i].cloud, clusters[i].cloud, x);
 
 
-            // CECExtraction(clusters[i].cloud, cloud_out, clusts, small_clusters, large_clusters, cloud_with_normals);
-            // cecparams = aux;
-            // Bring back the original params
+            //Capture cloud
+
+            // pcl::PCDWriter writer;
+            // writer.write<pcl::PointXYZRGB> ("big_segment.pcd", *(clusters[i].cloud), true);
+
+            // char temp[100];
+            // std::string ye = getcwd(temp, sizeof(temp)) ? std::string( temp ) : std::string("");
+
+            // // pcl::io::savePCDFile("./big_segment.pcd", *(clusters[i].cloud), true);
+            // cout << "current  dir: " << ye << std::endl;
+            PCLFunctions::superbodyClustering(clusters[i].cloud, NULL, x);
+
+            cout << "clusters: " << x.size() << endl;
+            std::vector<CloudInfo> cloud_clusters;
+            for(int i = 0; i < x.size(); i++)
+            {
+                CloudPtr cloud_cluster (new Cloud);
+                CloudNormalPtr cloud_normal_cluster (new CloudNormal);
+                pcl::PointIndices::Ptr cloud_indices (new pcl::PointIndices);
+                cloud_indices->indices = x[i].indices;
+                for (int j = 0; j < x[i].indices.size (); ++j)
+                {
+                    cloud_cluster->push_back(cloud_in->points[x[i].indices[j]]);
+                    cloud_normal_cluster->push_back(cloud_with_normals->points[x[i].indices[j]]);
+                }
+                CloudInfo cloud_info;
+                cloud_info.cloud = cloud_cluster;
+                cloud_info.cloudNormal = cloud_normal_cluster;
+                cloud_info.bb = PCLFunctions::computeCloudBoundingBox(cloud_cluster);
+                cloud_info.indices = cloud_indices;
+                cloud_clusters.push_back(cloud_info); 
+            }
+
+            for(int i = 0; i < cloud_clusters.size(); i++){
+                new_vec.push_back(cloud_clusters[i]);
+            }
+
 
             // cout << "cloud info clusters: " << clusts->size() << endl;
             // cout << "cloud info clusters small : " << small_clusters->size() << endl;
@@ -115,7 +168,9 @@ std::vector<CloudInfo> CorkIris::segmentBigClusters(std::vector<CloudInfo> clust
 
             // setup bb etc etc...
         }else{
+            // new_vec.push_back(clusters[i]);
             new_vec.push_back(clusters[i]);
+
         }
 
     }
@@ -131,11 +186,12 @@ std::vector<CloudInfo> CorkIris::segmentBigClusters(std::vector<CloudInfo> clust
 */
 bool CorkIris::isClusterBadShaped(BoundingBox cluster)
 {
-    float THRESHOLD_PERCENTAGE = bad_shape_percentage_threshold;
+    float THRESHOLD_WIDTH = bad_shape_width_threshold;
     float largura = cluster.maxPoint.y - cluster.minPoint.y;
-    float comprimento = cluster.maxPoint.z - cluster.minPoint.z;
+    cout << "largura: " << largura << endl;
+    // float comprimento = cluster.maxPoint.z - cluster.minPoint.z;
 
-    return ((largura/comprimento)) > THRESHOLD_PERCENTAGE;
+    return largura > THRESHOLD_WIDTH;
 }
 
 /*

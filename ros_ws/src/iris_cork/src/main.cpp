@@ -44,6 +44,8 @@ using namespace std;
 
 pcl::visualization::PCLVisualizer::Ptr viewer;
 
+
+
 bool displayed = false;
 
 // Global parameter values

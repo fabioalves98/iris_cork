@@ -11,14 +11,14 @@ static bool choose_best_cork;
 static Index chosen_cork_strip;
 static double z_threshold, center_threshold;
 static double space_distance_threshold, space_count_points_threshold, space_k_neighbors;
-static double bad_shape_percentage_threshold, volume_threshold;
+static double bad_shape_width_threshold, volume_threshold;
 static double splitted_cork_distance_threshold, splitted_cork_normal_threshold;
 
 class CorkIris
 {
 private:
     static std::vector<CloudInfo> clusterIndicesToCloud(IdxClustersPtr clusters, CloudPtr original_cloud, CloudNormalPtr original_cloud_normal);
-    static std::vector<CloudInfo> segmentBigClusters(std::vector<CloudInfo> clusters);
+    static std::vector<CloudInfo> segmentBigClusters(CloudPtr cloud_in, CloudNormalPtr cloud_with_normals, std::vector<CloudInfo> clusters);
     static bool isClusterBadShaped(BoundingBox cluster);
     static bool isClusterTooBig(BoundingBox cluster);
     static std::vector<CloudInfo> joinSplittedClusters(std::vector<CloudInfo> clusters);
