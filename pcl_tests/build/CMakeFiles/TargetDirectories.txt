@@ -1,3 +1,0 @@
-/home/fraga/Documents/Bolsa/pcl_tests/build/CMakeFiles/rebuild_cache.dir
-/home/fraga/Documents/Bolsa/pcl_tests/build/CMakeFiles/pcd_test.dir
-/home/fraga/Documents/Bolsa/pcl_tests/build/CMakeFiles/edit_cache.dir
