@@ -10,3 +10,9 @@
 [submodule "ros_ws/src/iris_ur10e"]
 	path = ros_ws/src/iris_ur10e
 	url = ../iris_ur10e.git
+[submodule "ros_ws/src/gazebo-pkgs"]
+	path = ros_ws/src/gazebo-pkgs
+	url = ../../JenniferBuehler/gazebo-pkgs.git
+[submodule "ros_ws/src/general-message-pkgs"]
+	path = ros_ws/src/general-message-pkgs
+	url = ../../JenniferBuehler/general-message-pkgs.git
