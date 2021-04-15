@@ -97,9 +97,9 @@ def samiMoveService(move):
 
 
 def samiAliasService(alias):
-    rospy.wait_for_service('iris_sami/joints_alias')
+    rospy.wait_for_service('iris_sami/alias')
     try:
-        aliasServ = rospy.ServiceProxy('iris_sami/joints_alias', JointGoalName)
+        aliasServ = rospy.ServiceProxy('iris_sami/alias', JointGoalName)
         resp = aliasServ(alias)
         return resp.feedback
     except rospy.ServiceException as e:
