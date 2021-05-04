@@ -96,9 +96,9 @@ cin >> lol;
   // subtract the object from the world
   // and to attach the object to the robot
   moveit_msgs::AttachedCollisionObject attached_object;
-  attached_object.link_name = "ee_link";
+  attached_object.link_name = "left_finger_link";
   /* The header must contain a valid TF frame*/
-  attached_object.object.header.frame_id = "ee_link";
+  attached_object.object.header.frame_id = "left_finger_link";
   /* The id of the object */
   attached_object.object.id = "box";
 
@@ -123,7 +123,7 @@ cin >> lol;
 
   // Since we are attaching the object to the robot hand to simulate picking up the object,
   // we want the collision checker to ignore collisions between the object and the robot hand
-  attached_object.touch_links = std::vector<std::string>{ "ee_link", "left_finger_link", "right_finger_link" };
+  attached_object.touch_links = std::vector<std::string>{ "ee_link", "gripper_link", "left_finger_link", "right_finger_link" };
 
   // Add an object into the environment
   // ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

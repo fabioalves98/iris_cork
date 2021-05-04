@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-
 import rospy
 import moveit_commander
 
@@ -56,15 +55,15 @@ def main():
     rospy.on_shutdown(delete_objects)
     
     scene = moveit_commander.PlanningSceneInterface(synchronous=True)
-    camera_transform = getTransform('base_link', 'camera_link')
+    # camera_transform = getTransform('base_link', 'camera_link')
     
-    # Camera Box Scene
-    pos = objectToArray(camera_transform.transform.translation)
-    ori = objectToArray(camera_transform.transform.rotation)
-    camera_box = newPoseStamped(pos, ori, "base_link")
-    scene.add_box("camera_box", camera_box, size=(CAMERA_WIDTH, CAMERA_LENGTH, CAMERA_HEIGHT))
-    status = wait_for_state_update(scene, "camera_box", object_is_known=True)
-    rospy.loginfo("Created camera box") if status else rospy.logwarn("Failed creating camera box")
+    # # Camera Box Scene
+    # pos = objectToArray(camera_transform.transform.translation)
+    # ori = objectToArray(camera_transform.transform.rotation)
+    # camera_box = newPoseStamped(pos, ori, "base_link")
+    # scene.add_box("camera_box", camera_box, size=(CAMERA_WIDTH, CAMERA_LENGTH, CAMERA_HEIGHT))
+    # status = wait_for_state_update(scene, "camera_box", object_is_known=True)
+    # rospy.loginfo("Created camera box") if status else rospy.logwarn("Failed creating camera box")
 
     # Robot Desk Scene
     base_plane = newPoseStamped([-0.3, -0.3, -0.05], quaternion_from_euler(pi/2, 0, pi/4), "base_link")
