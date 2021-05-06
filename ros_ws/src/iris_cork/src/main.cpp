@@ -39,6 +39,7 @@
 // Project 
 #include "box.h"
 #include "cork_iris.h"
+#include "cork_classifier/ClassifyCork.h"
 
 using namespace std;
 
@@ -61,8 +62,9 @@ ros::Publisher pub;
 ros::Publisher point_pub;
 ros::Publisher aux_point_pub_1;
 ros::Publisher aux_point_pub_2;
-ros::Publisher cork_cloud_img;
+// ros::Publisher cork_cloud_img;
 ros::Publisher planning_scene_diff_publisher;
+ros::ServiceClient classify_service;
 
 CloudPtr cloud (new Cloud);
 
@@ -329,6 +331,9 @@ void synced_callback(const sensor_msgs::ImageConstPtr& image,
                 }
                 else if (display_type == 4) // Clustering extraction
                 {
+                    // cork_pieces organized = true
+                    cout << "before extraction" << cork_pieces->isOrganized() << endl;
+
                     CloudInfo cloud_cluster = CorkIris::clusterExtraction(cork_pieces, cork_pieces);
 
                     broadcastCorkTransform(&(cloud_cluster.bb));
@@ -339,7 +344,7 @@ void synced_callback(const sensor_msgs::ImageConstPtr& image,
                     pcl::PCLImage image = PCLFunctions::extractImageFromCloud(cloud_cluster_full_res, true);
                     sensor_msgs::Image cloud_img;
                     pcl_conversions::moveFromPCL(image, cloud_img);
-                    cork_cloud_img.publish(cloud_img);
+                    cork_cloud_img.publish(cloud_img); // TODO: call service here directly
                 }
             }
 
@@ -394,7 +399,8 @@ int main (int argc, char** argv)
     point_pub = n.advertise<geometry_msgs::PoseStamped> ("/iris_cork/cork_piece", 1);
     aux_point_pub_1 = n.advertise<geometry_msgs::PoseStamped> ("/iris_cork/cork_piece_aux1", 1);
     aux_point_pub_2 = n.advertise<geometry_msgs::PoseStamped> ("/iris_cork/cork_piece_aux2", 1);
-    cork_cloud_img = n.advertise<sensor_msgs::Image> ("/iris_cork/cork_piece_cloud_img", 1);
+    // cork_cloud_img = n.advertise<sensor_msgs::Image> ("/iris_cork/cork_piece_cloud_img", 1);
+    classify_service = n.advertise<cork_classifier::ClassifyCork> ("/classify_cork", 1);
 
     // ROS publisher for the planning scene
     planning_scene_diff_publisher = n.advertise<moveit_msgs::PlanningScene>("planning_scene", 1);

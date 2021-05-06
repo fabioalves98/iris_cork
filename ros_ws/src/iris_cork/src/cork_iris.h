@@ -22,6 +22,7 @@ private:
     static bool isClusterBadShaped(BoundingBox cluster);
     static bool isClusterTooBig(BoundingBox cluster);
     static std::vector<CloudInfo> joinSplittedClusters(std::vector<CloudInfo> clusters);
+    static void shapeBasedSegmentation(CloudPtr cloud_in, IdxClustersPtr clusters_indices);
     static bool isSplittedCluster(CloudInfo cluster0, CloudInfo cluster1);
     static Eigen::Vector3f getClusterAverageNormal(CloudNormalPtr cluster);
     static CloudInfo joinClusters(CloudInfo cluster0, CloudInfo cluster1);

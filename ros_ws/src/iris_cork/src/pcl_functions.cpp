@@ -1,7 +1,7 @@
 #include "pcl_functions.h"
 
-double test1, test2;
-int test3, test4;
+// double test1, test2;
+// int test3, test4;
 
 void PCLFunctions::updateParams(iris_cork::PCLCorkConfig &config)
 {
@@ -25,10 +25,10 @@ void PCLFunctions::updateParams(iris_cork::PCLCorkConfig &config)
     cec_params.squared_dist = config.squared_dist;
     cec_params.curv = config.curvature;
 
-    test1 = config.test_param1;
-    test2 = config.test_param2;
-    test3 = config.test_param3;
-    test4 = config.test_param4;
+    // test1 = config.test_param1;
+    // test2 = config.test_param2;
+    // test3 = config.test_param3;
+    // test4 = config.test_param4;
 }
 
 void PCLFunctions::filterRollerBox(CloudPtr cloud_in, CloudPtr cloud_out)
@@ -37,6 +37,7 @@ void PCLFunctions::filterRollerBox(CloudPtr cloud_in, CloudPtr cloud_out)
     boxFilter.setMin(Eigen::Vector4f(-roller_width_value, -1, 0, 1.0));
     boxFilter.setMax(Eigen::Vector4f(roller_width_value, 2, roller_height_value, 1.0));
     boxFilter.setRotation(Eigen::Vector3f(-roller_height_angle*M_PI/180, 0, 0));
+    boxFilter.setKeepOrganized(true);
     boxFilter.setInputCloud(cloud_in);
     boxFilter.filter(*cloud_out);
 }
@@ -47,6 +48,7 @@ void PCLFunctions::remove_outliers(CloudPtr cloud_in, CloudPtr cloud_out)
     sor.setInputCloud (cloud_in);
     sor.setMeanK(meanK);
     sor.setStddevMulThresh (1.0);
+    sor.setKeepOrganized(true);
     sor.filter (*cloud_out);
 }
 
@@ -65,7 +67,7 @@ void PCLFunctions::cloud_smoothing(CloudPtr cloud_in, CloudPtr cloud_out)
     std::vector<int> test;
     pcl::removeNaNFromPointCloud(*cloud_in, *cloud_in, test);
     mls.setInputCloud (cloud_in);
-    mls.setPolynomialOrder (2);
+    mls.setPolynomialOrder (3);
     mls.setSearchMethod (tree);
     mls.setSearchRadius (0.03);
 
@@ -124,8 +126,12 @@ void PCLFunctions::cec_extraction(CloudPtr cloud_in, CloudPtr cloud_out, IdxClus
     vg.setInputCloud (cloud_in);
     vg.setLeafSize (cec_params.leaf_size, cec_params.leaf_size, cec_params.leaf_size);
     vg.setDownsampleAllData (true);
+    // vg.setKeepOrganized(true);
     vg.filter (*cloud_out);
+    // Voxel grids unorganizes the cloud. maybe cloud out needes to be a copy?
     
+    cout << "after voxel grid" << cloud_out->isOrganized() << endl;
+
     pcl::search::KdTree<pcl::PointXYZRGB>::Ptr search_tree (new pcl::search::KdTree<pcl::PointXYZRGB>);
 
     pcl::copyPointCloud(*cloud_out, *cloud_with_normals);
@@ -134,6 +140,7 @@ void PCLFunctions::cec_extraction(CloudPtr cloud_in, CloudPtr cloud_out, IdxClus
     ne.setSearchMethod (search_tree);
     ne.setRadiusSearch (radius_search);
     ne.compute (*cloud_with_normals);
+    cout << "after normal estimation" << cloud_out->isOrganized() << endl;
 
     pcl::ConditionalEuclideanClustering<pcl::PointXYZRGBNormal> cec (true);
     cec.setInputCloud (cloud_with_normals);
@@ -142,7 +149,8 @@ void PCLFunctions::cec_extraction(CloudPtr cloud_in, CloudPtr cloud_out, IdxClus
     cec.setMinClusterSize (cloud_with_normals->points.size () / cec_params.min_cluster_size);
     cec.setMaxClusterSize (cloud_with_normals->points.size () / cec_params.max_cluster_size);
     cec.segment (*clusters);
-    cec.getRemovedClusters (sclusters, lclusters);    
+    cec.getRemovedClusters (sclusters, lclusters);  
+      
 }
 
 bool PCLFunctions::enforceNormals (const pcl::PointXYZRGBNormal& point_a, const pcl::PointXYZRGBNormal& point_b, float squared_distance)
@@ -151,6 +159,7 @@ bool PCLFunctions::enforceNormals (const pcl::PointXYZRGBNormal& point_a, const 
     point_b_normal = point_b.getNormalVector3fMap ();
     double enf_normal_diff = point_a_normal.dot(point_b_normal);
     
+    // std::cout << "dist: "<< squared_distance << std::endl;
     if (squared_distance < cec_params.squared_dist)
     {
         if (enf_normal_diff >= cec_params.normal_diff)
@@ -181,8 +190,8 @@ void PCLFunctions::regionGrowingSegmentation(CloudPtr cloud_in, CloudPtr cloud_o
     reg.setInputCloud (cloud_in);
     //reg.setIndices (indices);
     reg.setInputNormals (normals);
-    reg.setSmoothnessThreshold (test2 / 180.0 * M_PI);
-    reg.setCurvatureThreshold (test1);
+    reg.setSmoothnessThreshold (1 / 180.0 * M_PI);
+    reg.setCurvatureThreshold (0.1);
 
     // std::vector <pcl::PointIndices> clusters;
     reg.extract (clusters);
@@ -204,8 +213,8 @@ void PCLFunctions::superbodyClustering(CloudPtr cloud_in, CloudPtr cloud_out, st
     float voxel_resolution = 0.008f;
     float seed_resolution = 0.1f;
     float color_importance = 0.2;
-    float spatial_importance = test1;
-    float normal_importance = test2;
+    float spatial_importance = 0.1;
+    float normal_importance = 0.1;
 
     //Generate crystallizer
     pcl::SupervoxelClustering<pcl::PointXYZRGB> super(voxel_resolution, seed_resolution);
@@ -250,7 +259,7 @@ void PCLFunctions::superbodyClustering(CloudPtr cloud_in, CloudPtr cloud_out, st
     //             directed_cutting = true,
     //             clean_cutting = false)；
     seg.setCutting();
-    seg.setRANSACIterations(test3);
+    seg.setRANSACIterations(2);
     seg.segment();
 
     pcl::PointCloud<pcl::PointXYZL>::Ptr sv_labeled_cloud = super.getLabeledCloud ();

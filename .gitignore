@@ -12,3 +12,8 @@ ros_ws/logs
 .rosinstall*
 
 **/*venv/
+**/build/
+
+*.bag
+*.pcd
+*.png
