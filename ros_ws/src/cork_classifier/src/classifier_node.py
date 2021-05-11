@@ -4,7 +4,7 @@ import rospkg
 import os
 
 from cork_classifier.srv import ClassifyCork
-from Classifier import classify
+from Classifier import classify, loadCNN
 from sensor_msgs.msg import PointCloud2, Image
 import sensor_msgs.point_cloud2 as pc2
 from cv_bridge import CvBridge
@@ -18,7 +18,8 @@ BASE_PATH = rp.get_path('cork_classifier')
 MODEL_PATH = BASE_PATH + "/models/" + MODEL
 print(MODEL_PATH)
 
-
+x =loadCNN(MODEL_PATH)
+print(x)
 
 def getCorkBoundingRect(img):
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
@@ -123,7 +124,7 @@ if __name__ == '__main__':
     except rospy.ROSInterruptException:
         pass
 
-    print("ok")
+    # print("ok")
 
     # for i in range(0, 179):
 

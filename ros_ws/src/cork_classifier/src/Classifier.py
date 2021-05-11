@@ -72,3 +72,5 @@ def classify(img, model, gpu=False):
 
     classification = (prediction_category, prediction_accuracy)
     return classification
+
+
