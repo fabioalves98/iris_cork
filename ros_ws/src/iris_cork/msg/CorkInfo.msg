@@ -1,0 +1,3 @@
+geometry_msgs/TransformStamped transform
+string classification
+float64 accuracy

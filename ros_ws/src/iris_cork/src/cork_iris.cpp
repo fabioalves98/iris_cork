@@ -236,11 +236,13 @@ void CorkIris::shapeBasedSegmentation(CloudPtr cloud_in, IdxClustersPtr clusters
                     
                     searched.insert(adjacent_idx[i]);
                 }
-            }else{
-                cout <<" Point too far not adding!" << endl;
+                else
+                {
+                    cout <<" Point too far not adding!" << endl;
+                }
             }
-
         }
+        
 
   
 

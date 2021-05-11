@@ -3,7 +3,6 @@ import sys, time, csv
 import rospy, rospkg, rosparam, tf
 import tf2_geometry_msgs
 import geometry_msgs.msg
-from ast import literal_eval
 from math import pi, cos, sin
 
 from geometry_msgs.msg import Point, TransformStamped, Pose, PoseStamped, Quaternion
@@ -11,6 +10,8 @@ from sensor_msgs.msg import Image
 from tf.transformations import euler_from_quaternion, quaternion_from_euler, quaternion_multiply
 from helpers import newPoseStamped, samiPoseService, samiMoveService, samiGripperService, \
     samiAliasService, keep_going, setPCLCorkParameter, getTransform
+
+from iris_cork.msg import CorkInfo
 
 
 def computeCorkGrabPositions(trans):
@@ -93,18 +94,20 @@ def main():
 
     setPCLCorkParameter()
 
-    while not rospy.is_shutdown():
-        trans = None
-        tries = 2
-        
-        while not trans and tries > 0:
-            trans = getTransform("base_link", "cork_piece")
-            tries -= 1
-        
-        setPCLCorkParameter({"live" : "false"})
+    cork_info_sub = rospy.Subscriber('cork_iris/cork_info', CorkInfo, queue_size=1)
 
-        if trans == None:
-            return "No Cork Piece found"
+    while not rospy.is_shutdown():
+        # trans = None
+        # tries = 2
+        
+        # while not trans and tries > 0:
+        #     trans = getTransform("base_link", "cork_piece")
+        #     tries -= 1
+        
+        # setPCLCorkParameter({"live" : "false"})
+
+        # if trans == None:
+        #     return "No Cork Piece found"
 
         grab1, grab2 = computeCorkGrabPositions(trans)
         grab_pose_pub.publish(grab1)

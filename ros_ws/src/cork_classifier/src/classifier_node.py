@@ -12,10 +12,11 @@ from cv_bridge import CvBridge
 name = 'belly_right'
 img_id = 100
 
-MODEL = "conv-32-drop25-dense-128-drop50-64-drop50-1572285048.h5"
+MODEL = "produtech_model.h5"
 rp = rospkg.RosPack()
 BASE_PATH = rp.get_path('cork_classifier')
 MODEL_PATH = BASE_PATH + "/models/" + MODEL
+print(MODEL_PATH)
 
 
 
@@ -84,9 +85,9 @@ def getClassifiableCorkImage(img):
     if unskewed.shape[0] < unskewed.shape[1]:
         unskewed = cv2.rotate(unskewed, cv2.cv2.ROTATE_90_CLOCKWISE) 
 
-    print(cv2.imwrite(BASE_PATH + '/img/' + name + '_' + str(img_id) + '.jpg', unskewed))
+    # print(cv2.imwrite(BASE_PATH + '/img/' + name + '_' + str(img_id) + '.jpg', unskewed))
    
-    img_id += 1
+    # img_id += 1
     # cv2.imshow("image", unskewed)
     # cv2.waitKey()
 
@@ -102,11 +103,14 @@ def classify_cork_piece(data):
 
     img = getClassifiableCorkImage(img)
 
-    # (classification_category, classification_accuracy) = classify(img, MODEL_PATH)
-    # # print(classification_accuracy, classification_category)
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
-    # return [classification_category, classification_accuracy]
-    return ['', 0.0]
+    (classification_category, classification_accuracy) = classify(gray, MODEL_PATH)
+    
+    print(classification_accuracy, classification_category)
+
+    return [classification_category, classification_accuracy]
+    # return ['', 0.0]
                     
 if __name__ == '__main__':
     
@@ -121,5 +125,5 @@ if __name__ == '__main__':
 
     print("ok")
 
-    for i in range(0, 179):
+    # for i in range(0, 179):
 

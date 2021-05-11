@@ -39,12 +39,15 @@
 // Project 
 #include "box.h"
 #include "cork_iris.h"
-#include "cork_classifier/ClassifyCork.h"
+
+#include <iris_sami/JointGoal.h>
+#include <cork_classifier/ClassifyCork.h>
+
+#include "iris_cork/CorkInfo.h"
 
 using namespace std;
 
 pcl::visualization::PCLVisualizer::Ptr viewer;
-
 
 
 bool displayed = false;
@@ -62,7 +65,7 @@ ros::Publisher pub;
 ros::Publisher point_pub;
 ros::Publisher aux_point_pub_1;
 ros::Publisher aux_point_pub_2;
-// ros::Publisher cork_cloud_img;
+ros::Publisher cork_info;
 ros::Publisher planning_scene_diff_publisher;
 ros::ServiceClient classify_service;
 
@@ -132,7 +135,7 @@ CloudPtr cropBoundingBox(CloudPtr cloud, BoundingBox bb)
 
 }
 
-void broadcastCorkTransform(BoundingBox *bb)
+void publishCorkInfo(BoundingBox *bb, std::string classification)
 {
     Eigen::Quaternionf corkOrientation = bb->orientation;
 
@@ -150,8 +153,27 @@ void broadcastCorkTransform(BoundingBox *bb)
     cork_piece_pose.header.frame_id = "camera_depth_optical_frame";
     cork_piece_pose.pose.position = center;
     cork_piece_pose.pose.orientation = orientation;
+    
+
+
 
     point_pub.publish(cork_piece_pose);
+
+    //static tf::TransformBroadcaster br;
+    tf::Transform transform;
+    tf::Quaternion q(orientation.x, orientation.y, orientation.z, orientation.w);  
+    transform.setOrigin(tf::Vector3(center.x, center.y, center.z));
+    transform.setRotation(q);
+    //br.sendTransform(tf::StampedTransform(transform, ros::Time::now(), "camera_depth_optical_frame", "cork_piece"));
+    geometry_msgs::TransformStamped tf_stamped;
+    tf::StampedTransform transform_stamped(transform, ros::Time::now(), "camera_depth_optical_frame", "cork_piece");
+    tf::transformStampedTFToMsg(transform_stamped, tf_stamped);
+
+    iris_cork::CorkInfo cork_info_msg;
+    cork_info_msg.transform = tf_stamped;
+    cork_info_msg.classification = classification;
+    cork_info.publish(cork_info_msg);
+
     
     // Adding cork piece object to move it planning scene
     if(add_planning_scene_cork){
@@ -171,7 +193,7 @@ void broadcastCorkTransform(BoundingBox *bb)
         attached_object.object.primitives.push_back(primitive);
         attached_object.object.primitive_poses.push_back(cork_piece_pose.pose);
         attached_object.object.operation = attached_object.object.ADD;
-        attached_object.touch_links = vector<string>{ "ee_link", "left_finger_link", "right_finger_link" };
+        attached_object.touch_links = vector<string>{ "gripper_link", "left_finger_link", "right_finger_link" };
 
         moveit_msgs::PlanningScene planning_scene;
         planning_scene.world.collision_objects.push_back(attached_object.object);
@@ -179,12 +201,7 @@ void broadcastCorkTransform(BoundingBox *bb)
         planning_scene_diff_publisher.publish(planning_scene);
     }
 
-    static tf::TransformBroadcaster br;
-    tf::Transform transform;
-    transform.setOrigin(tf::Vector3(center.x, center.y, center.z));
-    tf::Quaternion q(orientation.x, orientation.y, orientation.z, orientation.w);  
-    transform.setRotation(q);
-    br.sendTransform(tf::StampedTransform(transform, ros::Time::now(), "camera_depth_optical_frame", "cork_piece"));
+    
 
     double comp = bb->maxPoint.z - bb->minPoint.z;
 
@@ -335,16 +352,21 @@ void synced_callback(const sensor_msgs::ImageConstPtr& image,
                     cout << "before extraction" << cork_pieces->isOrganized() << endl;
 
                     CloudInfo cloud_cluster = CorkIris::clusterExtraction(cork_pieces, cork_pieces);
-
-                    broadcastCorkTransform(&(cloud_cluster.bb));
-                    drawBoundingBox(&(cloud_cluster.bb), "cork_piece");
-
-                    CloudPtr cloud_cluster_full_res = cropBoundingBox(cloud, cloud_cluster.bb);
                     
+                    CloudPtr cloud_cluster_full_res = cropBoundingBox(cloud, cloud_cluster.bb);
                     pcl::PCLImage image = PCLFunctions::extractImageFromCloud(cloud_cluster_full_res, true);
                     sensor_msgs::Image cloud_img;
                     pcl_conversions::moveFromPCL(image, cloud_img);
-                    cork_cloud_img.publish(cloud_img); // TODO: call service here directly
+                    cork_classifier::ClassifyCork srv;
+                    srv.request.cork_cloud = cloud_img;
+                    classify_service.call(srv);
+
+                    cout << srv.response.result << endl;
+
+                    publishCorkInfo(&(cloud_cluster.bb), srv.response.result);
+                    drawBoundingBox(&(cloud_cluster.bb), "cork_piece");
+
+                    
                 }
             }
 
@@ -399,8 +421,8 @@ int main (int argc, char** argv)
     point_pub = n.advertise<geometry_msgs::PoseStamped> ("/iris_cork/cork_piece", 1);
     aux_point_pub_1 = n.advertise<geometry_msgs::PoseStamped> ("/iris_cork/cork_piece_aux1", 1);
     aux_point_pub_2 = n.advertise<geometry_msgs::PoseStamped> ("/iris_cork/cork_piece_aux2", 1);
-    // cork_cloud_img = n.advertise<sensor_msgs::Image> ("/iris_cork/cork_piece_cloud_img", 1);
-    classify_service = n.advertise<cork_classifier::ClassifyCork> ("/classify_cork", 1);
+    cork_info = n.advertise<iris_cork::CorkInfo> ("/iris_cork/cork_info", 1);
+    classify_service = n.serviceClient<cork_classifier::ClassifyCork>("/classify_cork");
 
     // ROS publisher for the planning scene
     planning_scene_diff_publisher = n.advertise<moveit_msgs::PlanningScene>("planning_scene", 1);

@@ -23,6 +23,7 @@ def prepareIMG(img):
     # img = cv2.normalize(img, None, alpha=0, beta=1,
     #                     norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
     img = np.expand_dims(img, axis=0)
+    img = np.expand_dims(img, axis=3)
 
     return img
 
@@ -61,7 +62,8 @@ def classify(img, model, gpu=False):
     # Load model from file
     try:
         model = loadCNN(model)
-    except Exception:
+    except Exception as e:
+        print(e)
         print("Cannot load model file. Using default path.")
 
     prediction = model.predict(img)
