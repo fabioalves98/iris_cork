@@ -13,8 +13,12 @@ ros_ws/logs
 
 **/*venv/
 **/build/
+**/logs/
+**/resource/
+**/img/
 
 *.h5
 *.bag
 *.pcd
 *.png
+*.jpg
