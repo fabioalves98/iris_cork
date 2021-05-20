@@ -18,21 +18,30 @@ BASE_PATH = rp.get_path('cork_classifier')
 MODEL_PATH = BASE_PATH + "/models/" + MODEL
 print(MODEL_PATH)
 
-x =loadCNN(MODEL_PATH)
-print(x)
+# x =loadCNN(MODEL_PATH)
+# print(x)
 
 def getCorkBoundingRect(img):
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     ret,thresh = cv2.threshold(gray,250,255,0)
 
     kernel = numpy.ones((2,2), numpy.uint8)
-    thresh = cv2.erode(thresh, kernel, iterations=1)
-    # thresh = cv2.dilate(thresh, kernel, iterations=2)
+    thresh = cv2.erode(thresh, kernel, iterations=2)
+    # thresh = cv2.dilate(thresh, kernel, iterations=5)
 
+    contour_len = -1
+
+    while(contour_len != 2):
+        thresh = cv2.erode(thresh, kernel, iterations=1)
+        contours, hierarchy = cv2.findContours(thresh, 1,  cv2.CHAIN_APPROX_SIMPLE)
+        contour_len = len(contours)
+ 
+ 
     max_cont = None
     max_area = 0
 
-    contours, hierarchy = cv2.findContours(thresh, 1,  cv2.CHAIN_APPROX_SIMPLE)
+    cv2.drawContours(img, contours, -1, (0, 255, 0), 3)
+
     conts = []
     for c in contours:
         if(cv2.contourArea(c) > 100 and cv2.contourArea(c) < 30000):
@@ -72,43 +81,38 @@ def unskewImage(img, rect):
 
 ''' Apply contours etc. Get a bounding rectangle of the cork and unskew it. Finally get the desired pixels from the
     image_raw image.'''
-def getClassifiableCorkImage(img):
+def getClassifiableCorkImage(raw_image, cork_img):
     
-    box = getCorkBoundingRect(img)
+    box = getCorkBoundingRect(cork_img) # Get the 2d bounding box of the cork piece
     
-    data = rospy.wait_for_message("camera/rgb/image_raw", Image, timeout=1)    
-    bridge = CvBridge()
-    raw_img = bridge.imgmsg_to_cv2(data, 'bgr8')
-    unskewed = unskewImage(raw_img, box)
+    unskewed = unskewImage(raw_image, box) # unskew if necessary
 
     global img_id
 
     if unskewed.shape[0] < unskewed.shape[1]:
         unskewed = cv2.rotate(unskewed, cv2.cv2.ROTATE_90_CLOCKWISE) 
-
-    # print(cv2.imwrite(BASE_PATH + '/img/' + name + '_' + str(img_id) + '.jpg', unskewed))
-   
-    # img_id += 1
-    # cv2.imshow("image", unskewed)
-    # cv2.waitKey()
-
+    
     return unskewed
 
 
 def classify_cork_piece(data):
 
-    data = data.cork_cloud
+    # data = data.cork_cloud
     br = CvBridge()
-    img = br.imgmsg_to_cv2(data, 'bgr8')
-    img[numpy.where((img==[0,0,0]).all(axis=2))] = [255, 255, 255]
+    # cork_img contains the cropped rgb part of the rgb-d group 
+    cork_img = br.imgmsg_to_cv2(data.cork_cloud, 'bgr8')
+    cork_img[numpy.where((cork_img==[0,0,0]).all(axis=2))] = [255, 255, 255] # replace black bg with white
+    # raw image is the pure rgb image
+    raw_image = br.imgmsg_to_cv2(data.raw_image, 'bgr8')
 
-    img = getClassifiableCorkImage(img)
 
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-
-    (classification_category, classification_accuracy) = classify(gray, MODEL_PATH)
+    # cv2.imshow("image", raw_image)
+    # cv2.waitKey()
+    img = getClassifiableCorkImage(raw_image, cork_img)
     
-    print(classification_accuracy, classification_category)
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    # TODO: load model previously instead of loading every iteration
+    (classification_category, classification_accuracy) = classify(gray, MODEL_PATH)
 
     return [classification_category, classification_accuracy]
     # return ['', 0.0]

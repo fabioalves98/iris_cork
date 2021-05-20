@@ -354,11 +354,12 @@ void synced_callback(const sensor_msgs::ImageConstPtr& image,
                     CloudInfo cloud_cluster = CorkIris::clusterExtraction(cork_pieces, cork_pieces);
                     
                     CloudPtr cloud_cluster_full_res = cropBoundingBox(cloud, cloud_cluster.bb);
-                    pcl::PCLImage image = PCLFunctions::extractImageFromCloud(cloud_cluster_full_res, true);
+                    pcl::PCLImage pcl_image = PCLFunctions::extractImageFromCloud(cloud_cluster_full_res, true);
                     sensor_msgs::Image cloud_img;
-                    pcl_conversions::moveFromPCL(image, cloud_img);
+                    pcl_conversions::moveFromPCL(pcl_image, cloud_img);
                     cork_classifier::ClassifyCork srv;
                     srv.request.cork_cloud = cloud_img;
+                    srv.request.raw_image = *image;
                     classify_service.call(srv);
 
                     cout << srv.response.result << endl;

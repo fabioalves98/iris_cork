@@ -1,4 +1,5 @@
 sensor_msgs/Image cork_cloud
+sensor_msgs/Image raw_image
 ---
 string result
 float32 accuracy
