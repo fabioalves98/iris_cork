@@ -55,10 +55,12 @@ include_directories(${cork_classifier_INCLUDE_DIRS})
 
 add_executable(iris_cork src/main.cpp src/box.cpp src/pcl_functions.cpp src/cork_iris.cpp)
 target_link_libraries(iris_cork ${catkin_LIBRARIES} ${PCL_LIBRARIES})
+add_dependencies(iris_cork ${PROJECT_NAME}_generate_messages_cpp)
+add_dependencies(iris_cork ${PROJECT_NAME}_gencfg)
+
 
 add_executable(test_scene src/test_scene.cpp)
 target_link_libraries(test_scene ${catkin_LIBRARIES})
 
-add_dependencies(iris_cork ${PROJECT_NAME}_gencfg)
 
 

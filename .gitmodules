@@ -13,3 +13,9 @@
 [submodule "ros_ws/src/general-message-pkgs"]
 	path = ros_ws/src/general-message-pkgs
 	url = ../../JenniferBuehler/general-message-pkgs.git
+[submodule "ros_ws/src/fmauch_universal_robot"]
+	path = ros_ws/src/fmauch_universal_robot
+	url = ../../fmauch/universal_robot.git
+[submodule "ros_ws/src/Universal_Robots_ROS_Driver"]
+	path = ros_ws/src/Universal_Robots_ROS_Driver
+	url = ../../UniversalRobots/Universal_Robots_ROS_Driver.git
