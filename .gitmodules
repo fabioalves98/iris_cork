@@ -10,3 +10,9 @@
 [submodule "ros_ws/src/general-message-pkgs"]
 	path = ros_ws/src/general-message-pkgs
 	url = ../../JenniferBuehler/general-message-pkgs.git
+[submodule "ros_ws/src/universal_robot"]
+	path = ros_ws/src/universal_robot
+	url = ../universal_robot.git
+[submodule "ros_ws/src/Universal_Robots_ROS_Driver"]
+	path = ros_ws/src/Universal_Robots_ROS_Driver
+	url = ../Universal_Robots_ROS_Driver.git
