@@ -1,25 +1,34 @@
 #!/usr/bin/env python
-import rospy, socket, sys, struct, ctypes, math, cv2, numpy
-import rospkg
+import ctypes
+import math
 import os
+import socket
+import struct
+import sys
 
-from cork_classifier.srv import ClassifyCork
-from Classifier import classify, loadCNN
-from sensor_msgs.msg import PointCloud2, Image
+import cv2
+import numpy
+import rospkg
+import rospy
 import sensor_msgs.point_cloud2 as pc2
+from cork_classifier.srv import ClassifyCork
 from cv_bridge import CvBridge
+from sensor_msgs.msg import Image, PointCloud2
+
+from Classifier import classify, loadCNN
 
 name = 'belly_right'
 img_id = 100
 
-MODEL = "produtech_model.h5"
+MODEL_FILE = "produtech_model.h5"
 rp = rospkg.RosPack()
 BASE_PATH = rp.get_path('cork_classifier')
-MODEL_PATH = BASE_PATH + "/models/" + MODEL
+MODEL_PATH = BASE_PATH + "/models/" + MODEL_FILE
 print(MODEL_PATH)
 
-# x =loadCNN(MODEL_PATH)
-# print(x)
+# model = loadCNN(MODEL_PATH)
+# print(model)
+
 
 def getCorkBoundingRect(img):
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
@@ -111,7 +120,7 @@ def classify_cork_piece(data):
     img = getClassifiableCorkImage(raw_image, cork_img)
     
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    # TODO: load model previously instead of loading every iteration
+
     (classification_category, classification_accuracy) = classify(gray, MODEL_PATH)
 
     return [classification_category, classification_accuracy]

@@ -440,11 +440,11 @@ CloudInfo CorkIris::chooseBestCluster(std::vector<CloudInfo> cluster_clouds, Clo
         return cluster_clouds[idx];    
     }
 
-    // DEBUG SAVE CLUSTER CLOUDS TO INDIVIDUAL FILE
+    // // DEBUG SAVE CLUSTER CLOUDS TO INDIVIDUAL FILE
 
-    for(int i = 0; i < cluster_clouds.size(); i++){
-        pcl::io::savePCDFile("./individual_cork_strip" + std::to_string(i) + ".pcd", *(cluster_clouds[i].cloud), true);
-    }
+    // for(int i = 0; i < cluster_clouds.size(); i++){
+    //     pcl::io::savePCDFile("./individual_cork_strip" + std::to_string(i) + ".pcd", *(cluster_clouds[i].cloud), true);
+    // }
 
     Index highest_cloud_idx = getHighestCluster(cluster_clouds);
     CloudInfo highest_cloud = cluster_clouds[highest_cloud_idx];
