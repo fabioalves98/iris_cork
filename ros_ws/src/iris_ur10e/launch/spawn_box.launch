@@ -1,0 +1,5 @@
+
+<launch>
+  <param name="box_description" textfile="$(find ur_e_description)/urdf/object.urdf" />
+    <node name="spawn_urdf" pkg="gazebo_ros" type="spawn_model" args="-param box_description -urdf -model small_box" />
+</launch>
