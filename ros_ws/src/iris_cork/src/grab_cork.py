@@ -2,7 +2,6 @@
 import sys, time, csv
 import rospy, rospkg, rosparam, tf
 import tf2_geometry_msgs
-import geometry_msgs.msg
 from math import pi, cos, sin
 
 from geometry_msgs.msg import Point, TransformStamped, Pose, PoseStamped, Quaternion

@@ -13,6 +13,8 @@ find_package(catkin REQUIRED COMPONENTS
   dynamic_reconfigure
   geometry_msgs
   message_generation
+  moveit_core
+  moveit_ros_planning_interface
 )
 
 generate_dynamic_reconfigure_options(
@@ -58,6 +60,8 @@ target_link_libraries(iris_cork ${catkin_LIBRARIES} ${PCL_LIBRARIES})
 add_dependencies(iris_cork ${PROJECT_NAME}_generate_messages_cpp)
 add_dependencies(iris_cork ${PROJECT_NAME}_gencfg)
 
+add_executable(pm_poses src/pm_poses.cpp)
+target_link_libraries(pm_poses ${catkin_LIBRARIES})
 
 add_executable(test_scene src/test_scene.cpp)
 target_link_libraries(test_scene ${catkin_LIBRARIES})

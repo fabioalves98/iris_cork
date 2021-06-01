@@ -63,6 +63,13 @@ def newPoseStamped(position=[0,0,0], orientation=[0,0,0,1], frame_id="base_link"
 
     return pose
 
+def pointToList(point):
+    p_list = []
+    p_list.append(point.x)
+    p_list.append(point.y)
+    p_list.append(point.z)
+    return p_list
+
 
 def samiPoseService(pose):
     rospy.wait_for_service('iris_sami/pose')

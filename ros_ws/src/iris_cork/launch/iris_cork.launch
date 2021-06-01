@@ -1,13 +1,18 @@
+<?xml version="1.0"?>
 <launch>
 
-    <arg name="reconfigure" default="true"  doc="Launches rqt reconfigure"/>
+    <!-- IRIS UR10e withoit rviz -->
+    <include file="$(find iris_ur10e)/launch/live.launch">
+        <arg name="rviz" value="false"/>
+    </include>
 
-    <node pkg="iris_cork" type="iris_cork" name="iris_cork" output="screen"/>
-    
-    <!-- <include file="$(find astra_camera)/launch/astra.launch"/> -->
-    
-    <group if="$(arg reconfigure)">
-        <node pkg="rqt_reconfigure" type="rqt_reconfigure" name="configure_params" output="screen" /> 
-    </group>
+    <!-- Custom RViz -->
+    <node name="$(anon rviz)" pkg="rviz" type="rviz" respawn="false"
+        args="-d $(find iris_cork)/launch/iris_cork.rviz" output="screen">
+        <rosparam command="load" file="$(find ur10e_moveit_config)/config/kinematics.yaml"/>
+    </node>
+
+    <!-- IRIS Sami GUI Launcher -->
+    <include file="$(find iris_sami)/launch/iris_sami.launch"/>
 
 </launch>
