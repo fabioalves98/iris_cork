@@ -12,7 +12,7 @@
         <arg name="robot_ip" value="192.168.56.101"/>
     </include>
 
-    <include if="$(arg sim)" file="$(find ur_e_gazebo)/launch/ur10e.launch">
+    <include if="$(arg sim)" file="$(find ur_gazebo)/launch/ur10e_bringup.launch">
         <arg name="gui"     value="$(arg gui)"/>
     </include>
 

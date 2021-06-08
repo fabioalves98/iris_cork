@@ -10,6 +10,7 @@ class CorkScene:
         self.robot = moveit_commander.RobotCommander()
         self.object_name = 'cork_piece'
         self.eef_link = self.move_group.get_end_effector_link()
+        print(self.eef_link)
 
 
     def wait_for_state_update(self, box_is_known=False, box_is_attached=False, timeout=10):
@@ -46,7 +47,7 @@ class CorkScene:
         box_pose = PoseStamped()
         box_pose.header.frame_id = "gripper_link"
         box_pose.pose.orientation.w = 1.0
-        box_pose.pose.position.x = 0.15
+        box_pose.pose.position.x = 0.10
         scene.add_box(box_name, box_pose, size=(0.05, 0.05, 0.5))
 
         return self.wait_for_state_update(box_is_known=True, timeout=timeout)
@@ -67,8 +68,11 @@ class CorkScene:
         scene = self.scene
         eef_link = self.eef_link
 
-        grasping_group = 'manipulator'
-        touch_links = robot.get_link_names(group=grasping_group)
+        # grasping_group = 'manipulator'
+        # touch_links = robot.get_link_names(group=grasping_group)
+        touch_links = ['flange', 'gripper_link', 'left_finger_link', 'right_finger_link']
+        print(touch_links)
+
         scene.attach_box(eef_link, box_name, touch_links=touch_links)
 
         return self.wait_for_state_update(box_is_attached=True, box_is_known=False, timeout=timeout)

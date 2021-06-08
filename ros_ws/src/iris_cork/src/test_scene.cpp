@@ -123,7 +123,7 @@ cin >> lol;
 
   // Since we are attaching the object to the robot hand to simulate picking up the object,
   // we want the collision checker to ignore collisions between the object and the robot hand
-  attached_object.touch_links = std::vector<std::string>{ "ee_link", "gripper_link", "left_finger_link", "right_finger_link" };
+  attached_object.touch_links = std::vector<std::string>{ "flange", "gripper_link", "left_finger_link", "right_finger_link" };
 
   // Add an object into the environment
   // ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
