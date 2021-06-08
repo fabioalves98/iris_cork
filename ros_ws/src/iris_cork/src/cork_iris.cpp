@@ -20,6 +20,10 @@ void CorkIris::updateParams(iris_cork::PCLCorkConfig &config)
     splitted_cork_distance_threshold = config.splitted_cork_distance_threshold;
     splitted_cork_normal_threshold = config.splitted_cork_normal_threshold;
 
+    height_weight = config.height_weight;
+    distance_weight = config.distance_weight;
+    size_weight = config.size_weight;
+
     test1 = config.test_param1;
     test2 = config.test_param2;
     test3 = config.test_param3;
@@ -49,16 +53,20 @@ CloudInfo CorkIris::clusterExtraction(CloudPtr cloud_in, CloudPtr cloud_out)
     // Grouping clusters belonging to the same cork piece
     std::vector<CloudInfo> cluster_clouds = joinSplittedClusters(cloud_info_clusters);
     
-    // Paint Clusters for visualization
-    paintClustersFull(cloud_out, cluster_clouds, small_clusters, large_clusters);
     if(cluster_clouds.size() == 0){
         cout << "No clusters found. Returning!" << endl;
         CloudInfo empty;
         return empty;
     }
+    
+    // Choose the best cluster from the extracted and filtered ones.
+    CloudInfo best_cluster = chooseBestCluster(cluster_clouds, cloud_out);
+    
 
-    // Chooses one single cluster from all present in cloud
-    return chooseBestCluster(cluster_clouds, cloud_out);
+    // Paint Clusters for visualization before returning.
+    paintClustersFull(cloud_out, cluster_clouds, small_clusters, large_clusters);
+    
+    return best_cluster; 
 }
 
 std::vector<CloudInfo> CorkIris::clusterIndicesToCloud(IdxClustersPtr clusters, CloudPtr original_cloud, CloudNormalPtr original_cloud_normal)
@@ -71,28 +79,29 @@ std::vector<CloudInfo> CorkIris::clusterIndicesToCloud(IdxClustersPtr clusters, 
         pcl::PointIndices::Ptr cloud_indices (new pcl::PointIndices);
         cloud_indices->indices = (*clusters)[i].indices;
         CloudInfo cloud_info;
-        // pcl::ExtractIndices<pcl::PointXYZRGB> filter;
-        // cout << " original cloud organized? " << original_cloud->isOrganized() << endl;
-        // filter.setInputCloud (original_cloud);
-        // filter.setIndices (cloud_indices);
-        // filter.setNegative (false);
-        // // Extract the points in cloud_in referenced by indices_in as a separate point cloud:
-        // filter.setKeepOrganized (true);
-        // filter.filter (*(cloud_info.cloud));
-        // cout << "after original cloud organized? " << cloud_info.cloud->isOrganized() << endl;
-
 
         for (int j = 0; j < (*clusters)[i].indices.size (); ++j)
         {
             cloud_cluster->push_back(original_cloud->points[(*clusters)[i].indices[j]]);
             cloud_normal_cluster->push_back(original_cloud_normal->points[(*clusters)[i].indices[j]]);
         }
+
         cloud_info.cloud = cloud_cluster;
         // copyPointCloud(*original_cloud, *cloud_indices, *(cloud_info.cloud));
         cloud_info.cloudNormal = cloud_normal_cluster;
         cloud_info.bb = PCLFunctions::computeCloudBoundingBox(cloud_cluster);
         cloud_info.indices = cloud_indices;
-        cloud_clusters.push_back(cloud_info); 
+
+        // Average cork distance to camera
+        cloud_info.cloud_size = (*clusters)[i].indices.size();
+        float distance = 0;
+        for(int idx = 0; idx < cloud_info.cloud_size; idx++){
+            distance += cloud_cluster->at(idx).z;
+        }
+        cloud_info.average_height = distance / cloud_info.cloud_size;
+        cloud_info.distance_manipulator = 1.0; // TODO: Properly define this.
+        
+        cloud_clusters.push_back(cloud_info);
     }
 
     return cloud_clusters;
@@ -110,19 +119,18 @@ std::vector<CloudInfo> CorkIris::segmentBigClusters(CloudPtr cloud_in, CloudNorm
 
         if(isClusterBadShaped(clusters[i].bb) || isClusterTooBig(clusters[i].bb))
         {
-            cout << "Cluster " << colors[i%7] << " is either too big or bad shaped. Segmenting again" << endl;
-            cout << "Cluster bad shaped: " << isClusterBadShaped(clusters[i].bb) << endl;
-            cout << "Cluster too big: " << isClusterTooBig(clusters[i].bb) << endl;
+            // cout << "Cluster " << colors[i%7] << " is either too big or bad shaped. Segmenting again" << endl;
+            // cout << "Cluster bad shaped: " << isClusterBadShaped(clusters[i].bb) << endl;
+            // cout << "Cluster too big: " << isClusterTooBig(clusters[i].bb) << endl;
 
             IdxClustersPtr cluster_indices (new IdxClusters);
-            CorkIris::shapeBasedSegmentation(clusters[i].cloud, cluster_indices);
             std::vector<CloudInfo> cloud_info_clusters = clusterIndicesToCloud(cluster_indices, cloud_in, cloud_with_normals);
 
-            for(int i = 0; i < cloud_info_clusters.size(); i++){
-                new_vec.push_back(cloud_info_clusters[i]);
-                cout << "Segmented a new big cluster. Adding to array."<< endl;
+            // for(int i = 0; i < cloud_info_clusters.size(); i++){
+            //     new_vec.push_back(cloud_info_clusters[i]);
+            //     cout << "Segmented a new big cluster. Adding to array."<< endl;
 
-            }
+            // }
             
            }else{
             new_vec.push_back(clusters[i]);
@@ -188,126 +196,6 @@ std::vector<CloudInfo> CorkIris::joinSplittedClusters(std::vector<CloudInfo> clu
 }
 
 
-void CorkIris::shapeBasedSegmentation(CloudPtr cloud_in, IdxClustersPtr clusters_indices){
-
-
-    pcl::KdTreeFLANN<pcl::PointXYZRGB> kdtree;
-    kdtree.setInputCloud (cloud_in);
-    pcl::PointXYZRGB searchPoint;
-
-    int K = test3;
-    std::vector<int> adjacent_idx(K);
-    std::vector<float> adjacent_distance(K);
-    std::set<int> searched;
-    
-
-    std::vector<double> last_dir = {0.0,0.0,0.0};
-    std::vector<int> currently_growing = {-1, -1, -1};// Keeps track of last three iterations.
-    int grow_track = 2; // 2 porque estamos a procura do comprimento. isto pode ser um problema? talvez mas parece que o comprimento esta sempre ok
-    int cluster_idx = 0;
-    
-    pcl::PointCloud<pcl::PointXYZRGB>::Ptr subcloud (new pcl::PointCloud<pcl::PointXYZRGB>);
-    pcl::PointIndicesPtr subcloud_indices (new pcl::PointIndices);
-
-
-    for(int idx = 0; idx < cloud_in->points.size(); idx++){
-        // std::cout <<" IDX: " << idx << std::endl;
-        if(searched.find(idx) == searched.end()){
-            searchPoint = cloud_in->at(idx);
-            std::cout << "Search point(" << idx << "): " << searchPoint << std::endl;
-        }else{
-            // std::cout << "Point search ignored(" << idx << ")" << std::endl;
-            continue;
-        }
-        adjacent_idx.clear();
-        adjacent_distance.clear();
-
-        if (kdtree.nearestKSearch(searchPoint, K, adjacent_idx, adjacent_distance) > 0){
-            for(std::size_t i = 0; i < adjacent_idx.size (); ++i){
-                cout << "DISTANCE: " << adjacent_distance[i] << endl;
-                if(adjacent_distance[i] < test2){
-                    subcloud->points.push_back((*cloud_in)[adjacent_idx[i]]);
-                
-                    if(std::find(subcloud_indices->indices.begin(), subcloud_indices->indices.end(), adjacent_idx[i]) == subcloud_indices->indices.end()){
-                        subcloud_indices->indices.push_back(adjacent_idx[i]);
-                    }
-                    
-                    // subcloud_indices->indices.push_back(adjacent_idx[i]);
-                    
-                    searched.insert(adjacent_idx[i]);
-                }
-                else
-                {
-                    cout <<" Point too far not adding!" << endl;
-                }
-            }
-        }
-        
-
-  
-
-        BoundingBox bb = PCLFunctions::computeCloudBoundingBox(subcloud);
-        double compr = (bb.maxPoint.z - bb.minPoint.z) ;
-        double largura = (bb.maxPoint.y - bb.minPoint.y) ;
-        double altura = (bb.maxPoint.x - bb.minPoint.x) ;
-        std::vector<double> dims = {abs(largura - last_dir[1]), abs(compr - last_dir[2])}; // ignoramos a altura. talvez possa ser um problema, mas parece que altura esta sempre certa
-        int growing_side = (std::max_element(dims.begin(), dims.end()) - dims.begin()) + 1;
-
-        std::cout << "Currently tracking side: " << grow_track << std::endl;
-        std::cout << "Growing side: " << growing_side << std::endl;
-        currently_growing.erase(currently_growing.begin());            
-        currently_growing.push_back(growing_side);
-        std::cout << "growing queue: " << currently_growing[0] << " " << currently_growing[1] << " " << currently_growing[2] << std::endl;
-        std::cout << "dims : " << dims[0] << " " << dims[1]      << std::endl;
-        
-        // if(grow_track == -1){
-        //     if(currently_growing[2] == currently_growing[1]){
-        //         grow_track = growing_side;
-        //     }
-        // }
-
-        bool cond;
-
-        if(test1 > 0.5){
-            cond = (currently_growing[2] != grow_track && currently_growing[1] != grow_track && currently_growing[0] != -1) || (searched.size() == cloud_in->size());
-        }else{
-            cond = (currently_growing[2] != grow_track && currently_growing[1] != grow_track && currently_growing[0] != grow_track && currently_growing[1] != -1) || (searched.size() == cloud_in->size());
-        }
-
-        // if((currently_growing[2] != grow_track && currently_growing[1] != grow_track && currently_growing[0] != grow_track && currently_growing[1] != -1) || (searched.size() == cloud_in->size())){
-        // if((currently_growing[2] != grow_track && currently_growing[1] != grow_track && currently_growing[0] != -1) || (searched.size() == cloud_in->size())){
-        if(cond){
-            // std::cout << "COUNT: "<<  std::count(currently_growing.begin(), currently_growing.end(), grow_track) << std::endl;
-            std::cout << " CHANGED DIRECTION! STOP CLUSTER!" << std::endl;
-            std::cout << " searched == cloudin " <<  (searched.size() == cloud_in->size()) << std::endl;
-            std::cout << " dims0 > dims1 " <<  (dims[0] > 10*dims[1]) << std::endl;
-            // grow_track = -1;
-            currently_growing[0] = currently_growing[1] = currently_growing[2] = -1;
-            // pcl::PointIndices indices (new pcl::PointIndices);
-            // indices.indices = subcloud_indices.indices;
-            clusters_indices->push_back(*subcloud_indices);
-            // std::cout << *subcloud_indices << std::endl;
-            subcloud_indices->indices.clear();
-            // std::cout<< "AFTER CLEAR:" << *subcloud_indices << std::endl;
-            // std::cout<< "AFTER CLEAR:" << clusters_out[0] << std::endl;
-            subcloud->points.clear();
-            // grow_track = -1;
-            // if(searched.size() < cloud_in->size()){
-            //     // searched.erase(--searched.end());
-            //     idx = *searched.rbegin();
-            //     std::cout << "new idx: " << idx << std::endl;
-            // }
-            cluster_idx++;
-        
-        }    
-        last_dir.at(0) = altura;
-        last_dir.at(1) = largura;
-        last_dir.at(2) = compr;
-        // std::cout << "-------" << std::endl;
-        // usleep(100000);
-    }
-}
-
 /*
     Determines if a cork_piece was splitted into two different clusters (Works best if the clusters inserted here are one after the other
     in the original cluster array, since this means they were clustered one after the other. Clusters where this didn't happend should belong
@@ -366,6 +254,8 @@ CloudInfo CorkIris::joinClusters(CloudInfo cluster0, CloudInfo cluster1)
 
 void CorkIris::paintClustersFull(CloudPtr cloud_out, std::vector<CloudInfo> clusters, IdxClustersPtr small_clusters, IdxClustersPtr large_clusters)
 {
+    std::sort(std::begin(clusters), std::end(clusters), [](const CloudInfo &a, const CloudInfo &b){return a.score > b.score;});
+
     for (int i = 0; i < small_clusters->size (); ++i)
     {
         for (int j = 0; j < (*small_clusters)[i].indices.size (); ++j)
@@ -393,22 +283,14 @@ void CorkIris::paintClusters(CloudPtr cloud_out, std::vector<CloudInfo> clusters
 {
     for (int i = 0; i < clusters.size(); ++i)
     {      
-        std::bitset<8> binary = std::bitset<8>(i);
 
         for (int j = 0; j < clusters[i].indices->indices.size (); ++j)
         {
-            if (i % 8 == 0) 
-            {
-                cloud_out->points[clusters[i].indices->indices[j]].r = 255;
-                cloud_out->points[clusters[i].indices->indices[j]].g = 150;
-                cloud_out->points[clusters[i].indices->indices[j]].b = 0;
-            }
-            else
-            {
-                cloud_out->points[clusters[i].indices->indices[j]].r = 255 * binary[0];
-                cloud_out->points[clusters[i].indices->indices[j]].g = 255 * binary[1];
-                cloud_out->points[clusters[i].indices->indices[j]].b = 255 * binary[2];
-            }   
+            std::vector<int> color = (i >= gradient_colors.size()) ? gradient_colors[gradient_colors.size()-1] : gradient_colors[i]; 
+            cloud_out->points[clusters[i].indices->indices[j]].r = color[0];
+            cloud_out->points[clusters[i].indices->indices[j]].g = color[1];
+            cloud_out->points[clusters[i].indices->indices[j]].b = color[2];            
+        
         }
     }  
 }
@@ -417,21 +299,7 @@ CloudInfo CorkIris::chooseBestCluster(std::vector<CloudInfo> cluster_clouds, Clo
 {
     Index idx = 0;
     cout << "Got cloudinfo: " << cluster_clouds.size() << endl;
-    // Debug print
-
-    // for(int i = 0; i < cluster_clouds.size(); i++){
-    //     cout << "Cluster " << colors[i%7] << endl;
-    //     float x = cluster_clouds[i].bb.maxPoint.x - cluster_clouds[i].bb.minPoint.x;
-    //     float y = cluster_clouds[i].bb.maxPoint.y - cluster_clouds[i].bb.minPoint.y;
-    //     float z = cluster_clouds[i].bb.maxPoint.z - cluster_clouds[i].bb.minPoint.z;
-    //     cout << "X MAX POINT -- " << x << endl;
-    //     cout << "Y MAX POINT -- " << y << endl;
-    //     cout << "Z MAX POINT -- " << z << endl;
-    //     cout << "% y/z -- " << (y/z) * 100 << "(" << (((y/z) * 100) > 50.0) << ")" << endl;
-    //     cout << "Total volume -- " << (x * y * z) << "(" <<  ((x*y*z) > 0.001) << ")" << endl;
-    //     cout << "-----" << endl;        
-    // }
-
+   
     if(chosen_cork_strip > -1 && chosen_cork_strip < cluster_clouds.size()){
         return cluster_clouds[chosen_cork_strip];
     }
@@ -441,61 +309,104 @@ CloudInfo CorkIris::chooseBestCluster(std::vector<CloudInfo> cluster_clouds, Clo
     }
 
     // // DEBUG SAVE CLUSTER CLOUDS TO INDIVIDUAL FILE
-
     // for(int i = 0; i < cluster_clouds.size(); i++){
     //     pcl::io::savePCDFile("./individual_cork_strip" + std::to_string(i) + ".pcd", *(cluster_clouds[i].cloud), true);
     // }
 
+
     Index highest_cloud_idx = getHighestCluster(cluster_clouds);
     CloudInfo highest_cloud = cluster_clouds[highest_cloud_idx];
 
-    double THRESHOLD_Z_DOWN = highest_cloud.bb.centroid.z() + z_threshold;
-    double THRESHOLD_Z_UP = (THRESHOLD_Z_DOWN - (2*z_threshold));
-    double THRESHOLD_CENTER = center_threshold;
-    // TODO: Distance to center should increase as cork pieces get removed?
+    Index largest_cloud_idx = getBiggestCluster(cluster_clouds);
+    CloudInfo largest_cloud = cluster_clouds[largest_cloud_idx];
 
-    for(int i = 0; i < cluster_clouds.size(); i++){
-        cout << "-------- Cluster " << colors[i%7] << "----------" << endl;
-       
-        if((cluster_clouds[i].bb.centroid.z() <= THRESHOLD_Z_DOWN) && (cluster_clouds[i].bb.centroid.z() > THRESHOLD_Z_UP))
-        {
-            cout << "Cluster " << colors[i%7] << " is high enough!" << endl;
-            float dist2center = sqrt((cluster_clouds[i].bb.centroid.x() * cluster_clouds[i].bb.centroid.x()) + (cluster_clouds[i].bb.centroid.y() * cluster_clouds[i].bb.centroid.y())); 
-            if(dist2center <= THRESHOLD_CENTER)
-            {
-                cout << "Cluster " << colors[i%7] << " is close to center!" << endl;
-                if(isThereSpace(cluster_clouds[i], fullPointCloud))
-                {
-                    cout << "There is space around " << colors[i%7] << endl;
-                    cout << "Cluster " << colors[i%7] << " is the chosen one!" << endl;
-                    cout << "========================================" << endl;
-                    return cluster_clouds[i];
-                }
-            }
-        }    
+    // Set the score for each parameter and calculate final score using the weights from dynamic reconfigure.
+    for(Index idx = 0; idx < cluster_clouds.size(); idx++)
+    {
+        cluster_clouds[idx].height_score = 1/(cluster_clouds[idx].average_height / highest_cloud.average_height);
+        cluster_clouds[idx].size_score = cluster_clouds[idx].cloud_size / largest_cloud.cloud_size;
+        cluster_clouds[idx].distance_score = cluster_clouds[idx].distance_manipulator / highest_cloud.distance_manipulator;
+
+        // TODO take into account the nr of points to grab or something related to that
+
+        cluster_clouds[idx].score = (cluster_clouds[idx].height_score * height_weight) 
+        + (cluster_clouds[idx].size_score * size_weight) 
+        + (cluster_clouds[idx].distance_score * distance_weight); 
+
+        std::cout << colors[idx%7] << " has an height of: " << cluster_clouds[idx].average_height << std::endl;
+        std::cout << colors[idx%7] << " has an size of: " << cluster_clouds[idx].cloud_size << std::endl;
+        std::cout << colors[idx%7] << " has an distance of: " << cluster_clouds[idx].distance_manipulator << std::endl;
+
+
+        std::cout << colors[idx%7] << " has an height score of: " << cluster_clouds[idx].height_score << std::endl;
+        std::cout << colors[idx%7] << " has a size score of: " << cluster_clouds[idx].size_score << std::endl;
+        std::cout << colors[idx%7] << " has distance score of: " << cluster_clouds[idx].distance_score << std::endl;
+        std::cout << colors[idx%7] << " has a score of: " << cluster_clouds[idx].score << std::endl;
+        std::cout << "------\n" << std::endl;
+
     }
 
-    cout << "No 100% choice was made. Choosing the first one of the bunch." << endl;
+    idx = getBestClusterToGrab(cluster_clouds);
+
     return cluster_clouds[idx];
 }
 
+// Chooses the cluster with the biggest "average_height" attribute from CloudInfo
 Index CorkIris::getHighestCluster(std::vector<CloudInfo> clusters)
 {
     if(clusters.size() == 0) return -1;
 
     Index idx = 0;
-    float highest = clusters[0].bb.centroid.z();
+    float highest = clusters[0].average_height;
+    cout << "highest: " << highest << endl;
     for(int i = 1; i < clusters.size(); i++)
     {
-        if(clusters[i].bb.centroid.z() <= highest)
+        if(clusters[i].average_height <= highest)
         {
-            highest = clusters[i].bb.centroid.z();
+            highest = clusters[i].average_height;
             idx = i;
         }
     }
     return idx;
 }
 
+// Chooses the cluster with the biggest "cloud_size" attribute from CloudInfo
+Index CorkIris::getBiggestCluster(std::vector<CloudInfo> clusters)
+{
+
+    if(clusters.size() == 0) return -1;
+
+    Index idx = 0;
+    float highest = clusters[0].cloud_size;
+    for(int i = 1; i < clusters.size(); i++)
+    {
+        if(clusters[i].cloud_size > highest)
+        {
+            highest = clusters[i].cloud_size;
+            idx = i;
+        }
+    }
+    return idx;
+
+}
+
+Index CorkIris::getBestClusterToGrab(std::vector<CloudInfo> clusters)
+{
+    if(clusters.size() == 0) return -1;
+
+    Index idx = 0;
+    float highest = clusters[0].score;
+    for(int i = 1; i < clusters.size(); i++)
+    {
+        if(clusters[i].score > highest)
+        {
+            highest = clusters[i].score;
+            idx = i;
+        }
+    }
+    return idx;
+
+}
 bool CorkIris::isThereSpace(CloudInfo cluster, CloudPtr fullCloud)
 {
     CloudPtr fullCloudNoCluster = PCLFunctions::subtractCloud(fullCloud, cluster.indices);

@@ -348,8 +348,6 @@ void synced_callback(const sensor_msgs::ImageConstPtr& image,
                 }
                 else if (display_type == 4) // Clustering extraction
                 {
-                    // cork_pieces organized = true
-                    cout << "before extraction" << cork_pieces->isOrganized() << endl;
 
                     CloudInfo cloud_cluster = CorkIris::clusterExtraction(cork_pieces, cork_pieces);
                     

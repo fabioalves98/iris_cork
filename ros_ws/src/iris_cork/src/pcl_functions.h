@@ -51,12 +51,7 @@ struct BoundingBox{
     Eigen::Vector4f centroid;
 };
 
-struct CloudInfo{
-    CloudPtr cloud;
-    CloudNormalPtr cloudNormal;
-    pcl::PointIndices::Ptr indices;
-    BoundingBox bb;
-};
+
 
 // Parameters
 static double roller_height_value;
